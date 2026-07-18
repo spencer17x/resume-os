@@ -1189,10 +1189,6 @@ a {
 .resume-studio__draft-actions > div { display: flex; gap: 4px; }
 .resume-studio__draft-actions button { display: inline-flex; min-width: 0; min-height: 30px; flex: 1; align-items: center; justify-content: center; gap: 4px; overflow: hidden; border: 1px solid var(--theme-line); border-radius: 5px; background: var(--theme-panel); padding: 4px 5px; font-size: 10px; text-overflow: ellipsis; }
 .resume-studio__draft-actions .resume-studio__danger { color: #d85f56; }
-.resume-studio__diagnostics { display: grid; gap: 6px; padding: 9px; border-top: 1px solid var(--theme-line); }
-.resume-studio__diagnostics > span { display: flex; align-items: center; gap: 5px; color: var(--theme-muted); font-size: 10px; }
-.resume-studio__diagnostics button { min-height: 28px; border: 1px solid var(--theme-line); border-radius: 5px; background: var(--theme-panel); font-size: 10px; }
-.resume-studio__diagnostics output { overflow: hidden; color: var(--theme-accent-soft); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 
 .resume-studio__workspace { display: flex; flex-direction: column; border-right: 1px solid var(--theme-line); }
 .resume-studio__toolbar { display: flex; min-height: 42px; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 9px; border-bottom: 1px solid var(--theme-line); }
@@ -1867,10 +1863,7 @@ a {
 .settings-app__provider-options small,
 .settings-app__cloud-fallback small { color: var(--theme-muted); font-size: 9px; line-height: 1.45; }
 .settings-app__cloud-fallback { border-style: dashed; }
-.settings-app__local-diagnostics { display: grid; justify-items: end; gap: 7px; }
-.settings-app__local-diagnostics > p { max-width: 440px; margin: 0; color: var(--theme-muted); font-size: 10px; line-height: 1.45; text-align: right; }
-.settings-app__local-diagnostics output { max-width: 440px; color: var(--theme-accent-soft); font-size: 10px; line-height: 1.45; overflow-wrap: anywhere; text-align: right; }
-.settings-app__local-diagnostics output[data-state='error'] { color: #d85f56; }
+.settings-app__provider-boundary { max-width: 440px; margin: 0; color: var(--theme-muted); font-size: 10px; line-height: 1.45; text-align: right; }
 .settings-app__ai-config { display: grid; width: min(440px, 48vw); gap: 9px; }
 .settings-app__adapter { display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid var(--theme-line); border-radius: 6px; background: color-mix(in srgb, var(--theme-panel) 64%, transparent); padding: 7px 9px; font-size: 10px; }
 .settings-app__adapter span,
@@ -1886,6 +1879,7 @@ a {
 .settings-app__ai-actions { display: flex; justify-content: flex-end; gap: 7px; }
 .settings-app__ai-config output { color: var(--theme-accent-soft); font-size: 10px; line-height: 1.45; text-align: right; }
 .settings-app__diagnostics { display: grid; justify-items: end; gap: 7px; }
+.settings-app__diagnostics > span { color: var(--theme-muted); font-size: 10px; }
 .settings-app__diagnostics output { max-width: 340px; color: var(--theme-accent-soft); font-size: 10px; overflow-wrap: anywhere; text-align: right; }
 .settings-app__diagnostics output[data-state='error'] { color: #d85f56; }
 
@@ -1909,11 +1903,10 @@ a {
   .settings-app__ai-config input[type='password'] { min-height: 44px; }
   .settings-app__ai-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .settings-app__confirm span,
-  .settings-app__local-diagnostics output,
   .settings-app__ai-config output,
   .settings-app__diagnostics output { text-align: left; }
-  .settings-app__local-diagnostics,
   .settings-app__diagnostics { justify-items: stretch; }
+  .settings-app__provider-boundary { text-align: left; }
 }
 .motion-mode-control--compact { max-width: 180px; flex: 0 1 auto; padding: 1px; }
 .motion-mode-control--compact .motion-mode-control__option { min-width: 0; min-height: 20px; overflow: hidden; padding: 2px 5px; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }

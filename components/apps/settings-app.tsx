@@ -25,7 +25,14 @@ import {
   type AiProviderMode,
   type AiProviderPreference
 } from '@/lib/agent/provider-preference'
-import { ChromeBuiltInAiProvider, type ResumeAgentTask } from '@/lib/agent/providers'
+import {
+  ChromeBuiltInAiError,
+  ChromeBuiltInAiProvider,
+  ProviderRoutingError,
+  runPreferredProviderTask,
+  type StructuredTaskInput,
+  type StructuredTaskResult
+} from '@/lib/agent/providers'
 import { clearDesktopState } from '@/lib/desktop/persistence'
 
 const locales: readonly Locale[] = ['zh', 'en']
@@ -35,6 +42,16 @@ const providerOptions = [
   { mode: 'automatic', messageKey: 'automatic' }
 ] as const satisfies readonly { mode: AiProviderMode; messageKey: string }[]
 const DIAGNOSTIC_TIMEOUT_MS = 65_000
+const AI_DIAGNOSTIC_JSON_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    status: { type: 'string', enum: ['ok'] }
+  },
+  required: ['status']
+}
+
+type AiDiagnosticResult = { status: 'ok' }
 
 export function SettingsApp(_props: { appId: AppId }) {
   return <ThemePreferenceProvider>
@@ -62,10 +79,9 @@ function SettingsContent() {
   const [providerPreference, setProviderPreference] = useState<AiProviderPreference>(
     DEFAULT_AI_PROVIDER_PREFERENCE
   )
-  const [chromeDiagnosticState, setChromeDiagnosticState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
-  const [chromeDiagnosticMessage, setChromeDiagnosticMessage] = useState('')
   const [diagnosticState, setDiagnosticState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [diagnosticMessage, setDiagnosticMessage] = useState('')
+  const [downloadProgress, setDownloadProgress] = useState<number | null>(null)
   const [isPending, startTransition] = useTransition()
 
   useEffect(() => {
@@ -156,6 +172,9 @@ function SettingsContent() {
     }
     saveAiProviderPreference(next)
     setProviderPreference(next)
+    setDiagnosticMessage('')
+    setDiagnosticState('idle')
+    setDownloadProgress(null)
   }
 
   function setCloudFallback(allowCloudFallback: boolean) {
@@ -163,28 +182,9 @@ function SettingsContent() {
     const next = { ...providerPreference, allowCloudFallback }
     saveAiProviderPreference(next)
     setProviderPreference(next)
-  }
-
-  async function runChromeDiagnostics() {
-    setChromeDiagnosticState('loading')
-    setChromeDiagnosticMessage(t('chromeAvailability.checking'))
-    const language = locale === 'zh' ? 'zh' : 'en'
-    const task: ResumeAgentTask = {
-      kind: 'review-resume',
-      expectedInputLanguages: [language],
-      expectedOutputLanguages: [language]
-    }
-
-    try {
-      const availability = await new ChromeBuiltInAiProvider().availability(task)
-      setChromeDiagnosticState(availability === 'unavailable' ? 'error' : 'success')
-      setChromeDiagnosticMessage(t(`chromeAvailability.${availability}`, {
-        language: t(`languages.${locale}`)
-      }))
-    } catch {
-      setChromeDiagnosticState('error')
-      setChromeDiagnosticMessage(t('chromeAvailability.error'))
-    }
+    setDiagnosticMessage('')
+    setDiagnosticState('idle')
+    setDownloadProgress(null)
   }
 
   async function runDiagnostics() {
@@ -192,32 +192,107 @@ function SettingsContent() {
     const timeout = window.setTimeout(() => controller.abort(), DIAGNOSTIC_TIMEOUT_MS)
     setDiagnosticState('loading')
     setDiagnosticMessage(t('diagnosticsChecking'))
+    setDownloadProgress(null)
     try {
-      const response = await aiFetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ locale, message: t('diagnosticsPrompt') }),
-        signal: controller.signal
+      const localCopy = locale === 'zh'
+        ? {
+            system: '你是本地 AI 连接诊断器。只能返回符合 JSON Schema 的结果。',
+            prompt: '返回 {"status":"ok"}。'
+          }
+        : {
+            system: 'You are a local AI connection diagnostic. Return only JSON that matches the schema.',
+            prompt: 'Return {"status":"ok"}.'
+          }
+      const input: StructuredTaskInput<AiDiagnosticResult> = {
+        task: {
+          kind: 'review-resume',
+          expectedInputLanguages: [locale],
+          expectedOutputLanguages: [locale]
+        },
+        system: localCopy.system,
+        prompt: localCopy.prompt,
+        jsonSchema: AI_DIAGNOSTIC_JSON_SCHEMA,
+        validate(value) {
+          if (
+            typeof value !== 'object'
+            || value === null
+            || (value as { status?: unknown }).status !== 'ok'
+          ) {
+            throw new TypeError('Invalid AI diagnostic response.')
+          }
+          return { status: 'ok' }
+        },
+        signal: controller.signal,
+        onDownloadProgress(progress) {
+          setDownloadProgress(progress)
+        }
+      }
+      const result = await runPreferredProviderTask({
+        preference: providerPreference,
+        localProvider: new ChromeBuiltInAiProvider(),
+        input,
+        runCloudTask: () => runCloudDiagnostic(controller.signal)
       })
-      const body = await response.json().catch(() => ({})) as {
-        model?: unknown
-        code?: unknown
-        error?: { code?: unknown }
-      }
-      if (!response.ok) {
-        const code = typeof body.code === 'string' ? body.code : body.error?.code
-        const knownCode = typeof code === 'string' && errors.has(code)
-        throw new Error(knownCode ? errors(code) : t('diagnosticsError'))
-      }
-      if (typeof body.model !== 'string' || !body.model.trim()) throw new Error(t('diagnosticsError'))
+      const provider = result.provider === 'OpenAI-compatible'
+        ? t('providers.openAiCompatible')
+        : t('providers.chromeBuiltIn')
       setDiagnosticState('success')
-      setDiagnosticMessage(t('diagnosticsModel', { model: body.model }))
+      setDiagnosticMessage(t('diagnosticsConnected', {
+        provider,
+        model: result.model
+      }))
     } catch (error) {
       setDiagnosticState('error')
-      setDiagnosticMessage(error instanceof Error ? error.message : t('diagnosticsError'))
+      setDiagnosticMessage(diagnosticError(error))
     } finally {
       window.clearTimeout(timeout)
+      setDownloadProgress(null)
     }
+  }
+
+  async function runCloudDiagnostic(signal: AbortSignal): Promise<StructuredTaskResult<AiDiagnosticResult>> {
+    const response = await aiFetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locale, message: t('diagnosticsPrompt') }),
+      signal
+    })
+    const body = await response.json().catch(() => ({})) as {
+      model?: unknown
+      code?: unknown
+      error?: { code?: unknown }
+    }
+    if (!response.ok) {
+      const code = typeof body.code === 'string' ? body.code : body.error?.code
+      const knownCode = typeof code === 'string' && errors.has(code)
+      throw new Error(knownCode ? errors(code) : t('diagnosticsError'))
+    }
+    if (typeof body.model !== 'string' || !body.model.trim()) {
+      throw new Error(t('diagnosticsError'))
+    }
+    return {
+      value: { status: 'ok' },
+      provider: 'OpenAI-compatible',
+      model: body.model
+    }
+  }
+
+  function diagnosticError(error: unknown) {
+    if (error instanceof ProviderRoutingError) return t('diagnosticErrors.cloudFallbackNotAllowed')
+    if (error instanceof ChromeBuiltInAiError) {
+      switch (error.code) {
+        case 'MODEL_UNAVAILABLE':
+          if (!('LanguageModel' in globalThis)) return t('diagnosticErrors.apiUnavailable')
+          return t('diagnosticErrors.localModelUnavailable', { language: t(`languages.${locale}`) })
+        case 'USER_ACTIVATION_REQUIRED':
+          return t('diagnosticErrors.userActivationRequired')
+        case 'CONTEXT_LIMIT_EXCEEDED':
+          return t('diagnosticErrors.contextLimitExceeded')
+        case 'INVALID_MODEL_OUTPUT':
+          return t('diagnosticErrors.invalidModelOutput')
+      }
+    }
+    return error instanceof Error ? error.message : t('diagnosticsError')
   }
 
   return <section className="desktop-app-content settings-app" aria-labelledby="settings-title">
@@ -316,21 +391,7 @@ function SettingsContent() {
             </span>
           </label> : null}
 
-          <div className="settings-app__local-diagnostics">
-            <p>{t('chromeLanguageBoundary')}</p>
-            <button
-              className="settings-app__command"
-              type="button"
-              onClick={runChromeDiagnostics}
-              disabled={chromeDiagnosticState === 'loading'}
-            >
-              <Cpu size={16} aria-hidden="true" />
-              {chromeDiagnosticState === 'loading' ? t('chromeAvailability.checking') : t('checkChromeAvailability')}
-            </button>
-            {chromeDiagnosticMessage ? <output role="status" aria-live="polite" data-state={chromeDiagnosticState}>
-              {chromeDiagnosticMessage}
-            </output> : null}
-          </div>
+          <p className="settings-app__provider-boundary">{t('chromeLanguageBoundary')}</p>
         </div>
       </section>
 
@@ -396,18 +457,24 @@ function SettingsContent() {
         </div>
       </section> : null}
 
-      {providerPreference.mode !== 'chrome-built-in' ? <section aria-labelledby="settings-diagnostics">
+      <section aria-labelledby="settings-diagnostics">
         <div className="settings-app__section-copy">
           <h2 id="settings-diagnostics">{t('diagnostics')}</h2>
           <p>{t('diagnosticsDescription')}</p>
         </div>
         <div className="settings-app__diagnostics">
           <button className="settings-app__command" type="button" onClick={runDiagnostics} disabled={diagnosticState === 'loading'}>
-            <Activity size={16} aria-hidden="true" />{diagnosticState === 'loading' ? t('diagnosticsChecking') : t('runDiagnostics')}
+            {providerPreference.mode === 'chrome-built-in'
+              ? <Cpu size={16} aria-hidden="true" />
+              : <Activity size={16} aria-hidden="true" />}
+            {diagnosticState === 'loading' ? t('diagnosticsChecking') : t('runDiagnostics')}
           </button>
+          {downloadProgress !== null ? <span>{t('diagnosticsDownload', {
+            progress: Math.round(downloadProgress * 100)
+          })}</span> : null}
           {diagnosticMessage ? <output role="status" aria-live="polite" data-state={diagnosticState}>{diagnosticMessage}</output> : null}
         </div>
-      </section> : null}
+      </section>
     </div>
   </section>
 }

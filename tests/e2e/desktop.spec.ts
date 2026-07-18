@@ -438,7 +438,7 @@ test('keeps a BYOK key local and attaches it only to the AI diagnostic request',
   const settings = page.getByRole('application', { name: 'Settings' })
   await settings.getByLabel('API Base URL').fill('https://api.openai.com/v1')
   await settings.getByLabel('Model', { exact: true }).fill('e2e-model')
-  await settings.getByLabel('API Key').fill('e2e-user-key')
+  await settings.getByLabel('API Key', { exact: true }).fill('e2e-user-key')
   await settings.getByRole('button', { name: 'Save AI configuration' }).click()
   await expect(settings.getByRole('status')).toContainText('this session')
 
@@ -456,8 +456,8 @@ test('keeps a BYOK key local and attaches it only to the AI diagnostic request',
   expect(storage.localKey).toBeNull()
   expect(storage.sessionKey).toBe('e2e-user-key')
 
-  await settings.getByRole('button', { name: 'Run AI diagnostics' }).click()
-  await expect(settings.getByText('Connected model: e2e-model')).toBeVisible()
+  await settings.getByRole('button', { name: 'Check selected AI' }).click()
+  await expect(settings.getByText('Check succeeded: Self-configured AI · e2e-model')).toBeVisible()
   expect(requestHeaders).toMatchObject({
     'x-resume-os-ai-key': 'e2e-user-key',
     'x-resume-os-ai-base-url': 'https://api.openai.com/v1',

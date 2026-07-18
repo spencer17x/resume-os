@@ -104,10 +104,10 @@ describe('SettingsApp', () => {
       rememberApiKey: false
     })
     renderSettings()
-    await waitFor(() => expect(screen.getByRole('radio', { name: /OpenAI-compatible/ })).toBeChecked())
+    await waitFor(() => expect(screen.getByRole('radio', { name: /Self-configured AI/ })).toBeChecked())
 
     expect(screen.queryByRole('checkbox', { name: /Allow explicit cloud fallback/ })).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('radio', { name: /^Automatic/ }))
+    fireEvent.click(screen.getByRole('radio', { name: /^Automatic selection/ }))
 
     const fallback = screen.getByRole('checkbox', { name: /Allow explicit cloud fallback/ })
     expect(fallback).not.toBeChecked()
@@ -122,7 +122,7 @@ describe('SettingsApp', () => {
       allowCloudFallback: true
     })
 
-    fireEvent.click(screen.getByRole('radio', { name: /Chrome Built-in AI/ }))
+    fireEvent.click(screen.getByRole('radio', { name: /Local Chrome AI/ }))
     expect(screen.queryByRole('checkbox', { name: /Allow explicit cloud fallback/ })).not.toBeInTheDocument()
     expect(screen.queryByLabelText('API Key')).not.toBeInTheDocument()
     expect(readAiProviderPreference()).toEqual({
@@ -137,18 +137,45 @@ describe('SettingsApp', () => {
     })
   })
 
-  it('checks Chrome Built-in AI availability without sending a cloud request', async () => {
-    const availability = vi.fn().mockResolvedValue('readily')
-    vi.stubGlobal('LanguageModel', { availability })
+  it('runs a real local prompt when Local Chrome AI is selected', async () => {
+    const availability = vi.fn().mockResolvedValue('available')
+    const prompt = vi.fn().mockResolvedValue('{"status":"ok"}')
+    const destroy = vi.fn()
+    const create = vi.fn().mockResolvedValue({
+      contextUsage: 0,
+      contextWindow: 1024,
+      measureContextUsage: vi.fn().mockResolvedValue(12),
+      prompt,
+      destroy
+    })
+    vi.stubGlobal('LanguageModel', { availability, create })
     renderSettings()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Check Chrome local model' }))
+    fireEvent.click(screen.getByRole('radio', { name: /Local Chrome AI/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Check selected AI' }))
 
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Available for English'))
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Local Chrome AI (Beta) · browser-managed'))
     expect(availability).toHaveBeenCalledWith({
       expectedInputs: [{ type: 'text', languages: ['en'] }],
       expectedOutputs: [{ type: 'text', languages: ['en'] }]
     })
+    expect(create).toHaveBeenCalledOnce()
+    expect(prompt).toHaveBeenCalledWith('Return {"status":"ok"}.', expect.objectContaining({
+      responseConstraint: expect.objectContaining({ type: 'object' })
+    }))
+    expect(destroy).toHaveBeenCalledOnce()
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('distinguishes a missing Chrome Prompt API from language or model unavailability', async () => {
+    renderSettings()
+
+    fireEvent.click(screen.getByRole('radio', { name: /Local Chrome AI/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Check selected AI' }))
+
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(
+      'does not expose the built-in Prompt API'
+    ))
     expect(fetch).not.toHaveBeenCalled()
   })
 
@@ -159,7 +186,7 @@ describe('SettingsApp', () => {
     }))
     renderSettings()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Run AI diagnostics' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Check selected AI' }))
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('qwen-plus'))
     expect(fetch).toHaveBeenCalledWith('/api/chat', expect.objectContaining({
       method: 'POST',
@@ -193,7 +220,7 @@ describe('SettingsApp', () => {
       rememberApiKey: false
     })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Run AI diagnostics' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Check selected AI' }))
     await waitFor(() => expect(fetch).toHaveBeenCalled())
     const headers = new Headers(vi.mocked(fetch).mock.calls.at(-1)?.[1]?.headers)
     expect(headers.get(AI_API_KEY_HEADER)).toBe('user-owned-key')

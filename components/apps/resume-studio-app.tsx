@@ -1,7 +1,6 @@
 'use client'
 
 import {
-  Activity,
   ClipboardPaste,
   FileText,
   LoaderCircle,
@@ -42,14 +41,14 @@ import {
 
 type SourceMode = 'paste' | 'upload' | 'generate'
 type Seniority = 'junior' | 'mid' | 'senior' | 'lead'
-type PendingAction = 'parse' | 'upload' | 'generate' | 'diagnostics' | null
-type CooldownBucket = 'extract' | 'parse' | 'generate' | 'diagnostics'
+type PendingAction = 'parse' | 'upload' | 'generate' | null
+type CooldownBucket = 'extract' | 'parse' | 'generate'
 type Cooldowns = Record<CooldownBucket, number>
 
 type ResumeResult = { data: ResumeData; model: string }
 
 const SOURCE_MODES: SourceMode[] = ['paste', 'upload', 'generate']
-const EMPTY_COOLDOWNS: Cooldowns = { extract: 0, parse: 0, generate: 0, diagnostics: 0 }
+const EMPTY_COOLDOWNS: Cooldowns = { extract: 0, parse: 0, generate: 0 }
 const LOCALIZED_ERROR_CODES = new Set([
   'AI_PUBLIC_ACCESS_DISABLED',
   'AI_ACCESS_MISCONFIGURED',
@@ -112,7 +111,6 @@ export function ResumeStudioApp({
   const [pending, setPending] = useState<PendingAction>(null)
   const [error, setError] = useState('')
   const [model, setModel] = useState('')
-  const [diagnostic, setDiagnostic] = useState('')
   const [streamingResume, setStreamingResume] = useState<ResumeData | null>(null)
   const [deleteConfirmId, setDeleteConfirmId] = useState('')
   const [deletePending, setDeletePending] = useState(false)
@@ -154,8 +152,7 @@ export function ResumeStudioApp({
       setCooldowns((current) => ({
         extract: Math.max(0, current.extract - 1),
         parse: Math.max(0, current.parse - 1),
-        generate: Math.max(0, current.generate - 1),
-        diagnostics: Math.max(0, current.diagnostics - 1)
+        generate: Math.max(0, current.generate - 1)
       }))
     }, 1_000)
     return () => window.clearInterval(timer)
@@ -367,26 +364,6 @@ export function ResumeStudioApp({
     setStreamingResume(null)
   }
 
-  async function checkDiagnostics() {
-    const operation = beginOperation('diagnostics')
-    setDiagnostic('')
-    try {
-      requireCloudProviderConsent('diagnostics')
-      const result = await requestJson<{ model?: string }>('/api/chat', {
-        locale,
-        message: t('diagnosticPrompt')
-      }, operation.controller.signal, 'diagnostics')
-      if (!isCurrentRequest(operation.generation, operation.controller)) return
-      setDiagnostic(result.model || t('diagnosticSuccess'))
-    } catch (requestError) {
-      if (isCurrentRequest(operation.generation, operation.controller)) {
-        setError(localizedRequestError(requestError, t('diagnosticError')))
-      }
-    } finally {
-      finishOperation(operation.generation, operation.controller)
-    }
-  }
-
   function selectMode(nextMode: SourceMode) {
     if (nextMode === mode) return
     cancelActiveOperation()
@@ -526,13 +503,6 @@ export function ResumeStudioApp({
           )}
         </div>
 
-        <div className="resume-studio__diagnostics">
-          <span><Activity aria-hidden="true" size={14} />{t('diagnostics')}</span>
-          <button type="button" disabled={busy || cooldowns.diagnostics > 0} onClick={checkDiagnostics}>
-            {pending === 'diagnostics' ? t('checking') : t('checkService')}
-          </button>
-          {diagnostic ? <output aria-live="polite">{diagnostic}</output> : null}
-        </div>
       </aside>
 
       <main className="resume-studio__workspace">

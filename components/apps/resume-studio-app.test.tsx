@@ -509,7 +509,6 @@ describe('ResumeStudioApp', () => {
 
     expect(screen.getByRole('alert')).toHaveTextContent('Too many requests. Try again in 1 second.')
     expect(screen.getByRole('button', { name: 'Generate demo resume' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Check AI service' })).toBeEnabled()
 
     await user.click(screen.getByRole('tab', { name: 'Paste' }))
     expect(screen.getByRole('button', { name: 'Create draft' })).toBeEnabled()
@@ -620,19 +619,6 @@ describe('ResumeStudioApp', () => {
     })
     await waitFor(() => expect(screen.queryByRole('heading', { name: 'Stale' })).not.toBeInTheDocument())
     expect(screen.getAllByRole('button', { name: /^Open / })).toHaveLength(1)
-  })
-
-  it('maps diagnostics error codes to localized messages instead of server prose', async () => {
-    const user = userEvent.setup()
-    fetchMock.mockResolvedValueOnce(jsonResponse({
-      error: { code: 'AI_NOT_CONFIGURED', message: 'OPENAI_API_KEY raw detail' }
-    }, 503))
-    renderStudio()
-
-    await user.click(screen.getByRole('button', { name: 'Check AI service' }))
-
-    expect(await screen.findByRole('alert')).toHaveTextContent('configuration is missing or unavailable')
-    expect(screen.getByRole('alert')).not.toHaveTextContent('OPENAI_API_KEY')
   })
 
   it('implements linked ARIA tab panels and roving keyboard navigation', async () => {
