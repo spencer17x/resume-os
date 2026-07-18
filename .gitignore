@@ -1,0 +1,14 @@
+node_modules
+.next
+out
+.vercel
+.worktrees/
+
+# Local brainstorming mockups and state
+.superpowers/
+.claude/settings.local.json
+
+# Local environment files; keep only the sanitized template tracked.
+.env*
+!.env.example
+.DS_Store
