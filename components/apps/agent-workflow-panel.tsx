@@ -22,6 +22,7 @@ import {
   ChromeBuiltInAiError,
   ChromeBuiltInAiProvider,
   ProviderRoutingError,
+  localLanguagePolicyForLocale,
   runPreferredProviderTask,
   type StructuredTaskInput
 } from '@/lib/agent/providers'
@@ -462,7 +463,8 @@ export function createAgentWorkspaceService(): AgentWorkspaceService {
         task: {
           kind: 'prepare-optimization-plan',
           expectedInputLanguages: [input.locale],
-          expectedOutputLanguages: [input.locale]
+          expectedOutputLanguages: [input.locale],
+          localLanguagePolicy: localLanguagePolicyForLocale(input.locale)
         },
         system: prompt.system,
         prompt: prompt.user,

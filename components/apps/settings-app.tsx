@@ -29,6 +29,7 @@ import {
   ChromeBuiltInAiError,
   ChromeBuiltInAiProvider,
   ProviderRoutingError,
+  localLanguagePolicyForLocale,
   runPreferredProviderTask,
   type StructuredTaskInput,
   type StructuredTaskResult
@@ -207,7 +208,8 @@ function SettingsContent() {
         task: {
           kind: 'review-resume',
           expectedInputLanguages: [locale],
-          expectedOutputLanguages: [locale]
+          expectedOutputLanguages: [locale],
+          localLanguagePolicy: localLanguagePolicyForLocale(locale)
         },
         system: localCopy.system,
         prompt: localCopy.prompt,
@@ -233,11 +235,15 @@ function SettingsContent() {
         input,
         runCloudTask: () => runCloudDiagnostic(controller.signal)
       })
-      const provider = result.provider === 'OpenAI-compatible'
+      const usedCloudProvider = result.provider === 'OpenAI-compatible'
+      const provider = usedCloudProvider
         ? t('providers.openAiCompatible')
         : t('providers.chromeBuiltIn')
       setDiagnosticState('success')
-      setDiagnosticMessage(t('diagnosticsConnected', {
+      setDiagnosticMessage(t(
+        !usedCloudProvider && locale === 'zh'
+          ? 'diagnosticsConnectedBestEffort'
+          : 'diagnosticsConnected', {
         provider,
         model: result.model
       }))

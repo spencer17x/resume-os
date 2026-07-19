@@ -546,13 +546,13 @@
       "automatic": "自动选择"
     },
     "providerDescriptions": {
-      "chromeBuiltIn": "使用 Chrome 管理的设备端模型，不需要 API Key。",
+      "chromeBuiltIn": "使用 Chrome 管理的设备端模型；中文以实验性尽力模式运行，不需要 API Key。",
       "openAiCompatible": "使用你填写的 Base URL、模型和 API Key。",
       "automatic": "优先本地模型；无法运行任务时停止，除非已允许云端回退。"
     },
     "allowCloudFallback": "允许显式云端回退",
     "allowCloudFallbackDescription": "保存此项即代表你同意：本地模型不可用或无法容纳这个有界任务时，Resume OS 可仅将任务所需上下文发送到你配置的云端 Provider。",
-    "chromeLanguageBoundary": "本地检查会按当前界面语言执行真实 Prompt；Chrome 不支持该语言时会明确提示。",
+    "chromeLanguageBoundary": "Chrome 尚未正式保证 Prompt API 中文输出。中文任务会使用实验性本地尽力模式，仍需通过结构化校验，且没有已保存授权时绝不会转到云端。",
     "aiProvider": "自配置 AI",
     "aiProviderDescription": "填写 OpenAI-compatible 接口；自定义服务域名需要部署者加入允许列表。",
     "aiPrivacyNote": "密钥与职业数据默认保留在当前浏览器；执行 AI 任务时，仅将必要上下文发送给你选择的服务，Resume OS 服务端不会持久化。",
@@ -576,6 +576,7 @@
     "diagnosticsDownload": "Chrome 正在下载或更新本地模型资源：{progress}%",
     "diagnosticsPrompt": "请用一句话返回服务状态。",
     "diagnosticsConnected": "检查成功：{provider} · {model}",
+    "diagnosticsConnectedBestEffort": "实验性中文本地检查成功：{provider} · {model}",
     "diagnosticsError": "AI 检查失败。",
     "diagnosticErrors": {
       "apiUnavailable": "当前 Chrome 未提供内置 Prompt API（window.LanguageModel）。请使用支持该功能的 Chrome 版本，并确认设备符合要求且已启用内置 AI。",

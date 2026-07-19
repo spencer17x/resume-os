@@ -41,6 +41,7 @@ import {
   ChromeBuiltInAiError,
   ChromeBuiltInAiProvider,
   ProviderRoutingError,
+  localLanguagePolicyForLocale,
   runPreferredProviderTask,
   type StructuredTaskInput
 } from '@/lib/agent/providers'
@@ -224,7 +225,8 @@ export function JDMatchApp({
         task: {
           kind: 'extract-job-requirements',
           expectedInputLanguages: [locale],
-          expectedOutputLanguages: [locale]
+          expectedOutputLanguages: [locale],
+          localLanguagePolicy: localLanguagePolicyForLocale(locale)
         },
         system: prompt.system,
         prompt: prompt.user,

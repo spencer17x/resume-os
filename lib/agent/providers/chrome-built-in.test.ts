@@ -113,6 +113,61 @@ describe('Chrome Built-in AI provider', () => {
     expect(session.destroy).toHaveBeenCalledOnce()
   })
 
+  it('runs an explicitly opted-in language without declaring unsupported capabilities', async () => {
+    const session = createSession()
+    const languageModel = createLanguageModel(session)
+    const provider = new ChromeBuiltInAiProvider({ languageModel })
+    const bestEffortTask: ResumeAgentTask = {
+      kind: 'extract-job-requirements',
+      expectedInputLanguages: ['zh'],
+      expectedOutputLanguages: ['zh'],
+      localLanguagePolicy: 'best-effort'
+    }
+
+    await provider.runStructuredTask({
+      task: bestEffortTask,
+      system: '只返回符合结构的岗位要求。',
+      prompt: '高级前端工程师职位描述',
+      jsonSchema: schema,
+      validate: (value) => value
+    })
+
+    expect(languageModel.availability.mock.calls).toEqual([[]])
+    expect(languageModel.create).toHaveBeenCalledWith({
+      initialPrompts: [{ role: 'system', content: '只返回符合结构的岗位要求。' }]
+    })
+    expect(languageModel.create.mock.calls[0]?.[0]).not.toHaveProperty('expectedInputs')
+    expect(languageModel.create.mock.calls[0]?.[0]).not.toHaveProperty('expectedOutputs')
+    expect(session.prompt).toHaveBeenCalledWith(
+      '高级前端工程师职位描述',
+      { responseConstraint: schema }
+    )
+    expect(session.destroy).toHaveBeenCalledOnce()
+  })
+
+  it('normalizes a rejected best-effort language prompt without losing cleanup', async () => {
+    const session = createSession({
+      prompt: vi.fn().mockRejectedValue(new DOMException('Unsupported language', 'NotSupportedError'))
+    })
+    const provider = new ChromeBuiltInAiProvider({
+      languageModel: createLanguageModel(session)
+    })
+
+    await expect(provider.runStructuredTask({
+      task: {
+        kind: 'review-resume',
+        expectedInputLanguages: ['zh'],
+        expectedOutputLanguages: ['zh'],
+        localLanguagePolicy: 'best-effort'
+      },
+      system: '只返回结果。',
+      prompt: '检查简历。',
+      jsonSchema: schema,
+      validate: (value) => value
+    })).rejects.toMatchObject({ code: 'MODEL_UNAVAILABLE' })
+    expect(session.destroy).toHaveBeenCalledOnce()
+  })
+
   it('requires user activation before starting a model download', async () => {
     const session = createSession()
     const languageModel = createLanguageModel(session, 'downloadable')

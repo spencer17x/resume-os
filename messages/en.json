@@ -546,13 +546,13 @@
       "automatic": "Automatic selection"
     },
     "providerDescriptions": {
-      "chromeBuiltIn": "Use Chrome's browser-managed on-device model; no API key is needed.",
+      "chromeBuiltIn": "Use Chrome's browser-managed on-device model; Chinese runs in an experimental best-effort mode without an API key.",
       "openAiCompatible": "Use the Base URL, model, and API key you provide below.",
       "automatic": "Prefer the local model; stop when it cannot run the task unless fallback is allowed."
     },
     "allowCloudFallback": "Allow explicit cloud fallback",
     "allowCloudFallbackDescription": "Your saved consent lets Resume OS send only the required task context to your configured cloud provider when the local model is unavailable or cannot fit the bounded task.",
-    "chromeLanguageBoundary": "The local check runs a real prompt in the current interface language and reports when Chrome does not support that language.",
+    "chromeLanguageBoundary": "Chrome does not officially guarantee Chinese Prompt API output yet. Chinese tasks use an experimental best-effort local session, remain schema-validated, and never cross to cloud without saved consent.",
     "aiProvider": "Self-configured AI",
     "aiProviderDescription": "Configure an OpenAI-compatible endpoint. Custom service hosts must be allowed by the deployment.",
     "aiPrivacyNote": "Your key and career data stay in this browser until an AI task sends the necessary context to your chosen provider. Resume OS does not persist them on its server.",
@@ -576,6 +576,7 @@
     "diagnosticsDownload": "Chrome is downloading or updating local model resources: {progress}%",
     "diagnosticsPrompt": "Reply with a short service status.",
     "diagnosticsConnected": "Check succeeded: {provider} · {model}",
+    "diagnosticsConnectedBestEffort": "Experimental Chinese local check succeeded: {provider} · {model}",
     "diagnosticsError": "AI check failed.",
     "diagnosticErrors": {
       "apiUnavailable": "This Chrome does not expose the built-in Prompt API (window.LanguageModel). Use a supported Chrome version and make sure built-in AI is enabled on an eligible device.",

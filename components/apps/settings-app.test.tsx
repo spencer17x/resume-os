@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { NextIntlClientProvider } from 'next-intl'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import en from '@/messages/en.json'
+import zh from '@/messages/zh.json'
 import { MotionPreferenceProvider } from '@/components/desktop/motion-preference'
 import { ThemePreferenceProvider } from '@/components/theme-preference'
 import { DESKTOP_STORAGE_KEY } from '@/lib/desktop/persistence'
@@ -32,9 +33,9 @@ vi.mock('@/components/desktop/desktop-provider', async (importOriginal) => {
   return { ...original, useOptionalDesktop: () => ({ resetDesktop }) }
 })
 
-function renderSettings() {
+function renderSettings(locale: 'zh' | 'en' = 'en') {
   return render(
-    <NextIntlClientProvider locale="en" messages={en}>
+    <NextIntlClientProvider locale={locale} messages={locale === 'zh' ? zh : en}>
       <ThemePreferenceProvider>
         <MotionPreferenceProvider>
           <SettingsApp appId="settings" />
@@ -164,6 +165,41 @@ describe('SettingsApp', () => {
       responseConstraint: expect.objectContaining({ type: 'object' })
     }))
     expect(destroy).toHaveBeenCalledOnce()
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('runs Chinese locally in best-effort mode without claiming official language support', async () => {
+    const availability = vi.fn().mockResolvedValue('available')
+    const prompt = vi.fn().mockResolvedValue('{"status":"ok"}')
+    const create = vi.fn().mockResolvedValue({
+      contextUsage: 0,
+      contextWindow: 1024,
+      measureContextUsage: vi.fn().mockResolvedValue(12),
+      prompt,
+      destroy: vi.fn()
+    })
+    vi.stubGlobal('LanguageModel', { availability, create })
+    renderSettings('zh')
+
+    fireEvent.click(screen.getByRole('radio', { name: /本地 Chrome AI/ }))
+    fireEvent.click(screen.getByRole('button', { name: '检查当前 AI' }))
+
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(
+      '实验性中文本地检查成功'
+    ))
+    expect(availability.mock.calls).toEqual([[]])
+    const createOptions = create.mock.calls[0]?.[0]
+    expect(createOptions).not.toHaveProperty('expectedInputs')
+    expect(createOptions).not.toHaveProperty('expectedOutputs')
+    expect(createOptions).toMatchObject({
+      initialPrompts: [{
+        role: 'system',
+        content: '你是本地 AI 连接诊断器。只能返回符合 JSON Schema 的结果。'
+      }]
+    })
+    expect(prompt).toHaveBeenCalledWith('返回 {"status":"ok"}。', expect.objectContaining({
+      responseConstraint: expect.objectContaining({ type: 'object' })
+    }))
     expect(fetch).not.toHaveBeenCalled()
   })
 

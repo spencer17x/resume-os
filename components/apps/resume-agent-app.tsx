@@ -31,6 +31,7 @@ import {
   ChromeBuiltInAiError,
   ChromeBuiltInAiProvider,
   ProviderRoutingError,
+  localLanguagePolicyForLocale,
   runPreferredProviderTask,
   type StructuredTaskInput
 } from '@/lib/agent/providers'
@@ -299,7 +300,8 @@ export function ResumeAgentApp({
           task: {
             kind: 'rewrite-resume-bullet',
             expectedInputLanguages: [locale],
-            expectedOutputLanguages: [locale]
+            expectedOutputLanguages: [locale],
+            localLanguagePolicy: localLanguagePolicyForLocale(locale)
           },
           system: localPrompt.system,
           prompt: localPrompt.user,

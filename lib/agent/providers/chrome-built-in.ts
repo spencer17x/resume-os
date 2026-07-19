@@ -32,7 +32,9 @@ type ChromeDownloadMonitor = {
   ): void
 }
 
-type ChromeLanguageModelCreateOptions = ChromeLanguageModelCoreOptions & {
+type ChromeLanguageModelCreateOptions = {
+  expectedInputs?: ChromeExpectedContent[]
+  expectedOutputs?: ChromeExpectedContent[]
   initialPrompts: [{ role: 'system'; content: string }]
   signal?: AbortSignal
   monitor?: (monitor: ChromeDownloadMonitor) => void
@@ -47,7 +49,7 @@ export interface ChromeLanguageModelSession {
 }
 
 export interface ChromeLanguageModelApi {
-  availability(options: ChromeLanguageModelCoreOptions): Promise<unknown>
+  availability(options?: ChromeLanguageModelCoreOptions): Promise<unknown>
   create(options: ChromeLanguageModelCreateOptions): Promise<ChromeLanguageModelSession>
 }
 
@@ -86,7 +88,9 @@ function browserHasUserActivation(): boolean {
   }).userActivation?.isActive === true
 }
 
-function expectedLanguageOptions(task: ResumeAgentTask): ChromeLanguageModelCoreOptions {
+function expectedLanguageOptions(
+  task: ResumeAgentTask
+): ChromeLanguageModelCoreOptions | undefined {
   const inputLanguages = task.expectedInputLanguages.map((language) => language.trim())
   const outputLanguages = task.expectedOutputLanguages.map((language) => language.trim())
 
@@ -98,6 +102,8 @@ function expectedLanguageOptions(task: ResumeAgentTask): ChromeLanguageModelCore
   ) {
     throw new TypeError('Expected input and output languages must be provided.')
   }
+
+  if (task.localLanguagePolicy === 'best-effort') return undefined
 
   return {
     expectedInputs: [{ type: 'text', languages: inputLanguages }],
@@ -149,7 +155,10 @@ export class ChromeBuiltInAiProvider implements ResumeAiProvider {
 
   async availability(task: ResumeAgentTask): Promise<ProviderAvailability> {
     if (!this.languageModel) return 'unavailable'
-    const availability = await this.languageModel.availability(expectedLanguageOptions(task))
+    const languageOptions = expectedLanguageOptions(task)
+    const availability = languageOptions
+      ? await this.languageModel.availability(languageOptions)
+      : await this.languageModel.availability()
     return normalizeChromeAvailability(availability)
   }
 
@@ -167,7 +176,9 @@ export class ChromeBuiltInAiProvider implements ResumeAiProvider {
 
     const languageOptions = expectedLanguageOptions(input.task)
     const availability = normalizeChromeAvailability(
-      await languageModel.availability(languageOptions)
+      languageOptions
+        ? await languageModel.availability(languageOptions)
+        : await languageModel.availability()
     )
     throwIfAborted(input.signal)
 
@@ -184,14 +195,20 @@ export class ChromeBuiltInAiProvider implements ResumeAiProvider {
       )
     }
 
-    const session = await languageModel.create({
-      ...languageOptions,
-      initialPrompts: [{ role: 'system', content: input.system }],
-      ...(input.signal ? { signal: input.signal } : {}),
-      ...(input.onDownloadProgress
-        ? { monitor: progressMonitor(input.onDownloadProgress) }
-        : {})
-    })
+    let session: ChromeLanguageModelSession
+    try {
+      session = await languageModel.create({
+        ...(languageOptions ?? {}),
+        initialPrompts: [{ role: 'system', content: input.system }],
+        ...(input.signal ? { signal: input.signal } : {}),
+        ...(input.onDownloadProgress
+          ? { monitor: progressMonitor(input.onDownloadProgress) }
+          : {})
+      })
+    } catch (error) {
+      throwBestEffortLanguageError(input.task, error)
+      throw error
+    }
 
     try {
       const promptOptions: ChromePromptOptions = {
@@ -219,7 +236,13 @@ export class ChromeBuiltInAiProvider implements ResumeAiProvider {
         )
       }
 
-      const response = await session.prompt(input.prompt, promptOptions)
+      let response: string
+      try {
+        response = await session.prompt(input.prompt, promptOptions)
+      } catch (error) {
+        throwBestEffortLanguageError(input.task, error)
+        throw error
+      }
       let parsed: unknown
       try {
         parsed = JSON.parse(extractJsonText(response))
@@ -250,5 +273,19 @@ export class ChromeBuiltInAiProvider implements ResumeAiProvider {
     } finally {
       session.destroy()
     }
+  }
+}
+
+function throwBestEffortLanguageError(task: ResumeAgentTask, error: unknown): void {
+  if (
+    task.localLanguagePolicy === 'best-effort'
+    && error instanceof DOMException
+    && error.name === 'NotSupportedError'
+  ) {
+    throw new ChromeBuiltInAiError(
+      'MODEL_UNAVAILABLE',
+      'Chrome Built-in AI could not run this best-effort language task.',
+      { cause: error }
+    )
   }
 }

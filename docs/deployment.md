@@ -66,6 +66,8 @@ Provider routing has three modes:
 
 Automatic mode defaults to cloud fallback **off**. Context overflow, invalid structured output, cancellation, and other local errors do not silently cross the device boundary.
 
+Chrome does not currently guarantee Chinese as a Prompt API input or output language. Resume OS therefore treats Chinese local Agent tasks as experimental best-effort execution: it omits the unsupported `zh` capability declaration, sends the bounded task directly to the on-device model, and still requires the normal JSON schema, deterministic evidence, cancellation, and stale-input checks. Invalid model output never triggers cloud fallback; model unavailability can use cloud only in Automatic mode after saved fallback consent.
+
 ## Data that crosses the device boundary
 
 - A PDF/DOCX/TXT upload is sent to the same-origin extraction route. Bytes are processed transiently and are not stored by Resume OS. The route returns extracted text.
