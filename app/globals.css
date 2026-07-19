@@ -1135,9 +1135,6 @@ a {
 .desktop-window__control--maximize > span { background: #4bc8a7; }
 .desktop-window__title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--theme-fog); font-size: 12px; font-weight: 600; text-align: center; }
 .desktop-app-content { height: calc(100% - 32px); overflow: auto; }
-.desktop-placeholder { display: grid; min-height: 300px; height: 100%; align-content: center; gap: 8px; padding: 28px; }
-.desktop-placeholder__eyebrow { margin: 0; color: var(--theme-muted); font-size: 13px; }
-.desktop-placeholder__status { margin: 0; color: var(--theme-fog); font-size: 18px; font-weight: 600; }
 .desktop-app-error { display: grid; min-height: 300px; align-content: center; gap: 14px; padding: 28px; }
 .desktop-app-error p { margin: 0; }
 .desktop-app-error__actions { display: flex; gap: 8px; }
@@ -1808,7 +1805,6 @@ a {
 .mobile-app-frame__title span { color: var(--theme-muted); font-size: 11px; }
 .mobile-app-frame__content { min-height: 0; flex: 1; overflow: auto; padding-bottom: env(safe-area-inset-bottom); }
 .mobile-app-frame .desktop-app-content { height: 100%; overflow: auto; }
-.mobile-app-frame .desktop-placeholder,
 .mobile-app-frame .desktop-app-error { min-height: 100%; }
 .mobile-app-frame .desktop-app-error button { min-height: 44px; }
 

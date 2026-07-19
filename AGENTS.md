@@ -29,13 +29,13 @@ Preserve these product invariants:
 - `lib/server/`: request guards, bounded JSON parsing, document parser isolation, and DOCX preflight checks.
 - `i18n/` and `messages/`: locale routing and Chinese/English messages.
 - `tests/e2e/`: Playwright desktop, mobile, safety, and workflow coverage.
-- `docs/`: deployment boundaries, design specifications, implementation plans, and QA evidence.
+- `docs/`: deployment boundaries, design specifications, and implementation plans.
 
 ## Sources Of Truth
 
 - Treat the current implementation and its colocated tests as the source of truth for behavior and invariants.
 - Use `README.md` for the current product model and local workflow, and `docs/deployment.md` for environment, security, release, retry, rollback, and production boundaries.
-- Treat dated files under `docs/superpowers/` and visual artifacts under `docs/design/` as design history. Verify their assumptions against current code, tests, README, and deployment documentation before using them as requirements.
+- Treat dated files under `docs/superpowers/` as design history. Verify their assumptions against current code, tests, README, and deployment documentation before using them as requirements.
 - When behavior, data boundaries, or operational behavior changes intentionally, update the authoritative documentation in the same change instead of leaving contradictory guidance.
 
 ## Architecture Rules

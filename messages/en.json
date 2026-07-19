@@ -104,9 +104,7 @@
     "maximize": "Maximize",
     "restore": "Restore",
     "retry": "Retry",
-    "error": "This application could not be loaded.",
-    "placeholder": "Application is ready.",
-    "placeholderRegion": "{app} application"
+    "error": "This application could not be loaded."
   },
   "mobile": {
     "homeTitle": "Resume OS",
@@ -120,48 +118,6 @@
     "back": "Back",
     "home": "Home",
     "open": "Open"
-  },
-  "home": {
-    "eyebrow": "Local-first · Evidence-grounded",
-    "title": "Tailor every resume with facts you can verify",
-    "primaryCta": "Open Tailoring Agent",
-    "jdCta": "Analyze Target Job",
-    "projectsCta": "View Career Evidence",
-    "agentPanelTitle": "Career Evidence Assistant",
-    "agentPanelStatus": "Active resume context",
-    "agentOnline": "AI ready",
-    "quickTestInputLabel": "Question",
-    "quickTestPlaceholder": "Ask about role requirements, supporting evidence, gaps, or interview focus...",
-    "quickTestButton": "Test AI Service",
-    "quickTestLoading": "Requesting...",
-    "quickTestSuccess": "AI service responded successfully.",
-    "quickTestError": "AI service request failed.",
-    "quickTestEmpty": "Enter a question before testing.",
-    "quickPrompts": [
-      "Which target-job requirements does this resume support best?",
-      "Which experiences provide the strongest evidence of impact?",
-      "What important claims still need evidence?",
-      "Create a one-minute introduction using only verified facts"
-    ],
-    "agentEvidence": "This assistant uses the active structured resume and the AI provider saved in Settings. Review its answer before using it in an application.",
-    "errors": {
-      "AI_PUBLIC_ACCESS_DISABLED": "AI access is not allowed from this request origin.",
-      "AI_ACCESS_MISCONFIGURED": "AI server access is not configured safely.",
-      "FORBIDDEN": "This request is not allowed from the current origin.",
-      "RATE_LIMITED": "Too many requests. Try again shortly.",
-      "RATE_LIMITED_RETRY": "Too many requests. Try again in {seconds, plural, one {# second} other {# seconds}}.",
-      "PAYLOAD_TOO_LARGE": "The request is too large.",
-      "INVALID_REQUEST": "Check the provided information and try again.",
-      "AI_NOT_CONFIGURED": "The AI configuration is missing or unavailable. Check it in Settings and try again.",
-      "AI_UNAVAILABLE": "AI service is temporarily unavailable.",
-      "REQUEST_ABORTED": "The request was canceled.",
-      "CLOUD_PROVIDER_CONSENT_REQUIRED": "This task requires the OpenAI-compatible provider. Select it in Settings, or enable Automatic with explicit cloud fallback consent."
-    },
-    "focusLabel": "Target direction",
-    "featuredProjects": "Project Evidence",
-    "experience": "Experience Evidence",
-    "openSource": "Open Source Evidence",
-    "skillMap": "Skill Map"
   },
   "agent": {
     "back": "Back to Resume OS",
