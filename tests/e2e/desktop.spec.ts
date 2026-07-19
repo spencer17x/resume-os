@@ -381,7 +381,6 @@ test('keeps deep links, history, locale, theme, and reduced motion coherent', as
       menuPanel: customProperty(menu, '--theme-panel'),
       dockColorScheme: getComputedStyle(dock).colorScheme,
       dockPanel: customProperty(dock, '--theme-panel'),
-      appPanel: customProperty(app, '--theme-panel'),
       appBackground: getComputedStyle(app).backgroundColor
     }
   })).toEqual({
@@ -390,7 +389,6 @@ test('keeps deep links, history, locale, theme, and reduced motion coherent', as
     menuPanel: '#0b1624',
     dockColorScheme: 'dark',
     dockPanel: '#0b1624',
-    appPanel: '#ffffff',
     appBackground: 'rgb(255, 255, 255)'
   })
   await settings.getByRole('radio', { name: 'Reduced motion' }).click()

@@ -151,7 +151,7 @@ test('explicit Settings consent enables BYOK cloud fallback when Chrome is unava
   await expect(fallback).toBeChecked()
   await page.getByRole('textbox', { name: 'API Base URL' }).fill('https://byok.example/v1')
   await page.getByRole('textbox', { name: 'Model' }).fill('e2e-cloud-model')
-  await page.getByLabel('API Key').fill('sk-e2e-browser-key')
+  await page.getByRole('textbox', { name: 'API Key', exact: true }).fill('sk-e2e-browser-key')
   await page.getByRole('button', { name: 'Save AI configuration' }).click()
   await expect(page.getByRole('status')).toContainText(
     'Configuration saved. The key stays in this session only.'

@@ -308,8 +308,7 @@ test('builds a reviewable Evidence Agent run and saves a variant without mutatin
   await expect.poll(() => readActiveMaster(page)).not.toBeNull()
   const masterBefore = await readActiveMaster(page)
 
-  const dock = page.getByRole('navigation', { name: 'Dock' })
-  await dock.getByRole('button', { name: 'JD Match' }).click()
+  await page.goto('/en/jd-match')
   const jdMatch = page.getByRole('application', { name: 'JD Match' })
   await jdMatch.getByRole('textbox', { name: 'Job description' }).fill(jobDescription)
   await jdMatch.getByRole('button', { name: 'Analyze match' }).click()
@@ -321,6 +320,7 @@ test('builds a reviewable Evidence Agent run and saves a variant without mutatin
   await jdMatch.getByRole('button', { name: 'Confirm all & create Agent run' }).click()
   await expect(jdMatch.getByText('Target job and resumable Agent run saved in this browser.')).toBeVisible()
 
+  const dock = page.getByRole('navigation', { name: 'Dock' })
   await dock.getByRole('button', { name: 'Resume Agent' }).click()
   const agent = page.getByRole('application', { name: 'Resume Agent' })
   await agent.getByRole('textbox', { name: 'Optimization instruction' }).fill(
@@ -386,7 +386,7 @@ test('builds a reviewable Evidence Agent run and saves a variant without mutatin
     snapshots: []
   })
 
-  await dock.getByRole('button', { name: 'Review & Export' }).click()
+  await page.goto('/en/classic')
   const review = page.getByRole('application', { name: 'Review & Export' })
   const version = review.getByRole('combobox', { name: 'Resume version' })
   await expect(version.getByRole('option', {

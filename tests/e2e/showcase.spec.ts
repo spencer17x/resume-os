@@ -1,6 +1,27 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
+import { getSampleResumeData } from '../../lib/resume-sample'
 import { expectNoDevelopmentOverlay, expectReadableScreenshot } from './support/screenshot-evidence'
 import { waitForAppSurfaceToSettle, waitForFiniteMotionToSettle } from './support/stable-motion'
+
+async function seedSampleResume(page: Page) {
+  const data = getSampleResumeData('en')
+  const updatedAt = data.metadata.updatedAt
+  const draft = {
+    id: 'showcase-sample',
+    name: 'Demo Candidate',
+    source: 'sample',
+    createdAt: updatedAt,
+    updatedAt,
+    data,
+    snapshots: []
+  }
+  await page.addInitScript(({ draft }) => {
+    localStorage.setItem('resume-os-drafts-v1', JSON.stringify({
+      version: 1,
+      state: { activeDraftId: draft.id, drafts: [draft] }
+    }))
+  }, { draft })
+}
 
 async function canvasPixelMetrics(page: Page, canvas: Locator) {
   const bounds = await page.evaluate(() => {
@@ -192,6 +213,7 @@ async function inspectDesktopSceneRegions(app: Locator) {
 test('desktop Resume 3D renders real content, orbits, pauses, and falls back safely', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'Desktop 3D coverage')
   test.slow()
+  await seedSampleResume(page)
   await page.goto('/en/3d')
   const app = page.getByRole('region', { name: 'Resume 3D' })
   await expect(app).toBeVisible({ timeout: 15_000 })
@@ -254,6 +276,7 @@ test('desktop Resume 3D renders real content, orbits, pauses, and falls back saf
 
 test('Resume 3D disables automatic movement in reduced motion', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'Desktop reduced-motion coverage')
+  await seedSampleResume(page)
   await page.addInitScript(() => localStorage.setItem('resume-os-motion', 'reduced'))
   await page.goto('/en/3d')
   const canvas = await waitForRenderedCanvas(page)
@@ -268,6 +291,7 @@ test('Resume 3D disables automatic movement in reduced motion', async ({ page },
 
 test('Resume 3D uses structured fallback when WebGL initialization is unavailable', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'Desktop WebGL fallback coverage')
+  await seedSampleResume(page)
   await page.addInitScript(() => {
     const original = HTMLCanvasElement.prototype.getContext
     HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, contextId, options) {
@@ -363,6 +387,7 @@ test('dense Resume 3D frames twelve nodes per category without DOM label collisi
 
 test('mobile Resume 3D remains framed, interactive, and nonblank at 390x844', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'mobile', '390x844 mobile coverage')
+  await seedSampleResume(page)
   await page.goto('/en/3d')
   const frame = page.getByRole('main', { name: 'Resume 3D' })
   await expect(frame).toBeVisible()
