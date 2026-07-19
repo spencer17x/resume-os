@@ -122,18 +122,39 @@ The shipped `pnpm dev` and `pnpm start` scripts bind Next.js to `127.0.0.1` and 
 
 The in-process route limiter remains defense-in-depth. Set `RESUME_OS_TRUSTED_PROXY=vercel` on Vercel or `RESUME_OS_TRUSTED_PROXY=cloudflare` behind Cloudflare to use the platform-provided client IP inside each instance. Public deployments must also configure a platform or distributed rate limiter because process memory is not shared across serverless instances.
 
+## Versioned releases
+
+Production is released from SemVer tags rather than directly from every `main` push:
+
+```text
+push main → CI → calculate SemVer → package version + CHANGELOG
+          → vX.Y.Z tag → GitHub Release → Vercel Production
+```
+
+Pull requests are optional. For a solo-maintained change, push a Conventional Commit directly to `main`; if a pull request is useful, use a Conventional Commit title and squash merge it. The release workflow derives the next version from commits added since the previous release:
+
+- `fix:` creates a patch release.
+- `feat:` creates a minor release.
+- `feat!:` or a `BREAKING CHANGE` creates a major release.
+- `perf:` and `revert:` create a patch release.
+- `docs:`, `test:`, `chore:`, and `ci:` do not create a production release by themselves.
+
+`release-it` updates `package.json` and `CHANGELOG.md`, creates the version commit and immutable tag, and publishes the GitHub Release with the repository's built-in `GITHUB_TOKEN`. The only custom Actions secrets are `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID`. See [Deployment and data boundaries](docs/deployment.md#automated-release-and-deployment) for setup, deployment retry, rollback, and the complete lifecycle.
+
 ## Deploy to Vercel
 
 Vercel can run the complete current Next.js application, including Node.js document extraction and stateless AI route handlers. It does **not** replace the browser's IndexedDB/localStorage, and it does not require a server database.
 
 For the complete raw-resume-to-tailored-variant workflow on Vercel:
 
-1. Deploy from source on Vercel's Linux builder; do not upload a macOS-built `.next` directory because document extraction includes platform-native code.
-2. Set `RESUME_OS_TRUSTED_PROXY=vercel`; do not set `RESUME_OS_LOCAL_ONLY`.
-3. Add a Vercel Firewall or other distributed rate limit for `/api/`. The in-process limiter is not shared across Functions.
-4. If users select an OpenAI-compatible host outside the built-in exact-host allowlist, add that exact host to `RESUME_OS_ALLOWED_AI_HOSTS`.
-5. Each browser user configures BYOK in Settings and runs diagnostics. Chrome-only mode can run the tasks currently supported by the local adapter, but it does not yet replace cloud resume parsing for a new pasted/uploaded resume.
-6. The browser must allow site storage. Chrome Built-in AI additionally requires a compatible Chrome environment and an available browser-managed model.
+1. Link the repository to the Vercel project once, then add the Vercel project IDs and access token to GitHub Actions secrets.
+2. Keep branch Preview deployments enabled. `vercel.json` disables direct `main` deployments so Production can only follow a version tag.
+3. Build from source in GitHub Actions on Linux; do not upload a macOS-built `.next` directory because document extraction includes platform-native code.
+4. Set `RESUME_OS_TRUSTED_PROXY=vercel`; do not set `RESUME_OS_LOCAL_ONLY`.
+5. Add a Vercel Firewall or other distributed rate limit for `/api/`. The in-process limiter is not shared across Functions.
+6. If users select an OpenAI-compatible host outside the built-in exact-host allowlist, add that exact host to `RESUME_OS_ALLOWED_AI_HOSTS`.
+7. Each browser user configures BYOK in Settings and runs diagnostics. Chrome-only mode can run the tasks currently supported by the local adapter, but it does not yet replace cloud resume parsing for a new pasted/uploaded resume.
+8. The browser must allow site storage. Chrome Built-in AI additionally requires a compatible Chrome environment and an available browser-managed model.
 
 The app enforces a 3 MiB resume-file limit and a 4 MiB multipart limit, below Vercel Functions' documented 4.5 MB request-body limit. PDF and DOCX extraction uses the Node.js runtime and includes its worker asset in the production trace. See [Deployment and data boundaries](docs/deployment.md) for the environment-variable matrix, privacy flow, and verification checklist.
 

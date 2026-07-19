@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  conventional-title:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Validate pull request title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: >-
+          node -e "const pattern = /^(feat|fix|docs|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9._/-]+\))?(!)?: .+/;
+          if (!pattern.test(process.env.PR_TITLE ?? '')) {
+            console.error('Use a Conventional Commit PR title, for example: feat(settings): add provider diagnostics');
+            process.exit(1);
+          }"
+
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: corepack pnpm@10.33.0 install --frozen-lockfile
+
+      - name: Type-check
+        run: corepack pnpm@10.33.0 typecheck
+
+      - name: Lint
+        run: corepack pnpm@10.33.0 lint
+
+      - name: Run unit and integration tests
+        run: corepack pnpm@10.33.0 test
+
+      - name: Build and smoke-test document extraction
+        run: corepack pnpm@10.33.0 test:production-extraction
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: corepack pnpm@10.33.0 install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: corepack pnpm@10.33.0 exec playwright install --with-deps chromium
+
+      - name: Run browser tests
+        run: corepack pnpm@10.33.0 test:e2e

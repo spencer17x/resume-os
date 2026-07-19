@@ -1,0 +1,206 @@
+name: Release
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing vX.Y.Z release tag to redeploy
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      release_created: ${{ steps.result.outputs.release_created }}
+      sha: ${{ steps.result.outputs.sha }}
+      tag_name: ${{ steps.result.outputs.tag_name }}
+      version: ${{ steps.result.outputs.version }}
+    steps:
+      - name: Check out main with release history
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Verify CI tested the current main revision
+        if: github.event_name == 'workflow_run'
+        id: gate
+        env:
+          TESTED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          current_sha="$(git rev-parse HEAD)"
+          if [ "$current_sha" = "$TESTED_SHA" ]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "current=false" >> "$GITHUB_OUTPUT"
+            echo "A newer main revision exists; its CI run will handle the release."
+          fi
+
+      - name: Set up Node.js
+        if: github.event_name == 'workflow_run' && steps.gate.outputs.current == 'true'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      - name: Install release dependencies
+        if: github.event_name == 'workflow_run' && steps.gate.outputs.current == 'true'
+        run: |
+          corepack enable
+          corepack pnpm@10.33.0 install --frozen-lockfile
+
+      - name: Resolve the next semantic version
+        if: github.event_name == 'workflow_run' && steps.gate.outputs.current == 'true'
+        id: next
+        run: |
+          set +e
+          release_output="$(corepack pnpm@10.33.0 exec release-it --release-version --config .release-it.cjs --no-github.release 2>&1)"
+          release_status=$?
+          set -e
+
+          if [ "$release_status" -eq 0 ]; then
+            next_version="$(printf '%s\n' "$release_output" | tail -n 1)"
+            if ! printf '%s\n' "$next_version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+              printf '%s\n' "$release_output"
+              echo "release-it did not return a stable semantic version."
+              exit 1
+            fi
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            echo "version=$next_version" >> "$GITHUB_OUTPUT"
+            echo "Next release: v$next_version"
+          elif printf '%s\n' "$release_output" | grep -q 'No new version to release'; then
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            echo "No releasable Conventional Commits were found."
+          else
+            printf '%s\n' "$release_output"
+            exit "$release_status"
+          fi
+
+      - name: Create version commit, tag, and GitHub Release
+        if: steps.next.outputs.should_release == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          corepack pnpm@10.33.0 release
+
+      - name: Resolve release for deployment
+        id: result
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          MANUAL_TAG: ${{ inputs.tag }}
+          EXPECTED_VERSION: ${{ steps.next.outputs.version }}
+          SHOULD_RELEASE: ${{ steps.next.outputs.should_release }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            release_tag="$MANUAL_TAG"
+            if ! printf '%s\n' "$release_tag" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+              echo "The retry tag must match vX.Y.Z."
+              exit 1
+            fi
+            if ! git rev-parse --verify --quiet "refs/tags/$release_tag" >/dev/null; then
+              echo "Tag $release_tag does not exist."
+              exit 1
+            fi
+            gh release view "$release_tag" --repo "$GITHUB_REPOSITORY" >/dev/null
+          elif [ "$SHOULD_RELEASE" = "true" ]; then
+            release_tag="v$EXPECTED_VERSION"
+            if ! git rev-parse --verify --quiet "refs/tags/$release_tag" >/dev/null; then
+              echo "release-it completed without creating $release_tag."
+              exit 1
+            fi
+            gh release view "$release_tag" --repo "$GITHUB_REPOSITORY" >/dev/null
+          else
+            echo "release_created=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          release_sha="$(git rev-list -n 1 "$release_tag")"
+          release_version="${release_tag#v}"
+          package_version="$(git show "$release_tag:package.json" | node -e "let data=''; process.stdin.on('data', chunk => data += chunk); process.stdin.on('end', () => console.log(JSON.parse(data).version));")"
+          if [ "$release_version" != "$package_version" ]; then
+            echo "Tag $release_tag does not match package.json version $package_version."
+            exit 1
+          fi
+
+          echo "release_created=true" >> "$GITHUB_OUTPUT"
+          echo "sha=$release_sha" >> "$GITHUB_OUTPUT"
+          echo "tag_name=$release_tag" >> "$GITHUB_OUTPUT"
+          echo "version=$release_version" >> "$GITHUB_OUTPUT"
+
+  deploy-production:
+    if: needs.release.outputs.release_created == 'true'
+    needs:
+      - release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: production
+      url: https://resume-os-phi.vercel.app
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    steps:
+      - name: Verify deployment secrets
+        run: |
+          test -n "$VERCEL_ORG_ID" || { echo 'Missing VERCEL_ORG_ID'; exit 1; }
+          test -n "$VERCEL_PROJECT_ID" || { echo 'Missing VERCEL_PROJECT_ID'; exit 1; }
+          test -n "$VERCEL_TOKEN" || { echo 'Missing VERCEL_TOKEN'; exit 1; }
+
+      - name: Check out released commit
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.release.outputs.sha }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      - name: Verify tag matches package version
+        env:
+          RELEASE_TAG: ${{ needs.release.outputs.tag_name }}
+          RELEASE_VERSION: ${{ needs.release.outputs.version }}
+        run: >-
+          node -e "const pkg = require('./package.json');
+          if (process.env.RELEASE_TAG !== 'v' + process.env.RELEASE_VERSION || pkg.version !== process.env.RELEASE_VERSION) {
+            console.error('Release tag, action output, and package.json version do not match.');
+            process.exit(1);
+          }"
+
+      - name: Install Vercel CLI
+        run: |
+          corepack enable
+          npm install --global vercel@56.3.1
+
+      - name: Pull Vercel production configuration
+        run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+
+      - name: Build Vercel production artifacts
+        run: vercel build --prod --token="$VERCEL_TOKEN"
+
+      - name: Deploy released artifacts
+        run: |
+          deployment_url="$(vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN")"
+          echo "### Production deployment" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Version: ${{ needs.release.outputs.tag_name }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- URL: $deployment_url" >> "$GITHUB_STEP_SUMMARY"

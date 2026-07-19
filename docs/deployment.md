@@ -76,6 +76,63 @@ Automatic mode defaults to cloud fallback **off**. Context overflow, invalid str
 
 Users should still review the privacy and retention terms of their chosen hosting platform and OpenAI-compatible provider. “No Resume OS server database” is not a claim that network infrastructure or an external provider has no operational logs.
 
+## Automated release and deployment
+
+The repository separates validation, versioning, and production deployment into explicit gates:
+
+```text
+Conventional Commit pushed to main
+  → CI / verify + e2e
+  → release-it calculates the next SemVer version
+  → package.json + CHANGELOG.md + version commit
+  → immutable vX.Y.Z tag + GitHub Release
+  → Vercel production build and deployment from the released commit
+```
+
+`.github/workflows/ci.yml` runs for pull requests and `main`. `.github/workflows/release.yml` is triggered only after a successful CI run for the current `main` revision. If another commit reaches `main` while an older run is finishing, the older run exits and the newer CI run owns the release. `vercel.json` disables Vercel's direct deployment for `main`, while unspecified feature branches retain Vercel Preview deployments. This prevents one commit from producing both a Git-based Production deployment and a version-based Production deployment.
+
+No Release PR is created. Pull requests remain available for risky or collaborative changes, but they are not part of the required release path.
+
+### One-time GitHub configuration
+
+Add these repository Actions secrets:
+
+| Secret | Purpose |
+| --- | --- |
+| `VERCEL_TOKEN` | Vercel access token used only by the tagged production deployment job. |
+| `VERCEL_ORG_ID` | The linked Vercel project `orgId` from `.vercel/project.json`. |
+| `VERCEL_PROJECT_ID` | The linked Vercel project `projectId` from `.vercel/project.json`. |
+
+The release job requests `contents: write` for the built-in `GITHUB_TOKEN`; no personal release token is required. In **Settings → Actions → General**, make sure repository policy permits workflows to request write access. Keep force-pushes and branch deletion disabled for `main`, but do not add a rule that blocks the Actions bot from pushing the generated version commit.
+
+For the simplest solo-maintainer flow, direct pushes to `main` are allowed. Run the same checks locally when practical, then let Actions provide the required gate. If a change uses a pull request, require these checks and use squash merge so its Conventional Commit title becomes the commit on `main`:
+
+- `CI / conventional-title`
+- `CI / verify`
+- `CI / e2e`
+
+### Version rules
+
+The package baseline is `0.1.0`. Until the first version tag exists, release-it examines repository history but ignores commits that do not match a releasable Conventional Commit type.
+
+| Conventional Commit | SemVer result |
+| --- | --- |
+| `fix(scope): ...` | Patch, for example `0.1.0` → `0.1.1` |
+| `feat(scope): ...` | Minor, for example `0.1.0` → `0.2.0` |
+| `feat(scope)!: ...` or `BREAKING CHANGE:` | Major, for example `0.1.0` → `1.0.0` |
+| `perf(scope): ...` or `revert: ...` | Patch |
+| `docs:`, `test:`, `build:`, `ci:`, `chore:` | No release by itself |
+
+`release-it` accumulates all unreleased commits, chooses the highest required bump, updates `package.json` and `CHANGELOG.md`, commits `chore(release): vX.Y.Z [skip ci]`, creates the matching tag and GitHub Release, and then deploys that exact released commit to Vercel Production. The release commit does not start a second release cycle. Do not create or move version tags manually.
+
+If GitHub Release creation succeeds but the Vercel job fails, open **Actions → Release → Run workflow**, enter the existing `vX.Y.Z` tag, and rerun deployment. The manual path validates that both the immutable tag and GitHub Release already exist; it never recalculates or replaces the version.
+
+### Rollback and hotfixes
+
+- For a normal fix, push a `fix:` commit to `main`. This produces a new patch version after CI and preserves forward-only release history.
+- For an urgent traffic rollback, restore the previous deployment in Vercel, then follow with a `revert:` or `fix:` commit so Git history and the next patch version describe the production state.
+- Never move or overwrite an existing `vX.Y.Z` tag.
+
 ## Vercel deployment
 
 Vercel is the supported zero-server-management topology because it runs the Next.js App Router and route handlers required by this repository.
@@ -92,13 +149,15 @@ Vercel is the supported zero-server-management topology because it runs the Next
 
 ### Deployment steps
 
-1. Push the repository with `pnpm-lock.yaml` and import it as a Next.js project.
-2. Build from source on Vercel's Linux builder. Do not upload a `.next` output built on macOS because PDF extraction includes platform-native canvas code.
-3. Set `RESUME_OS_TRUSTED_PROXY=vercel` in Preview and Production. Keep `RESUME_OS_LOCAL_ONLY` unset.
-4. Add only the exact additional BYOK provider hosts users need. Treat this list as an SSRF boundary.
-5. Add a Vercel Firewall or another distributed rate limit for `/api/`. The built-in process-memory limiter is defense-in-depth and is not shared by serverless instances.
-6. Deploy and open Settings. Select the intended provider mode, check Chrome availability if relevant, and run OpenAI-compatible diagnostics when cloud mode or fallback is enabled.
-7. Import both a TXT and a representative PDF/DOCX; complete a JD analysis, save an agent run, reload, and verify IndexedDB recovery on the deployed origin.
+1. Keep the GitHub repository connected to the existing Vercel project so feature branches receive Preview deployments.
+2. Store the Vercel token, organization ID, and project ID in GitHub Actions secrets. Do not commit `.vercel/`.
+3. Build from source on the GitHub-hosted Linux runner. The release workflow uses `vercel build --prod` and `vercel deploy --prebuilt --prod`; do not upload a `.next` output built on macOS because PDF extraction includes platform-native canvas code.
+4. Set `RESUME_OS_TRUSTED_PROXY=vercel` in Preview and Production. Keep `RESUME_OS_LOCAL_ONLY` unset.
+5. Add only the exact additional BYOK provider hosts users need. Treat this list as an SSRF boundary.
+6. Add a Vercel Firewall or another distributed rate limit for `/api/`. The built-in process-memory limiter is defense-in-depth and is not shared by serverless instances.
+7. Push a releasable Conventional Commit to `main` and confirm that its `vX.Y.Z` GitHub Release produces the Production deployment.
+8. Open Settings on Production, select the intended provider mode, and run the corresponding AI check.
+9. Import both a TXT and a representative PDF/DOCX; complete a JD analysis, save an agent run, reload, and verify IndexedDB recovery on the deployed origin.
 
 ### Complete-function conditions
 
