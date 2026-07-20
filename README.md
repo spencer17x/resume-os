@@ -72,6 +72,8 @@ corepack pnpm@10.33.0 install
 corepack pnpm@10.33.0 dev
 ```
 
+Installation enables the repository's tracked `commit-msg` hook. It rejects commit subjects that do not follow the Conventional Commit format used by automated releases. To restore the hook in an existing checkout, run `corepack pnpm@10.33.0 hooks:install`.
+
 `pnpm dev` binds to `127.0.0.1:3001`. When that port is owned by another process, use a separate loopback port without killing an unrelated service:
 
 ```bash
@@ -131,7 +133,7 @@ push main → CI → calculate SemVer → package version + CHANGELOG
           → vX.Y.Z tag → GitHub Release → Vercel Production
 ```
 
-Pull requests are optional. For a solo-maintained change, push a Conventional Commit directly to `main`; if a pull request is useful, use a Conventional Commit title and squash merge it. The release workflow derives the next version from commits added since the previous release:
+Pull requests are optional. For a solo-maintained change, push a Conventional Commit directly to `main`; if a pull request is useful, use a Conventional Commit title and squash merge it. A local `commit-msg` hook rejects invalid subjects before a commit is created, and CI validates every commit added by a push or pull request so bypassing the local hook cannot trigger a release. The release workflow derives the next version from commits added since the previous release:
 
 - `fix:` creates a patch release.
 - `feat:` creates a minor release.

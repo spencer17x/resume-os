@@ -3,6 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "prepare": "node scripts/install-git-hooks.mjs",
+    "hooks:install": "node scripts/install-git-hooks.mjs",
     "dev": "RESUME_OS_LOCAL_ONLY=1 next dev --hostname 127.0.0.1 -p 3001",
     "build": "next build",
     "start": "RESUME_OS_LOCAL_ONLY=1 next start --hostname 127.0.0.1",

@@ -113,6 +113,8 @@ corepack pnpm@10.33.0 test:e2e
 corepack pnpm@10.33.0 test:production-extraction
 ```
 
+`corepack pnpm@10.33.0 install` configures the tracked `.githooks/commit-msg` hook. If an existing checkout needs to restore it, run `corepack pnpm@10.33.0 hooks:install`.
+
 Verification policy:
 
 - Run the narrowest relevant Vitest file while iterating.
@@ -152,6 +154,7 @@ Rules:
 - Use `!` for a breaking change, for example `feat(agent)!: replace persisted run schema`, and explain the migration in a `BREAKING CHANGE:` footer when useful.
 - Split unrelated changes into separate commits when they have independent purposes or release effects.
 - Do not amend an existing commit or force-push unless explicitly requested.
+- Do not bypass the tracked `commit-msg` hook with `--no-verify`. Treat a hook rejection as a request to correct the subject, not to disable validation.
 
 Examples:
 

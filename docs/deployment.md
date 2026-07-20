@@ -84,7 +84,7 @@ The repository separates validation, versioning, and production deployment into 
 
 ```text
 Conventional Commit pushed to main
-  → CI / verify + e2e
+  → CI / conventional-commits + verify + e2e
   → release-it calculates the next SemVer version
   → package.json + CHANGELOG.md + version commit
   → immutable vX.Y.Z tag + GitHub Release
@@ -107,9 +107,10 @@ Add these repository Actions secrets:
 
 The release job requests `contents: write` for the built-in `GITHUB_TOKEN`; no personal release token is required. In **Settings → Actions → General**, make sure repository policy permits workflows to request write access. Keep force-pushes and branch deletion disabled for `main`, but do not add a rule that blocks the Actions bot from pushing the generated version commit.
 
-For the simplest solo-maintainer flow, direct pushes to `main` are allowed. Run the same checks locally when practical, then let Actions provide the required gate. If a change uses a pull request, require these checks and use squash merge so its Conventional Commit title becomes the commit on `main`:
+For the simplest solo-maintainer flow, direct pushes to `main` are allowed. Dependency installation configures the tracked `.githooks/commit-msg` hook, which rejects invalid subjects before Git creates a commit. CI validates the complete commit range again, so `--no-verify`, another Git client, or a missing local hook cannot start the release workflow with an invalid message. If a change uses a pull request, require these checks and use squash merge so its Conventional Commit title becomes the commit on `main`:
 
 - `CI / conventional-title`
+- `CI / conventional-commits`
 - `CI / verify`
 - `CI / e2e`
 
