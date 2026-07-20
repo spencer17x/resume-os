@@ -82,6 +82,14 @@ function requestJson<T extends Record<string, unknown>>(route: Route) {
 }
 
 async function installAiMocks(page: Page) {
+  await page.addInitScript(() => {
+    localStorage.setItem('resume-os-ai-provider-preference-v1', JSON.stringify({
+      version: 1,
+      mode: 'openai-compatible',
+      allowCloudFallback: false
+    }))
+  })
+
   await page.route('**/api/**', (route) => {
     throw new Error(`Unexpected unmocked API request: ${route.request().method()} ${route.request().url()}`)
   })

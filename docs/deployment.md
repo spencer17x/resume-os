@@ -44,7 +44,7 @@ If IndexedDB is unavailable, Resume OS reports that Career Evidence or agent sta
 
 The current adapter uses Chrome's `LanguageModel` API for bounded structured tasks. It checks task-specific input/output languages, normalizes availability (`unavailable`, `downloadable`, `downloading`, `available`), requires user activation before a required model download, can forward download progress when a caller supplies a progress handler, enforces the session context budget, applies a JSON response constraint, validates the parsed value, supports cancellation, and destroys the session after the task.
 
-Current product integrations cover target-job requirement extraction, scoped optimization-plan preparation, and one evidence-linked narrative-leaf rewrite at a time. The local rewrite prompt contains only the selected path and original text, its approved plan item, and linked requirements/facts; it excludes contact details, unrelated resume sections, and the full JD. Raw resume parsing and Demo / Sandbox resume generation still use OpenAI-compatible routes. A Chrome-only selection therefore provides a useful local subset, but not the complete first-time raw-resume workflow.
+Chrome Built-in AI is initialized and persisted as the first provider preference. Every AI task reads the persisted preference when it starts; cloud calls also read the persisted Base URL and model plus the saved session/device key. Current product integrations cover raw resume parsing, Demo / Sandbox generation, target-job requirement extraction, scoped optimization-plan preparation, and one evidence-linked narrative-leaf rewrite at a time. Studio's local and cloud paths use the same prompts, structural JSON schema, normalized `ResumeData` validation, cancellation, and source classification. The local rewrite prompt contains only the selected path and original text, its approved plan item, and linked requirements/facts; it excludes contact details, unrelated resume sections, and the full JD.
 
 Chrome owns model eligibility and download lifecycle. Availability can vary by browser, device resources, language, and model state. The [official Chrome Prompt API documentation](https://developer.chrome.com/docs/ai/prompt-api) is the source of truth for platform eligibility.
 
@@ -66,12 +66,13 @@ Provider routing has three modes:
 
 Automatic mode defaults to cloud fallback **off**. Context overflow, invalid structured output, cancellation, and other local errors do not silently cross the device boundary.
 
-Chrome does not currently guarantee Chinese as a Prompt API input or output language. Resume OS therefore treats Chinese local Agent tasks as experimental best-effort execution: it omits the unsupported `zh` capability declaration, sends the bounded task directly to the on-device model, and still requires the normal JSON schema, deterministic evidence, cancellation, and stale-input checks. Invalid model output never triggers cloud fallback; model unavailability can use cloud only in Automatic mode after saved fallback consent.
+Chrome does not currently guarantee Chinese as a Prompt API input or output language. Resume OS therefore treats Chinese local AI tasks as experimental best-effort execution: it omits the unsupported `zh` capability declaration, sends the bounded task directly to the on-device model, and still requires the task's normal JSON schema, deterministic validations, cancellation, and stale-input checks where applicable. Invalid model output never triggers cloud fallback; model unavailability can use cloud only in Automatic mode after saved fallback consent.
 
 ## Data that crosses the device boundary
 
 - A PDF/DOCX/TXT upload is sent to the same-origin extraction route. Bytes are processed transiently and are not stored by Resume OS. The route returns extracted text.
-- Pasted or extracted raw resume text is currently sent to the configured OpenAI-compatible provider through the same-origin parse route to create structured `ResumeData`.
+- Pasted or extracted raw resume text is processed in the browser when Chrome Built-in AI is selected. It is sent through the same-origin parse route to the configured OpenAI-compatible provider only when that provider is explicitly selected or Automatic mode has saved fallback consent and the local model is unavailable or over its context budget.
+- Demo / Sandbox generation follows the same saved provider preference. Locally generated and cloud-generated demo resumes are both classified as `ai-generated` and never become verified Career Evidence.
 - Cloud agent tasks receive only the context assembled for that task, plus the user's instructions. Planning sends only requirements, matches, and facts already referenced by the Requirement Matrix. Change generation sends the full active structured resume and full target-job description so the provider can produce exact path/original edits, while requirement, match, and career-fact collections are limited to IDs cited by the approved plan.
 - Chrome Built-in AI tasks run in the browser and do not pass their prompt through Resume OS route handlers.
 - The same-origin route sees the BYOK credential for the duration of a cloud request, but Resume OS server code does not persist it.
@@ -168,8 +169,8 @@ The complete current raw-resume-to-job-variant workflow requires all of the foll
 
 - Next.js route handlers are deployed and reachable at the same origin.
 - browser site storage (`localStorage` and IndexedDB) is available.
-- every browser user who needs cloud tasks has saved a valid BYOK configuration.
-- the provider host is on the exact-host allowlist and reachable over HTTPS.
+- every browser user who selects cloud tasks or allows cloud fallback has saved a valid BYOK configuration.
+- any selected cloud provider host is on the exact-host allowlist and reachable over HTTPS.
 - platform-level rate limiting is in place for a public deployment.
 - uploaded files fit the application's 3 MiB file and 4 MiB multipart limits.
 - Chrome-only tasks additionally require a compatible Chrome environment, model availability/download, supported language, and sufficient context budget.

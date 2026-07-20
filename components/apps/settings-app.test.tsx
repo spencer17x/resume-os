@@ -11,7 +11,8 @@ import { readBrowserAiConfig, saveBrowserAiConfig } from '@/lib/agent/browser-co
 import {
   AI_PROVIDER_PREFERENCE_STORAGE_KEY,
   clearAiProviderPreference,
-  readAiProviderPreference
+  readAiProviderPreference,
+  saveAiProviderPreference
 } from '@/lib/agent/provider-preference'
 import {
   AI_API_KEY_HEADER,
@@ -105,9 +106,12 @@ describe('SettingsApp', () => {
       rememberApiKey: false
     })
     renderSettings()
-    await waitFor(() => expect(screen.getByRole('radio', { name: /Self-configured AI/ })).toBeChecked())
+    await waitFor(() => expect(screen.getByRole('radio', { name: /Local Chrome AI/ })).toBeChecked())
 
     expect(screen.queryByRole('checkbox', { name: /Allow explicit cloud fallback/ })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('API Key')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('radio', { name: /Self-configured AI/ }))
+    expect(screen.getByLabelText('API Key')).toHaveValue('existing-secret')
     fireEvent.click(screen.getByRole('radio', { name: /^Automatic selection/ }))
 
     const fallback = screen.getByRole('checkbox', { name: /Allow explicit cloud fallback/ })
@@ -215,11 +219,12 @@ describe('SettingsApp', () => {
     expect(fetch).not.toHaveBeenCalled()
   })
 
-  it('reports the configured model from an AI diagnostic request', async () => {
+  it('runs diagnostics with the saved provider preference and reports its model', async () => {
     vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ answer: 'ready', model: 'qwen-plus' }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
     }))
+    saveAiProviderPreference({ mode: 'openai-compatible', allowCloudFallback: false })
     renderSettings()
 
     fireEvent.click(screen.getByRole('button', { name: 'Check selected AI' }))
@@ -237,6 +242,7 @@ describe('SettingsApp', () => {
     }))
     renderSettings()
 
+    fireEvent.click(screen.getByRole('radio', { name: /Self-configured AI/ }))
     fireEvent.change(screen.getByLabelText('API Base URL'), {
       target: { value: 'https://api.deepseek.com' }
     })

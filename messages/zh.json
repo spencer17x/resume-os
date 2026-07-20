@@ -539,14 +539,14 @@
     "cancel": "取消",
     "providerPreference": "AI 模式",
     "providerPreferenceDescription": "选择使用本地 Chrome AI、你自己配置的 AI，或让系统按隐私偏好自动选择。",
-    "providerPrivacyNote": "Chrome Built-in AI 会在此设备运行受支持的任务；云端任务只会向你配置的 Provider 发送该任务所需的上下文。",
+    "providerPrivacyNote": "所有 AI 功能都统一使用这里已保存的选择。Chrome Built-in AI 会在此设备运行受支持的任务；云端任务使用已保存的 Base URL 和模型，并只发送该任务所需的上下文。",
     "providers": {
       "chromeBuiltIn": "本地 Chrome AI（Beta）",
       "openAiCompatible": "自配置 AI",
       "automatic": "自动选择"
     },
     "providerDescriptions": {
-      "chromeBuiltIn": "使用 Chrome 管理的设备端模型；中文以实验性尽力模式运行，不需要 API Key。",
+      "chromeBuiltIn": "使用 Chrome 管理的设备端模型执行 Studio 解析、演示生成及受支持的 Agent 任务；不需要 API Key。",
       "openAiCompatible": "使用你填写的 Base URL、模型和 API Key。",
       "automatic": "优先本地模型；无法运行任务时停止，除非已允许云端回退。"
     },
@@ -641,8 +641,10 @@
       "lead": "负责人"
     },
     "background": "背景信息",
+    "providerRoutingHint": "解析和生成统一使用“设置”中已保存的 Provider 和模型。初始保存的 Provider 为本地；只有明确选择或允许回退时才会使用云端。",
     "generateResume": "生成演示简历",
     "generating": "正在生成简历",
+    "localModelDownload": "Chrome 正在下载或更新本地模型资源：{progress}%",
     "sampleTitle": "匿名示例",
     "sampleDescription": "在本地加载完全虚构的简历，不会发起 AI 请求。",
     "loadSample": "加载匿名示例",
@@ -724,7 +726,10 @@
       "AI_OUTPUT_INVALID": "AI 返回的简历数据无效。",
       "AI_OUTPUT_TOO_LARGE": "AI 返回的简历数据超出限制。",
       "REQUEST_ABORTED": "请求已取消。",
-      "CLOUD_PROVIDER_CONSENT_REQUIRED": "简历解析和演示生成需要 OpenAI 兼容服务。请在设置中选择该服务，或启用自动模式并明确允许云端回退。"
+      "LOCAL_MODEL_UNAVAILABLE": "当前 Chrome 本地模型无法运行此任务或语言。请检查 AI 设置，或选择已配置的服务。",
+      "CLOUD_FALLBACK_NOT_ALLOWED": "本地模型无法运行此任务，且云端回退未开启。请检查 AI 设置。",
+      "USER_ACTIVATION_REQUIRED": "Chrome 需要新的用户操作才能下载本地模型，请再次点击当前操作。",
+      "CONTEXT_LIMIT_EXCEEDED": "当前简历任务超出了 Chrome 本地模型的上下文限制。请缩短输入，或选择已配置的服务。"
     }
   }
 }

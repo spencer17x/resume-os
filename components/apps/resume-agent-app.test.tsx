@@ -195,6 +195,7 @@ async function requestSuggestions(
 beforeEach(() => {
   window.localStorage.clear()
   clearAiProviderPreference()
+  saveAiProviderPreference({ mode: 'openai-compatible', allowCloudFallback: false })
   workflowService.load.mockReset().mockResolvedValue(generatingWorkspace)
   workflowService.linkFact.mockReset()
   workflowService.addFact.mockReset()

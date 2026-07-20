@@ -3,7 +3,6 @@ import {
   AI_PROVIDER_PREFERENCE_STORAGE_KEY,
   DEFAULT_AI_PROVIDER_PREFERENCE,
   clearAiProviderPreference,
-  hasExplicitCloudProviderConsent,
   readAiProviderPreference,
   saveAiProviderPreference
 } from './provider-preference'
@@ -15,8 +14,20 @@ beforeEach(() => {
 })
 
 describe('AI provider preference', () => {
-  it('defaults to the existing OpenAI-compatible path without cloud fallback', () => {
-    expect(readAiProviderPreference()).toEqual(DEFAULT_AI_PROVIDER_PREFERENCE)
+  it('initializes and persists the local Chrome model as the saved preference', () => {
+    expect(DEFAULT_AI_PROVIDER_PREFERENCE).toEqual({
+      mode: 'chrome-built-in',
+      allowCloudFallback: false
+    })
+    expect(readAiProviderPreference()).toEqual({
+      mode: 'chrome-built-in',
+      allowCloudFallback: false
+    })
+    expect(JSON.parse(window.localStorage.getItem(AI_PROVIDER_PREFERENCE_STORAGE_KEY) ?? '')).toEqual({
+      version: 1,
+      mode: 'chrome-built-in',
+      allowCloudFallback: false
+    })
   })
 
   it('persists an explicit automatic provider and fallback consent', () => {
@@ -42,21 +53,6 @@ describe('AI provider preference', () => {
     }
   )
 
-  it('allows cloud-only tasks only for the cloud provider or explicit automatic fallback', () => {
-    expect(hasExplicitCloudProviderConsent({
-      mode: 'openai-compatible', allowCloudFallback: false
-    })).toBe(true)
-    expect(hasExplicitCloudProviderConsent({
-      mode: 'automatic', allowCloudFallback: true
-    })).toBe(true)
-    expect(hasExplicitCloudProviderConsent({
-      mode: 'automatic', allowCloudFallback: false
-    })).toBe(false)
-    expect(hasExplicitCloudProviderConsent({
-      mode: 'chrome-built-in', allowCloudFallback: false
-    })).toBe(false)
-  })
-
   it('ignores malformed persisted preferences', () => {
     window.localStorage.setItem(AI_PROVIDER_PREFERENCE_STORAGE_KEY, JSON.stringify({
       version: 1,
@@ -76,6 +72,24 @@ describe('AI provider preference', () => {
     expect(readAiProviderPreference()).toEqual({
       mode: 'chrome-built-in',
       allowCloudFallback: false
+    })
+  })
+
+  it('retains the last saved preference if storage becomes unreadable', () => {
+    window.localStorage.setItem(AI_PROVIDER_PREFERENCE_STORAGE_KEY, JSON.stringify({
+      version: 1,
+      mode: 'automatic',
+      allowCloudFallback: true
+    }))
+    expect(readAiProviderPreference()).toEqual({
+      mode: 'automatic',
+      allowCloudFallback: true
+    })
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('blocked') })
+
+    expect(readAiProviderPreference()).toEqual({
+      mode: 'automatic',
+      allowCloudFallback: true
     })
   })
 

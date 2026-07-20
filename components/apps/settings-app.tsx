@@ -191,6 +191,8 @@ function SettingsContent() {
   async function runDiagnostics() {
     const controller = new AbortController()
     const timeout = window.setTimeout(() => controller.abort(), DIAGNOSTIC_TIMEOUT_MS)
+    const savedProviderPreference = readAiProviderPreference()
+    setProviderPreference(savedProviderPreference)
     setDiagnosticState('loading')
     setDiagnosticMessage(t('diagnosticsChecking'))
     setDownloadProgress(null)
@@ -230,7 +232,7 @@ function SettingsContent() {
         }
       }
       const result = await runPreferredProviderTask({
-        preference: providerPreference,
+        preference: savedProviderPreference,
         localProvider: new ChromeBuiltInAiProvider(),
         input,
         runCloudTask: () => runCloudDiagnostic(controller.signal)

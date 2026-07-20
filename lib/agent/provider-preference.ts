@@ -22,7 +22,7 @@ const PROVIDER_MODES = new Set<AiProviderMode>([
 ])
 
 export const DEFAULT_AI_PROVIDER_PREFERENCE: AiProviderPreference = {
-  mode: 'openai-compatible',
+  mode: 'chrome-built-in',
   allowCloudFallback: false
 }
 
@@ -64,22 +64,19 @@ export function readAiProviderPreference(): AiProviderPreference {
   try {
     const serialized = storage.getItem(AI_PROVIDER_PREFERENCE_STORAGE_KEY)
     if (serialized === null) {
-      return storageWriteFailed
+      const preference = storageWriteFailed
         ? { ...memoryPreference }
         : { ...DEFAULT_AI_PROVIDER_PREFERENCE }
+      persistPreference(storage, preference)
+      return preference
     }
     const preference = normalizePreference(JSON.parse(serialized))
-    return preference ?? { ...DEFAULT_AI_PROVIDER_PREFERENCE }
+    if (!preference) return { ...DEFAULT_AI_PROVIDER_PREFERENCE }
+    memoryPreference = preference
+    return { ...preference }
   } catch {
     return { ...memoryPreference }
   }
-}
-
-export function hasExplicitCloudProviderConsent(
-  preference: AiProviderPreference = readAiProviderPreference()
-) {
-  return preference.mode === 'openai-compatible'
-    || (preference.mode === 'automatic' && preference.allowCloudFallback)
 }
 
 export function saveAiProviderPreference(preference: AiProviderPreference): void {
@@ -89,8 +86,15 @@ export function saveAiProviderPreference(preference: AiProviderPreference): void
   memoryPreference = normalized
   const storage = browserStorage()
   if (!storage) return
+  persistPreference(storage, normalized)
+}
+
+function persistPreference(
+  storage: BrowserStorage,
+  preference: AiProviderPreference
+): void {
   try {
-    const stored: StoredAiProviderPreference = { version: 1, ...normalized }
+    const stored: StoredAiProviderPreference = { version: 1, ...preference }
     storage.setItem(AI_PROVIDER_PREFERENCE_STORAGE_KEY, JSON.stringify(stored))
     storageWriteFailed = false
   } catch {

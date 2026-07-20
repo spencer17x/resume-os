@@ -91,6 +91,46 @@ test.beforeEach(async ({}, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'Desktop Evidence Agent safety coverage')
 })
 
+test('Studio initializes and uses the saved Chrome preference without an AI route', async ({ page }) => {
+  const apiRequests = await blockApiRoutes(page)
+  await installChromeLanguageModel(page, {
+    profile: {
+      name: 'Local Demo Candidate',
+      title: 'Agent Engineer',
+      summary: ['Builds bounded local-first AI workflows.'],
+      tags: ['Agent'],
+      links: []
+    },
+    targetRole: 'Untrusted model role',
+    skills: [{ group: 'AI', items: ['Structured output'] }],
+    experiences: [],
+    projects: [],
+    education: [],
+    certifications: [],
+    awards: [],
+    languages: ['English'],
+    openSource: []
+  })
+
+  await page.goto('/en/studio')
+  const studio = page.getByRole('application', { name: 'Resume Studio' })
+  await studio.getByRole('tab', { name: 'Demo / Sandbox' }).click()
+  await studio.getByRole('textbox', { name: 'Target role' }).fill('Local Agent Engineer')
+  await studio.getByRole('button', { name: 'Generate demo resume' }).click()
+
+  await expect(studio.getByRole('heading', { name: 'Local Demo Candidate' })).toBeVisible()
+  await expect(studio.getByText('browser-managed')).toBeVisible()
+  await expect(studio.getByText('Local Agent Engineer', { exact: true })).toBeVisible()
+  expect(await page.evaluate(() => JSON.parse(
+    localStorage.getItem('resume-os-ai-provider-preference-v1') ?? 'null'
+  ))).toEqual({
+    version: 1,
+    mode: 'chrome-built-in',
+    allowCloudFallback: false
+  })
+  expect(apiRequests).toEqual([])
+})
+
 test('Chrome local JD extraction never invokes a Resume OS AI route', async ({ page }) => {
   const draft = resumeDraft()
   const apiRequests = await blockApiRoutes(page)

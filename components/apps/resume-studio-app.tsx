@@ -27,10 +27,30 @@ import {
   type CareerEvidenceService
 } from '@/lib/agent/career-evidence'
 import { DomainStoreError } from '@/lib/agent/domain-store'
+import { AgentOutputError } from '@/lib/agent/json'
+import { readAiProviderPreference } from '@/lib/agent/provider-preference'
+import {
+  ChromeBuiltInAiError,
+  ChromeBuiltInAiProvider,
+  ProviderRoutingError,
+  localLanguagePolicyForLocale,
+  runPreferredProviderTask,
+  type StructuredTaskInput,
+  type StructuredTaskResult
+} from '@/lib/agent/providers'
+import {
+  buildGenerateResumePrompt,
+  buildParseResumePrompt
+} from '@/lib/agent/resume-prompts'
+import {
+  RESUME_TASK_JSON_SCHEMA,
+  validateDemoResumeTaskOutput,
+  validateParsedResumeTaskOutput,
+  type DemoResumeTaskInput
+} from '@/lib/agent/resume-tasks'
 import type { AppId } from '@/lib/desktop/types'
 import type { Locale } from '@/i18n/routing'
 import { parseRetryAfter } from '@/lib/retry-after'
-import { hasExplicitCloudProviderConsent } from '@/lib/agent/provider-preference'
 import { getSampleResumeData } from '@/lib/resume-sample'
 import {
   defaultDraftName,
@@ -45,7 +65,7 @@ type PendingAction = 'parse' | 'upload' | 'generate' | null
 type CooldownBucket = 'extract' | 'parse' | 'generate'
 type Cooldowns = Record<CooldownBucket, number>
 
-type ResumeResult = { data: ResumeData; model: string }
+type CloudResumeResult = { data?: unknown; model?: unknown }
 
 const SOURCE_MODES: SourceMode[] = ['paste', 'upload', 'generate']
 const EMPTY_COOLDOWNS: Cooldowns = { extract: 0, parse: 0, generate: 0 }
@@ -69,7 +89,10 @@ const LOCALIZED_ERROR_CODES = new Set([
   'AI_OUTPUT_INVALID',
   'AI_OUTPUT_TOO_LARGE',
   'REQUEST_ABORTED',
-  'CLOUD_PROVIDER_CONSENT_REQUIRED'
+  'LOCAL_MODEL_UNAVAILABLE',
+  'CLOUD_FALLBACK_NOT_ALLOWED',
+  'USER_ACTIVATION_REQUIRED',
+  'CONTEXT_LIMIT_EXCEEDED'
 ])
 
 class ApiRequestError extends Error {
@@ -112,6 +135,7 @@ export function ResumeStudioApp({
   const [error, setError] = useState('')
   const [model, setModel] = useState('')
   const [streamingResume, setStreamingResume] = useState<ResumeData | null>(null)
+  const [downloadProgress, setDownloadProgress] = useState<number | null>(null)
   const [deleteConfirmId, setDeleteConfirmId] = useState('')
   const [deletePending, setDeletePending] = useState(false)
   const [evidenceNotice, setEvidenceNotice] = useState('')
@@ -166,6 +190,7 @@ export function ResumeStudioApp({
     activeControllerRef.current = controller
     setPending(action)
     setError('')
+    setDownloadProgress(null)
     return { controller, generation }
   }
 
@@ -179,6 +204,7 @@ export function ResumeStudioApp({
     if (!isCurrentRequest(generation, controller)) return
     activeControllerRef.current = null
     setPending(null)
+    setDownloadProgress(null)
   }
 
   function cancelActiveOperation() {
@@ -187,9 +213,13 @@ export function ResumeStudioApp({
     activeControllerRef.current = null
     setPending(null)
     setStreamingResume(null)
+    setDownloadProgress(null)
   }
 
   function localizedRequestError(requestError: unknown, fallback: string) {
+    const providerCode = providerErrorCode(requestError)
+    if (providerCode) return t(`errors.${providerCode}`)
+    if (requestError instanceof AgentOutputError) return t(`errors.${requestError.code}`)
     if (requestError instanceof ApiRequestError && LOCALIZED_ERROR_CODES.has(requestError.code)) {
       if (requestError.code === 'RATE_LIMITED' && requestError.retryAfterSeconds > 0) {
         setCooldowns((current) => ({
@@ -203,23 +233,50 @@ export function ResumeStudioApp({
     return fallback
   }
 
-  function requireCloudProviderConsent(bucket: CooldownBucket) {
-    if (!hasExplicitCloudProviderConsent()) {
-      throw new ApiRequestError('CLOUD_PROVIDER_CONSENT_REQUIRED', bucket)
-    }
-  }
-
   async function parseResume(
     text: string,
     source: Extract<ResumeSource, 'paste' | 'upload'>,
     signal: AbortSignal
   ) {
-    requireCloudProviderConsent('parse')
-    return requestJson<ResumeResult>('/api/resume/parse', {
-      text,
-      locale,
-      source
-    }, signal, 'parse')
+    const request = { text, locale, source }
+    const prompt = buildParseResumePrompt(text, locale)
+    const taskInput: StructuredTaskInput<ResumeData> = {
+      task: {
+        kind: 'parse-resume',
+        expectedInputLanguages: [locale],
+        expectedOutputLanguages: [locale],
+        localLanguagePolicy: localLanguagePolicyForLocale(locale)
+      },
+      system: prompt.system,
+      prompt: prompt.user,
+      jsonSchema: RESUME_TASK_JSON_SCHEMA,
+      validate: (value) => validateParsedResumeTaskOutput(value, { locale, source }),
+      signal,
+      onDownloadProgress: (progress) => {
+        if (activeControllerRef.current?.signal === signal && !signal.aborted) {
+          setDownloadProgress(progress)
+        }
+      }
+    }
+    const result = await runPreferredProviderTask({
+      preference: readAiProviderPreference(),
+      localProvider: new ChromeBuiltInAiProvider(),
+      input: taskInput,
+      runCloudTask: async () => {
+        const cloud = await requestJson<CloudResumeResult>(
+          '/api/resume/parse',
+          request,
+          signal,
+          'parse'
+        )
+        return cloudTaskResult(
+          validateParsedResumeTaskOutput(cloud.data, { locale, source }),
+          cloud.model,
+          'parse'
+        )
+      }
+    })
+    return { data: result.value, model: result.model }
   }
 
   async function createFromPaste() {
@@ -250,11 +307,6 @@ export function ResumeStudioApp({
     if (!file) return
 
     const input = event.currentTarget
-    if (!hasExplicitCloudProviderConsent()) {
-      setError(t('errors.CLOUD_PROVIDER_CONSENT_REQUIRED'))
-      input.value = ''
-      return
-    }
     const operation = beginOperation('upload')
     setUploadText('')
     setUploadName('')
@@ -323,19 +375,61 @@ export function ResumeStudioApp({
     const operation = beginOperation('generate')
     setStreamingResume(null)
     try {
-      requireCloudProviderConsent('generate')
-      const result = await requestResumeStream('/api/resume/generate', {
+      const request: DemoResumeTaskInput = {
         locale,
         targetRole: role,
         seniority,
         ...(background.trim() ? { background: background.trim() } : {})
-      }, operation.controller.signal, (data) => {
-        if (isCurrentRequest(operation.generation, operation.controller)) setStreamingResume(data)
-      }, (activeModel) => {
-        if (isCurrentRequest(operation.generation, operation.controller)) setModel(activeModel)
+      }
+      const prompt = buildGenerateResumePrompt(request)
+      const taskInput: StructuredTaskInput<ResumeData> = {
+        task: {
+          kind: 'generate-demo-resume',
+          expectedInputLanguages: [locale],
+          expectedOutputLanguages: [locale],
+          localLanguagePolicy: localLanguagePolicyForLocale(locale)
+        },
+        system: prompt.system,
+        prompt: prompt.user,
+        jsonSchema: RESUME_TASK_JSON_SCHEMA,
+        validate: (value) => validateDemoResumeTaskOutput(value, request),
+        signal: operation.controller.signal,
+        onDownloadProgress: (progress) => {
+          if (isCurrentRequest(operation.generation, operation.controller)) {
+            setDownloadProgress(progress)
+          }
+        }
+      }
+      const result = await runPreferredProviderTask({
+        preference: readAiProviderPreference(),
+        localProvider: new ChromeBuiltInAiProvider(),
+        input: taskInput,
+        runCloudTask: async () => {
+          const cloud = await requestResumeStream(
+            '/api/resume/generate',
+            request,
+            operation.controller.signal,
+            (data) => {
+              if (!isCurrentRequest(operation.generation, operation.controller)) return
+              try {
+                setStreamingResume(validateDemoResumeTaskOutput(data, request))
+              } catch {
+                // Partial streamed objects may be incomplete between validated snapshots.
+              }
+            },
+            (activeModel) => {
+              if (isCurrentRequest(operation.generation, operation.controller)) setModel(activeModel)
+            }
+          )
+          return cloudTaskResult(
+            validateDemoResumeTaskOutput(cloud.data, request),
+            cloud.model,
+            'generate'
+          )
+        }
       })
       if (!isCurrentRequest(operation.generation, operation.controller)) return
-      createDraft(result.data, { source: 'ai-generated' })
+      createDraft(result.value, { source: 'ai-generated' })
       setModel(result.model)
       setStreamingResume(null)
     } catch (requestError) {
@@ -543,6 +637,9 @@ export function ResumeStudioApp({
             />
           </div>
           {model ? <p>{t('model')}: <strong>{model}</strong></p> : null}
+          {downloadProgress !== null ? <p role="status">{t('localModelDownload', {
+            progress: Math.round(downloadProgress * 100)
+          })}</p> : null}
         </header>
 
         <div
@@ -635,6 +732,7 @@ export function ResumeStudioApp({
             </select>
             <label htmlFor="studio-background">{t('background')}</label>
             <textarea id="studio-background" value={background} disabled={busy} onChange={(event) => setBackground(event.target.value)} />
+            <p>{t('providerRoutingHint')}</p>
             <button type="button" className="resume-studio__primary" disabled={busy || cooldowns.generate > 0} onClick={generateResume}>
               {pending === 'generate' ? <LoaderCircle className="resume-studio__spinner" aria-hidden="true" size={16} /> : <WandSparkles aria-hidden="true" size={16} />}
               {pending === 'generate' ? t('generating') : t('generateResume')}
@@ -766,11 +864,11 @@ function ResumePreview({ data, sample, streaming }: { data: ResumeData | null; s
 
 async function requestResumeStream(
   url: string,
-  body: Record<string, unknown>,
+  body: object,
   signal: AbortSignal,
-  onPartial: (data: ResumeData) => void,
+  onPartial: (data: unknown) => void,
   onModel: (model: string) => void
-): Promise<ResumeResult> {
+): Promise<CloudResumeResult> {
   const response = await aiFetch(url, {
     method: 'POST',
     headers: {
@@ -783,17 +881,17 @@ async function requestResumeStream(
 
   if (!response.ok) throw await responseApiError(response, 'generate')
   if (!response.body || !response.headers.get('Content-Type')?.includes('application/x-ndjson')) {
-    return await response.json() as ResumeResult
+    return await response.json() as CloudResumeResult
   }
 
   const reader = response.body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
-  let completed: ResumeResult | null = null
+  let completed: CloudResumeResult | null = null
 
   const consumeLine = (line: string) => {
     if (!line.trim()) return
-    let event: { type?: string; data?: ResumeData; model?: string; code?: string }
+    let event: { type?: string; data?: unknown; model?: unknown; code?: unknown }
     try {
       event = JSON.parse(line) as typeof event
     } catch {
@@ -801,15 +899,23 @@ async function requestResumeStream(
     }
 
     if (event.type === 'start') {
-      if (event.model) onModel(event.model)
-      if (event.data) onPartial(event.data)
+      if (typeof event.model === 'string' && event.model.trim()) onModel(event.model)
+      if (event.data !== undefined) onPartial(event.data)
     }
-    if (event.type === 'partial' && event.data) onPartial(event.data)
-    if (event.type === 'result' && event.data && event.model) {
+    if (event.type === 'partial' && event.data !== undefined) onPartial(event.data)
+    if (
+      event.type === 'result'
+      && event.data !== undefined
+      && typeof event.model === 'string'
+      && event.model.trim()
+    ) {
       completed = { data: event.data, model: event.model }
     }
     if (event.type === 'error') {
-      throw new ApiRequestError(event.code || 'AI_UNAVAILABLE', 'generate')
+      throw new ApiRequestError(
+        typeof event.code === 'string' ? event.code : 'AI_UNAVAILABLE',
+        'generate'
+      )
     }
   }
 
@@ -832,7 +938,7 @@ async function requestResumeStream(
 
 async function requestJson<T>(
   url: string,
-  body: FormData | Record<string, unknown>,
+  body: FormData | object,
   signal: AbortSignal,
   bucket: CooldownBucket
 ): Promise<T> {
@@ -850,6 +956,37 @@ async function requestJson<T>(
   }
 
   return payload as T
+}
+
+function cloudTaskResult<T>(
+  value: T,
+  model: unknown,
+  bucket: CooldownBucket
+): StructuredTaskResult<T> {
+  if (typeof model !== 'string' || !model.trim()) {
+    throw new ApiRequestError('AI_OUTPUT_INVALID', bucket)
+  }
+  return {
+    value,
+    provider: 'OpenAI-compatible',
+    model
+  }
+}
+
+function providerErrorCode(error: unknown) {
+  if (error instanceof ProviderRoutingError) return 'CLOUD_FALLBACK_NOT_ALLOWED'
+  if (!(error instanceof ChromeBuiltInAiError)) return null
+
+  switch (error.code) {
+    case 'MODEL_UNAVAILABLE':
+      return 'LOCAL_MODEL_UNAVAILABLE'
+    case 'USER_ACTIVATION_REQUIRED':
+      return 'USER_ACTIVATION_REQUIRED'
+    case 'CONTEXT_LIMIT_EXCEEDED':
+      return 'CONTEXT_LIMIT_EXCEEDED'
+    case 'INVALID_MODEL_OUTPUT':
+      return 'AI_OUTPUT_INVALID'
+  }
 }
 
 async function responseApiError(response: Response, bucket: CooldownBucket) {

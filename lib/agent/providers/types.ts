@@ -1,4 +1,6 @@
 export const RESUME_AGENT_TASK_KINDS = [
+  'parse-resume',
+  'generate-demo-resume',
   'extract-job-requirements',
   'classify-evidence',
   'draft-gap-questions',

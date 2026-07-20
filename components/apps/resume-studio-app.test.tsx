@@ -11,8 +11,18 @@ import {
   type CareerEvidenceService,
   type DraftCareerEvidence
 } from '@/lib/agent/career-evidence'
+import {
+  clearBrowserAiConfig,
+  saveBrowserAiConfig
+} from '@/lib/agent/browser-config'
+import {
+  AI_API_KEY_HEADER,
+  AI_BASE_URL_HEADER,
+  AI_MODEL_HEADER
+} from '@/lib/agent/provider-headers'
 import { DomainStoreError, type CareerFact } from '@/lib/agent/domain-store'
 import {
+  AI_PROVIDER_PREFERENCE_STORAGE_KEY,
   clearAiProviderPreference,
   saveAiProviderPreference
 } from '@/lib/agent/provider-preference'
@@ -41,6 +51,29 @@ function resume(name: string, title: string, source: ResumeData['metadata']['sou
     openSource: [],
     metadata: { source, locale: 'en', updatedAt: '2026-07-13T00:00:00.000Z' }
   }
+}
+
+function modelResume(data: ResumeData) {
+  const { metadata: _metadata, ...output } = data
+  return output
+}
+
+function stubLocalModel(output: unknown, availability: unknown = 'available') {
+  const prompt = vi.fn().mockResolvedValue(JSON.stringify(output))
+  const destroy = vi.fn()
+  const create = vi.fn().mockResolvedValue({
+    contextUsage: 0,
+    contextWindow: 32_000,
+    measureContextUsage: vi.fn().mockResolvedValue(500),
+    prompt,
+    destroy
+  })
+  const languageModel = {
+    availability: vi.fn().mockResolvedValue(availability),
+    create
+  }
+  vi.stubGlobal('LanguageModel', languageModel)
+  return { ...languageModel, prompt, destroy }
 }
 
 function jsonResponse(body: unknown, status = 200, headers: Record<string, string> = {}) {
@@ -139,7 +172,10 @@ async function createPastedDraft(user: ReturnType<typeof userEvent.setup>, data:
 
 beforeEach(() => {
   window.localStorage.clear()
+  window.sessionStorage.clear()
+  clearBrowserAiConfig()
   clearAiProviderPreference()
+  saveAiProviderPreference({ mode: 'openai-compatible', allowCloudFallback: false })
   fetchMock.mockReset()
   vi.stubGlobal('fetch', fetchMock)
 })
@@ -176,19 +212,42 @@ describe('ResumeStudioApp', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it.each([
-    { mode: 'chrome-built-in' as const, allowCloudFallback: false },
-    { mode: 'automatic' as const, allowCloudFallback: false }
-  ])('blocks cloud-only resume parsing before a request in $mode mode', async (preference) => {
+  it('parses pasted resumes with the initialized saved local preference and never calls a cloud route', async () => {
     const user = userEvent.setup()
-    saveAiProviderPreference(preference)
+    clearAiProviderPreference()
+    const parsed = resume('Local Ada', 'AI Engineer', 'paste')
+    const local = stubLocalModel(modelResume(parsed))
     renderStudio()
 
     await user.type(screen.getByRole('textbox', { name: 'Resume text' }), 'Private resume source')
     await user.click(screen.getByRole('button', { name: 'Create draft' }))
 
+    expect(await screen.findByRole('heading', { name: 'Local Ada' })).toBeVisible()
+    expect(screen.getByText('browser-managed')).toBeVisible()
+    expect(local.prompt).toHaveBeenCalledWith(
+      expect.stringContaining('Private resume source'),
+      expect.objectContaining({ responseConstraint: expect.objectContaining({ type: 'object' }) })
+    )
+    expect(JSON.parse(window.localStorage.getItem(AI_PROVIDER_PREFERENCE_STORAGE_KEY) ?? '')).toEqual({
+      version: 1,
+      mode: 'chrome-built-in',
+      allowCloudFallback: false
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('does not silently call the cloud when automatic mode cannot use the local model', async () => {
+    const user = userEvent.setup()
+    saveAiProviderPreference({ mode: 'automatic', allowCloudFallback: false })
+    stubLocalModel({}, 'unavailable')
+    renderStudio()
+
+    await user.click(screen.getByRole('tab', { name: 'Demo / Sandbox' }))
+    await user.type(screen.getByRole('textbox', { name: 'Target role' }), 'Agent Engineer')
+    await user.click(screen.getByRole('button', { name: 'Generate demo resume' }))
+
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Resume parsing and demo generation require the OpenAI-compatible provider.'
+      'The local model cannot run this task and cloud fallback is disabled.'
     )
     expect(fetchMock).not.toHaveBeenCalled()
   })
@@ -303,7 +362,13 @@ describe('ResumeStudioApp', () => {
     const generated = resume('Lin Chen', 'Agent Engineer', 'ai-generated')
     const evidenceService = memoryEvidenceService()
     const importSpy = vi.spyOn(evidenceService, 'importResume')
-    fetchMock.mockResolvedValueOnce(jsonResponse({ data: generated, model: 'qwen-test' }))
+    saveBrowserAiConfig({
+      baseURL: 'https://saved-provider.example/v1',
+      model: 'saved-cloud-model',
+      apiKey: 'synthetic-test-key',
+      rememberApiKey: false
+    })
+    fetchMock.mockResolvedValueOnce(jsonResponse({ data: generated, model: 'saved-cloud-model' }))
     renderStudio('en', evidenceService)
 
     await user.click(screen.getByRole('tab', { name: 'Demo / Sandbox' }))
@@ -319,9 +384,34 @@ describe('ResumeStudioApp', () => {
       seniority: 'senior',
       background: 'Frontend platform owner'
     })
-    expect(screen.getByText('qwen-test')).toBeVisible()
+    const requestHeaders = new Headers(fetchMock.mock.calls[0][1]?.headers)
+    expect(requestHeaders.get(AI_BASE_URL_HEADER)).toBe('https://saved-provider.example/v1')
+    expect(requestHeaders.get(AI_MODEL_HEADER)).toBe('saved-cloud-model')
+    expect(requestHeaders.get(AI_API_KEY_HEADER)).toBe('synthetic-test-key')
+    expect(screen.getByText('saved-cloud-model')).toBeVisible()
     expect(importSpy).not.toHaveBeenCalled()
     expect(screen.getByText('Demo, sample, and AI-created drafts are excluded from Career Evidence.')).toBeVisible()
+  })
+
+  it('generates a demo resume with the initialized saved local preference', async () => {
+    const user = userEvent.setup()
+    clearAiProviderPreference()
+    const generated = resume('Local Lin', 'Agent Engineer', 'ai-generated')
+    const local = stubLocalModel(modelResume(generated))
+    renderStudio()
+
+    await user.click(screen.getByRole('tab', { name: 'Demo / Sandbox' }))
+    await user.type(screen.getByRole('textbox', { name: 'Target role' }), 'Agent Engineer')
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Seniority' }), 'senior')
+    await user.click(screen.getByRole('button', { name: 'Generate demo resume' }))
+
+    expect(await screen.findByRole('heading', { name: 'Local Lin' })).toBeVisible()
+    expect(screen.getByText('browser-managed')).toBeVisible()
+    expect(local.prompt).toHaveBeenCalledWith(
+      expect.stringContaining('Agent Engineer'),
+      expect.objectContaining({ responseConstraint: expect.objectContaining({ type: 'object' }) })
+    )
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('previews streamed resume fields before saving the completed draft', async () => {

@@ -3,7 +3,11 @@ import { NoObjectGeneratedError } from 'ai'
 import { createAgentErrorResponse, generateAgentText, streamAgentObject } from '@/lib/agent/openai'
 import { AgentOutputError, parseResumeJson } from '@/lib/agent/json'
 import { buildGenerateResumePrompt } from '@/lib/agent/resume-prompts'
-import { normalizeResumeData, resumeDataSchema, resumeLocaleSchema, type ResumeLocale } from '@/lib/resume-model'
+import {
+  resumeTaskOutputSchema,
+  validateDemoResumeTaskOutput
+} from '@/lib/agent/resume-tasks'
+import { resumeLocaleSchema } from '@/lib/resume-model'
 import { apiErrorResponse, guardAiRequest, type AiRequestGuard } from '@/lib/server/request-guard'
 import { readLimitedJson, requestJsonErrorResponse } from '@/lib/server/request-json'
 
@@ -18,7 +22,6 @@ const generateResumeRequestSchema = z.object({
   background: z.string().trim().max(MAX_GENERATE_BACKGROUND_CHARS).optional()
 }).strict()
 
-const generatedResumeSchema = resumeDataSchema.omit({ metadata: true })
 type GenerateResumeInput = z.infer<typeof generateResumeRequestSchema>
 
 export function createResumeGenerateRoute(dependencies: {
@@ -62,7 +65,7 @@ export function createResumeGenerateRoute(dependencies: {
         locale: input.data.locale,
         source: 'ai-generated'
       })
-      const data = normalizeGeneratedResume(parsed, input.data.targetRole, input.data.locale)
+      const data = validateDemoResumeTaskOutput(parsed, input.data)
 
       return Response.json({ data, model: result.model })
     } catch (error) {
@@ -77,7 +80,7 @@ function createResumeStream(
   input: GenerateResumeInput,
   prompt: ReturnType<typeof buildGenerateResumePrompt>
 ) {
-  const result = streamAgentObject(prompt.user, generatedResumeSchema, {
+  const result = streamAgentObject(prompt.user, resumeTaskOutputSchema, {
     system: prompt.system,
     request,
     abortSignal: request.signal,
@@ -96,12 +99,12 @@ function createResumeStream(
       send({
         type: 'start',
         model: result.model,
-        data: normalizeGeneratedResume({}, input.targetRole, input.locale)
+        data: validateDemoResumeTaskOutput({}, input)
       })
       void (async () => {
         try {
           for await (const partial of result.partialOutputStream) {
-            const data = tryNormalizeGeneratedResume(partial, input.targetRole, input.locale)
+            const data = tryNormalizeGeneratedResume(partial, input)
             const now = Date.now()
             if (data && now - lastPartialSentAt >= RESUME_STREAM_INTERVAL_MS) {
               lastPartialSentAt = now
@@ -110,7 +113,7 @@ function createResumeStream(
           }
 
           const output = await result.output
-          const data = normalizeGeneratedResume(output, input.targetRole, input.locale)
+          const data = validateDemoResumeTaskOutput(output, input)
           send({ type: 'result', data, model: result.model })
         } catch (error) {
           if (NoObjectGeneratedError.isInstance(error)) {
@@ -119,7 +122,7 @@ function createResumeStream(
                 locale: input.locale,
                 source: 'ai-generated'
               })
-              const data = normalizeGeneratedResume(parsed, input.targetRole, input.locale)
+              const data = validateDemoResumeTaskOutput(parsed, input)
               send({ type: 'result', data, model: result.model })
             } catch {
               send({ type: 'error', code: 'AI_OUTPUT_INVALID' })
@@ -154,21 +157,12 @@ function createResumeStream(
   })
 }
 
-function tryNormalizeGeneratedResume(input: unknown, targetRole: string, locale: ResumeLocale) {
+function tryNormalizeGeneratedResume(input: unknown, request: GenerateResumeInput) {
   try {
-    return normalizeGeneratedResume(input, targetRole, locale)
+    return validateDemoResumeTaskOutput(input, request)
   } catch {
     return null
   }
-}
-
-function normalizeGeneratedResume(input: unknown, targetRole: string, locale: ResumeLocale) {
-  const partial = typeof input === 'object' && input !== null ? input as Record<string, unknown> : {}
-  const profile = typeof partial.profile === 'object' && partial.profile !== null ? partial.profile : {}
-  return normalizeResumeData({ ...partial, profile, targetRole }, {
-    locale,
-    source: 'ai-generated'
-  })
 }
 
 export const POST = createResumeGenerateRoute()

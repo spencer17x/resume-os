@@ -106,6 +106,7 @@ function response(body: unknown, status = 200, headers?: HeadersInit) {
 beforeEach(() => {
   window.localStorage.clear()
   clearAiProviderPreference()
+  saveAiProviderPreference({ mode: 'openai-compatible', allowCloudFallback: false })
   fetchMock.mockReset().mockImplementation(async (_url, init) => {
     const body = JSON.parse(String(init?.body)) as { jd: string }
     return response({

@@ -539,14 +539,14 @@
     "cancel": "Cancel",
     "providerPreference": "AI mode",
     "providerPreferenceDescription": "Choose local Chrome AI, your own configured AI, or automatic routing that follows your privacy preference.",
-    "providerPrivacyNote": "Chrome Built-in AI runs supported tasks on this device. Cloud tasks send only the context required for that task to your configured provider.",
+    "providerPrivacyNote": "All AI features use the saved selection. Chrome Built-in AI runs supported tasks on this device. Cloud tasks use the saved Base URL and model, and send only the context required for that task.",
     "providers": {
       "chromeBuiltIn": "Local Chrome AI (Beta)",
       "openAiCompatible": "Self-configured AI",
       "automatic": "Automatic selection"
     },
     "providerDescriptions": {
-      "chromeBuiltIn": "Use Chrome's browser-managed on-device model; Chinese runs in an experimental best-effort mode without an API key.",
+      "chromeBuiltIn": "Use Chrome's browser-managed on-device model for Studio parsing, demo generation, and supported Agent tasks; no API key is required.",
       "openAiCompatible": "Use the Base URL, model, and API key you provide below.",
       "automatic": "Prefer the local model; stop when it cannot run the task unless fallback is allowed."
     },
@@ -641,8 +641,10 @@
       "lead": "Lead"
     },
     "background": "Background",
+    "providerRoutingHint": "Parsing and generation use the provider and model saved in Settings. The initial saved provider is local; cloud is used only when explicitly selected or allowed as fallback.",
     "generateResume": "Generate demo resume",
     "generating": "Generating resume",
+    "localModelDownload": "Chrome is downloading or updating local model resources: {progress}%",
     "sampleTitle": "Anonymous sample",
     "sampleDescription": "Load a fully fictional resume locally. No AI request is made.",
     "loadSample": "Load anonymous sample",
@@ -724,7 +726,10 @@
       "AI_OUTPUT_INVALID": "AI returned invalid resume data.",
       "AI_OUTPUT_TOO_LARGE": "AI returned more resume data than allowed.",
       "REQUEST_ABORTED": "The request was canceled.",
-      "CLOUD_PROVIDER_CONSENT_REQUIRED": "Resume parsing and demo generation require the OpenAI-compatible provider. Select it in Settings, or enable Automatic with explicit cloud fallback consent."
+      "LOCAL_MODEL_UNAVAILABLE": "The selected Chrome local model cannot run this task or language. Check AI Settings or select a configured provider.",
+      "CLOUD_FALLBACK_NOT_ALLOWED": "The local model cannot run this task and cloud fallback is disabled. Check AI Settings.",
+      "USER_ACTIVATION_REQUIRED": "Chrome needs a new user action before downloading the local model. Click the action again.",
+      "CONTEXT_LIMIT_EXCEEDED": "This resume task exceeds the Chrome local model context limit. Use a shorter input or select a configured provider."
     }
   }
 }
