@@ -16,7 +16,7 @@ on:
         type: string
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: release-main
@@ -27,6 +27,8 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: write
     outputs:
       release_created: ${{ steps.result.outputs.release_created }}
       sha: ${{ steps.result.outputs.sha }}
@@ -152,6 +154,8 @@ jobs:
       - release
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
     environment:
       name: production
       url: https://resume-os-phi.vercel.app
@@ -170,6 +174,7 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ needs.release.outputs.sha }}
+          persist-credentials: false
 
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0

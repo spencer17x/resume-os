@@ -30,7 +30,7 @@ const currentAbsolutePath = currentHooksPath ? resolve(repositoryRoot, currentHo
 if (currentHooksPath && currentAbsolutePath !== expectedAbsolutePath) {
   console.warn(
     `[git-hooks] Skipped: core.hooksPath is already set to ${currentHooksPath}. ` +
-      `Integrate scripts/validate-commit-message.mjs with that hook path manually.`,
+      `Integrate the tracked hooks from ${expectedHooksPath} with that path manually.`,
   );
   process.exit(0);
 }
@@ -44,7 +44,9 @@ if (!currentHooksPath) {
 }
 
 if (process.platform !== "win32") {
-  chmodSync(resolve(repositoryRoot, expectedHooksPath, "commit-msg"), 0o755);
+  for (const hook of ["pre-commit", "commit-msg", "pre-push"]) {
+    chmodSync(resolve(repositoryRoot, expectedHooksPath, hook), 0o755);
+  }
 }
 
-console.log(`[git-hooks] Conventional Commit validation enabled from ${expectedHooksPath}.`);
+console.log(`[git-hooks] Staged-file, commit-message, and push validation enabled from ${expectedHooksPath}.`);

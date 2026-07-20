@@ -2,6 +2,12 @@ name: CI
 
 on:
   pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - edited
+      - ready_for_review
   push:
     branches:
       - main
@@ -19,15 +25,21 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - name: Check out repository policy
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
       - name: Validate pull request title
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
-        run: >-
-          node -e "const pattern = /^(feat|fix|docs|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9._/-]+\))?(!)?: .+/;
-          if (!pattern.test(process.env.PR_TITLE ?? '')) {
-            console.error('Use a Conventional Commit PR title, for example: feat(settings): add provider diagnostics');
-            process.exit(1);
-          }"
+        run: node scripts/validate-commit-message.mjs --subject "$PR_TITLE"
 
   conventional-commits:
     runs-on: ubuntu-latest
@@ -37,11 +49,20 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
+
+      - name: Check out trusted pull-request policy
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .ci-policy
+          persist-credentials: false
 
       - name: Validate commit messages
         env:
@@ -49,7 +70,40 @@ jobs:
           BEFORE_SHA: ${{ github.event.before }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: node scripts/validate-commit-message.mjs --ci
+          POLICY_ROOT: ${{ github.event_name == 'pull_request' && '.ci-policy' || '.' }}
+        run: node "$POLICY_ROOT/scripts/validate-commit-message.mjs" --ci
+
+  change-policy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out commit history
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      - name: Check out trusted pull-request policy
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .ci-policy
+          persist-credentials: false
+
+      - name: Validate changed files and added content
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          POLICY_ROOT: ${{ github.event_name == 'pull_request' && '.ci-policy' || '.' }}
+        run: node "$POLICY_ROOT/scripts/validate-staged-files.mjs" --ci
 
   verify:
     runs-on: ubuntu-latest
@@ -57,6 +111,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -87,6 +143,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -104,3 +162,13 @@ jobs:
 
       - name: Run browser tests
         run: corepack pnpm@10.33.0 test:e2e
+
+      - name: Upload Playwright failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-results-${{ github.run_attempt }}
+          path: .next/playwright-results
+          if-no-files-found: warn
+          include-hidden-files: true
+          retention-days: 7

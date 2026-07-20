@@ -17,6 +17,7 @@ export const ALLOWED_COMMIT_TYPES = [
   "chore",
   "revert",
 ];
+export const MAX_COMMIT_SUBJECT_LENGTH = 100;
 
 const COMMIT_SUBJECT_PATTERN = new RegExp(
   `^(${ALLOWED_COMMIT_TYPES.join("|")})(\\([a-z0-9._/-]+\\))?(!)?: \\S.*$`,
@@ -27,6 +28,7 @@ const ZERO_SHA_PATTERN = /^0{40}$/;
 const FORMAT_HELP = [
   "Expected: <type>(<optional-scope>): <imperative summary>",
   `Allowed types: ${ALLOWED_COMMIT_TYPES.join(", ")}`,
+  `Maximum subject length: ${MAX_COMMIT_SUBJECT_LENGTH} characters`,
   "Examples:",
   "  feat(agent): support Chinese local AI tasks",
   "  fix(api): reject redirected provider requests",
@@ -43,6 +45,10 @@ export function commitSubjectError(subject) {
 
   if (subject !== subject.trim()) {
     return "The commit subject must not start or end with whitespace.";
+  }
+
+  if (subject.length > MAX_COMMIT_SUBJECT_LENGTH) {
+    return `The commit subject must not exceed ${MAX_COMMIT_SUBJECT_LENGTH} characters.`;
   }
 
   if (!COMMIT_SUBJECT_PATTERN.test(subject)) {
@@ -111,7 +117,7 @@ function gitCommitExists(revision) {
   return result.status === 0;
 }
 
-function validateSubjectOrReport(subject, label) {
+export function validateSubjectOrReport(subject, label) {
   const error = commitSubjectError(subject);
   if (!error) {
     return true;
@@ -129,13 +135,9 @@ function validateMessageFile(filePath) {
   return validateSubjectOrReport(subject, filePath);
 }
 
-function validateCommitRange(range) {
-  const hashes = runGit(["rev-list", "--reverse", range])
-    .split(/\r?\n/)
-    .filter(Boolean);
-
+export function validateCommitHashes(hashes, label) {
   if (hashes.length === 0) {
-    console.log(`No commits found in ${range}.`);
+    console.log(`No commits found in ${label}.`);
     return true;
   }
 
@@ -153,9 +155,16 @@ function validateCommitRange(range) {
   return valid;
 }
 
+function validateCommitRange(range) {
+  const hashes = runGit(["rev-list", "--reverse", range])
+    .split(/\r?\n/)
+    .filter(Boolean);
+  return validateCommitHashes(hashes, range);
+}
+
 function printUsage() {
   console.error(
-    "Usage: node scripts/validate-commit-message.mjs --file <commit-message-file> | --range <base..head> | --ci",
+    "Usage: node scripts/validate-commit-message.mjs --file <commit-message-file> | --subject <subject> | --range <base..head> | --ci",
   );
 }
 
@@ -169,6 +178,10 @@ function main(argv) {
   try {
     if (mode === "--file" && value) {
       return validateMessageFile(value) ? 0 : 1;
+    }
+
+    if (mode === "--subject" && value !== undefined) {
+      return validateSubjectOrReport(value, "subject") ? 0 : 1;
     }
 
     if (mode === "--range" && value) {

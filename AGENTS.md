@@ -113,7 +113,7 @@ corepack pnpm@10.33.0 test:e2e
 corepack pnpm@10.33.0 test:production-extraction
 ```
 
-`corepack pnpm@10.33.0 install` configures the tracked `.githooks/commit-msg` hook. If an existing checkout needs to restore it, run `corepack pnpm@10.33.0 hooks:install`.
+`corepack pnpm@10.33.0 install` configures the tracked `.githooks/pre-commit`, `.githooks/commit-msg`, and `.githooks/pre-push` hooks. The first validates the exact staged snapshot, the second validates the commit subject, and the third validates every outgoing commit plus protected refs. If an existing checkout needs to restore them, run `corepack pnpm@10.33.0 hooks:install`.
 
 Verification policy:
 
@@ -150,11 +150,11 @@ Rules:
 - Allowed types: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`.
 - Use `feat`, never `feature`; PR title validation does not accept `feature`.
 - Use a lowercase type and optional lowercase scope. Useful scopes include `agent`, `studio`, `desktop`, `api`, `i18n`, `settings`, `docs`, `test`, `deps`, and `release`.
-- Keep the subject concise, imperative, and free of a trailing period.
+- Keep the subject imperative, free of a trailing period, and at most 100 characters.
 - Use `!` for a breaking change, for example `feat(agent)!: replace persisted run schema`, and explain the migration in a `BREAKING CHANGE:` footer when useful.
 - Split unrelated changes into separate commits when they have independent purposes or release effects.
 - Do not amend an existing commit or force-push unless explicitly requested.
-- Do not bypass the tracked `commit-msg` hook with `--no-verify`. Treat a hook rejection as a request to correct the subject, not to disable validation.
+- Do not bypass the tracked `pre-commit`, `commit-msg`, or `pre-push` hooks with `--no-verify`. Treat a hook rejection as a request to correct the staged files, commit subject, or outgoing history, not to disable validation.
 
 Examples:
 
@@ -174,7 +174,7 @@ Release behavior:
 - `docs`, `refactor`, `test`, `build`, `ci`, and `chore` do not create a release by themselves.
 - Let release-it create the version commit, `vX.Y.Z` tag, and GitHub Release. Do not manually create release tags unless explicitly handling a documented redeploy or recovery.
 - Do not run `pnpm release`, deploy production, move a tag, or invoke the manual redeploy workflow unless the user explicitly requests that exact release operation.
-- PR titles must follow the same Conventional Commit subject format. Prefer squash merge so the validated PR title becomes the release commit subject.
+- PR titles must pass the same validator and 100-character limit as commit subjects. Prefer squash merge so the validated PR title becomes the release commit subject.
 
 ## Review Guidelines
 

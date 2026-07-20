@@ -434,6 +434,7 @@ test('keeps a BYOK key local and attaches it only to the AI diagnostic request',
   await page.goto('/en/settings')
 
   const settings = page.getByRole('application', { name: 'Settings' })
+  await settings.getByRole('radio', { name: /Self-configured AI/ }).check()
   await settings.getByLabel('API Base URL').fill('https://api.openai.com/v1')
   await settings.getByLabel('Model', { exact: true }).fill('e2e-model')
   await settings.getByLabel('API Key', { exact: true }).fill('e2e-user-key')

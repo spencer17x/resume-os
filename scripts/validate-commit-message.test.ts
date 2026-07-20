@@ -26,6 +26,12 @@ function validateMessage(message: string) {
   });
 }
 
+function validateSubject(subject: string) {
+  return spawnSync(process.execPath, [validatorPath, "--subject", subject], {
+    encoding: "utf8",
+  });
+}
+
 function runGit(directory: string, args: string[]) {
   const result = spawnSync("git", args, {
     cwd: directory,
@@ -73,6 +79,21 @@ describe("commit message file validation", () => {
       "\uFEFFfeat(agent): support Chinese local AI tasks\n\nBREAKING CHANGE: migrate preferences",
     );
     expect(result.status, result.stderr).toBe(0);
+  });
+
+  it("uses the same subject policy for pull request titles", () => {
+    expect(validateSubject("feat(settings): unify AI provider selection").status).toBe(0);
+
+    const invalid = validateSubject("feature(settings): unify AI provider selection");
+    expect(invalid.status).toBe(1);
+    expect(invalid.stderr).toContain("not a valid Conventional Commit");
+  });
+
+  it("rejects subjects longer than 100 characters", () => {
+    const result = validateSubject(`fix(ci): ${"a".repeat(92)}`);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("must not exceed 100 characters");
   });
 });
 

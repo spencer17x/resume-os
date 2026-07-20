@@ -85,14 +85,14 @@ The repository separates validation, versioning, and production deployment into 
 
 ```text
 Conventional Commit pushed to main
-  → CI / conventional-commits + verify + e2e
+  → CI / conventional-commits + change-policy + verify + e2e
   → release-it calculates the next SemVer version
   → package.json + CHANGELOG.md + version commit
   → immutable vX.Y.Z tag + GitHub Release
   → Vercel production build and deployment from the released commit
 ```
 
-`.github/workflows/ci.yml` runs for pull requests and `main`. `.github/workflows/release.yml` is triggered only after a successful CI run for the current `main` revision. If another commit reaches `main` while an older run is finishing, the older run exits and the newer CI run owns the release. `vercel.json` disables Vercel's direct deployment for `main`, while unspecified feature branches retain Vercel Preview deployments. This prevents one commit from producing both a Git-based Production deployment and a version-based Production deployment.
+`.github/workflows/ci.yml` runs for pull requests and `main`; pull-request title edits also rerun the shared Conventional Commit title policy. Pull-request policy jobs execute the validator from the trusted target-branch revision, so a proposed change cannot weaken its own gate. The change-policy job examines every new commit rather than only the final tree, so a sensitive file or secret added and later removed in the same pushed range still fails. `.github/workflows/release.yml` is triggered only after a successful CI run for the current `main` revision. If another commit reaches `main` while an older run is finishing, the older run exits and the newer CI run owns the release. `vercel.json` disables Vercel's direct deployment for `main`, while unspecified feature branches retain Vercel Preview deployments. This prevents one commit from producing both a Git-based Production deployment and a version-based Production deployment.
 
 No Release PR is created. Pull requests remain available for risky or collaborative changes, but they are not part of the required release path.
 
@@ -106,14 +106,30 @@ Add these repository Actions secrets:
 | `VERCEL_ORG_ID` | The linked Vercel project `orgId` from `.vercel/project.json`. |
 | `VERCEL_PROJECT_ID` | The linked Vercel project `projectId` from `.vercel/project.json`. |
 
-The release job requests `contents: write` for the built-in `GITHUB_TOKEN`; no personal release token is required. In **Settings → Actions → General**, make sure repository policy permits workflows to request write access. Keep force-pushes and branch deletion disabled for `main`, but do not add a rule that blocks the Actions bot from pushing the generated version commit.
+The workflow-level `GITHUB_TOKEN` default is read-only. Only the release job requests `contents: write`; the production deployment job stays read-only, and no personal release token is required. The repository Actions policy allows only GitHub-owned actions pinned to a full commit SHA. Keep this policy aligned with every `uses:` entry before introducing another action.
 
-For the simplest solo-maintainer flow, direct pushes to `main` are allowed. Dependency installation configures the tracked `.githooks/commit-msg` hook, which rejects invalid subjects before Git creates a commit. CI validates the complete commit range again, so `--no-verify`, another Git client, or a missing local hook cannot start the release workflow with an invalid message. If a change uses a pull request, require these checks and use squash merge so its Conventional Commit title becomes the commit on `main`:
+Keep the remote repository settings aligned with these boundaries:
+
+| Setting | Required value |
+| --- | --- |
+| Actions default workflow permissions | Read-only; workflows cannot approve pull requests |
+| Allowed Actions | GitHub-owned only; full-length commit SHA required |
+| `main` protection | Enforce for administrators; require linear history; disallow force pushes and deletion; ordinary fast-forward direct pushes remain allowed |
+| Pull-request merge methods | Merge commits disabled; squash and rebase enabled; squash subject comes from the validated PR title |
+| Secret scanning | Secret scanning and push protection enabled |
+| Code scanning | CodeQL default setup enabled for JavaScript/TypeScript and Actions |
+
+CodeQL runs as GitHub's default security-analysis workflow. The release workflow remains gated by the repository `CI` workflow, so treat any CodeQL alert as a security finding that must be reviewed rather than as a versioning signal.
+
+For the simplest solo-maintainer flow, ordinary fast-forward pushes to `main` are allowed. Dependency installation configures tracked `pre-commit`, `commit-msg`, and `pre-push` hooks under `.githooks/`. They validate the exact staged snapshot, hide matching secret values, enforce the shared Conventional Commit policy, scan every outgoing commit, reject non-linear or non-fast-forward `main` updates, and keep existing release tags immutable. CI repeats the commit and change policies before project checks, so `--no-verify`, another Git client, or a missing local hook cannot produce a successful release CI run with invalid commits. If a change uses a pull request, require these checks and use squash merge so its Conventional Commit title becomes the commit on `main`:
 
 - `CI / conventional-title`
 - `CI / conventional-commits`
+- `CI / change-policy`
 - `CI / verify`
 - `CI / e2e`
+
+When Playwright fails, `CI / e2e` uploads `.next/playwright-results` as a seven-day artifact so traces and error context remain available after the runner exits. Fixtures must remain synthetic because traces can contain rendered form values and mocked request details.
 
 ### Version rules
 
