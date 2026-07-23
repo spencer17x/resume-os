@@ -46,6 +46,7 @@ export function AppWindow({ window }: { window: DesktopWindowState }) {
       role="application"
       tabIndex={0}
       aria-label={appName}
+      data-material="window"
       data-window-status={window.status}
       onFocusCapture={focusWindow}
       onPointerDown={focusWindow}

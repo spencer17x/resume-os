@@ -18,7 +18,13 @@ function DesktopLayout({ children }: { children: ReactNode }) {
   const t = useTranslations('desktop')
 
   return (
-    <div className="desktop-shell" data-testid="desktop-shell" aria-label={t('landmark')} role="main">
+    <div
+      className="desktop-shell"
+      data-design-system="macos-tahoe"
+      data-testid="desktop-shell"
+      aria-label={t('landmark')}
+      role="main"
+    >
       <MenuBar />
       <DesktopSurface />
       <WindowManager />

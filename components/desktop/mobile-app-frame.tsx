@@ -22,6 +22,7 @@ export function MobileAppFrame({ appId }: { appId: AppId }) {
   return (
     <motion.main
       className="mobile-app-frame"
+      data-design-system="macos-tahoe"
       data-testid="mobile-app-frame"
       data-motion-mode={resolvedReducedMotion ? 'reduced' : 'full'}
       initial={initial}

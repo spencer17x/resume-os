@@ -6,7 +6,6 @@ import { AppControls } from '@/components/app-controls'
 import { appRegistry } from '@/lib/desktop/app-registry'
 import type { Locale } from '@/i18n/routing'
 import { useDesktop } from './desktop-provider'
-import { MotionModeControl } from './motion-preference'
 
 function useClock(locale: Locale) {
   const [now, setNow] = useState(() => new Date())
@@ -27,10 +26,10 @@ export function MenuBar() {
   const clock = useClock(locale)
 
   return (
-    <header className="desktop-menu-bar" data-testid="menu-bar">
+    <header className="desktop-menu-bar" data-material="clear" data-testid="menu-bar">
       <div className="desktop-menu-bar__identity">
         <strong>{t('brand')}</strong>
-        <span aria-hidden="true">/</span>
+        <span className="desktop-menu-bar__separator" aria-hidden="true">›</span>
         <span
           key={focusedApp?.id ?? 'desktop'}
           className="desktop-menu-bar__active-label"
@@ -41,7 +40,6 @@ export function MenuBar() {
       </div>
       <div className="desktop-menu-bar__tools">
         <time className="desktop-menu-bar__clock">{clock}</time>
-        <MotionModeControl compact />
         <AppControls />
       </div>
     </header>

@@ -40,7 +40,7 @@ export function Dock() {
 
   return (
     <nav className="desktop-dock" data-testid="dock" aria-label={t('dock')}>
-      <div className="desktop-dock__items">
+      <div className="desktop-dock__items" data-material="regular">
         {appIds.map((appId) => {
           const app = appRegistry[appId]
           const window = state.windows[appId]

@@ -37,7 +37,12 @@ export function MobileHome() {
     : '--:--'
 
   return (
-    <main className="mobile-home" data-testid="mobile-home" aria-label={t('homeTitle')}>
+    <main
+      className="mobile-home"
+      data-design-system="macos-tahoe"
+      data-testid="mobile-home"
+      aria-label={t('homeTitle')}
+    >
       <header className="mobile-status-area">
         <time className="mobile-status-area__time">{time}</time>
         <span className="mobile-status-area__status">{t('status')}</span>

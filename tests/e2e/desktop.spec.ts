@@ -21,6 +21,15 @@ async function loadAnonymousSample(page: Page) {
   await expect(studio.getByRole('heading', { name: 'Demo Candidate' })).toBeVisible()
 }
 
+async function setMotionPreference(page: Page, preference: 'Full motion' | 'Reduced motion') {
+  const dock = page.getByRole('navigation', { name: 'Dock' })
+  await dock.getByRole('button', { name: 'Settings' }).click()
+  const settings = page.getByRole('application', { name: 'Settings' })
+  await settings.getByRole('radio', { name: preference, exact: true }).click()
+  await settings.getByRole('button', { name: 'Close Settings', exact: true }).click()
+  await expect(settings).toBeHidden()
+}
+
 test('starts with the workflow overview and manages concurrent windows with persistent geometry', async ({ page }) => {
   await page.goto('/en')
   await expect(page.getByTestId('workflow-overview')).toBeVisible()
@@ -145,7 +154,7 @@ test('renders the AI agent constellation across desktop motion states and viewpo
   const phases = ambient.locator('[data-agent-phase]')
 
   await menuBar.getByRole('button', { name: 'Dark', exact: true }).click()
-  await menuBar.getByRole('radio', { name: 'Full motion', exact: true }).click()
+  await setMotionPreference(page, 'Full motion')
   await expect(html).toHaveAttribute('data-theme', 'dark')
   await expect(html).toHaveAttribute('data-motion', 'full')
   await expect(ambient).toHaveAttribute('aria-hidden', 'true')
@@ -241,7 +250,7 @@ test('renders the AI agent constellation across desktop motion states and viewpo
   await expect(agent).toBeHidden()
   await expect(ambient).toHaveAttribute('data-subdued', 'false')
 
-  await menuBar.getByRole('radio', { name: 'Reduced motion', exact: true }).click()
+  await setMotionPreference(page, 'Reduced motion')
   await expect(html).toHaveAttribute('data-motion', 'reduced')
   await expect(ambient).toHaveAttribute('data-reduced-motion', 'true')
   await expect(ambient).toHaveAttribute('data-story-mode', 'poster')
@@ -384,12 +393,12 @@ test('keeps deep links, history, locale, theme, and reduced motion coherent', as
       appBackground: getComputedStyle(app).backgroundColor
     }
   })).toEqual({
-    shellBackground: 'rgb(7, 17, 28)',
-    menuColorScheme: 'dark',
-    menuPanel: '#0b1624',
-    dockColorScheme: 'dark',
-    dockPanel: '#0b1624',
-    appBackground: 'rgb(255, 255, 255)'
+    shellBackground: 'rgb(238, 244, 246)',
+    menuColorScheme: 'light',
+    menuPanel: '#fff',
+    dockColorScheme: 'light',
+    dockPanel: '#fff',
+    appBackground: 'rgba(246, 246, 248, 0.96)'
   })
   await settings.getByRole('radio', { name: 'Reduced motion' }).click()
   await expect(page.locator('html')).toHaveAttribute('data-motion', 'reduced')

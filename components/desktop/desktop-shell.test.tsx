@@ -234,6 +234,17 @@ describe('DesktopShell', () => {
     for (const variable of variables) expect(css).toContain(variable)
     expect(css).toContain('z-index: var(--z-menu)')
     expect(css).toContain('border-radius: var(--system-window-radius)')
+    expect(css).toContain('@media (prefers-reduced-transparency: reduce)')
+    expect(css).toContain('@media (prefers-contrast: more)')
+  })
+
+  it('marks desktop chrome with the Tahoe design system and material roles', async () => {
+    renderDesktop()
+
+    expect(screen.getByTestId('desktop-shell')).toHaveAttribute('data-design-system', 'macos-tahoe')
+    expect(screen.getByTestId('menu-bar')).toHaveAttribute('data-material', 'clear')
+    expect(screen.getByTestId('dock').querySelector('[data-material="regular"]')).toBeInTheDocument()
+    expect(await screen.findByRole('application', { name: 'Resume Studio' })).toHaveAttribute('data-material', 'window')
   })
 
   it('ships the original dark and light WebP wallpapers and references both variants', () => {
@@ -311,7 +322,9 @@ describe('DesktopShell', () => {
     expect(ambient).toHaveAttribute('data-pointer', 'true')
 
     const scheduledFrames = requestFrame.mock.calls.length
-    fireEvent.click(within(screen.getByTestId('menu-bar')).getByRole('radio', { name: 'Reduced motion' }))
+    fireEvent.click(within(screen.getByTestId('dock')).getByRole('button', { name: 'Settings' }))
+    const settings = await screen.findByRole('application', { name: 'Settings' })
+    fireEvent.click(within(settings).getByRole('radio', { name: 'Reduced motion' }))
 
     await waitFor(() => expect(ambient).toHaveAttribute('data-reduced-motion', 'true'))
     expect(ambient).toHaveAttribute('data-story-mode', 'poster')
@@ -402,14 +415,18 @@ describe('DesktopShell', () => {
     expect(within(screen.getByTestId('dock')).getByRole('button', { name: 'Resume Studio' })).toHaveAttribute('aria-current', 'page')
   })
 
-  it('mounts the compact motion control in the production menu bar', () => {
+  it('keeps motion preferences in Settings instead of crowding the menu bar', async () => {
     renderDesktop({ descriptor: null })
     const menuBar = within(screen.getByTestId('menu-bar'))
-    const motionControl = menuBar.getByRole('radiogroup', { name: 'Motion preference' })
+
+    expect(menuBar.queryByRole('radiogroup', { name: 'Motion preference' })).not.toBeInTheDocument()
+
+    fireEvent.click(within(screen.getByTestId('dock')).getByRole('button', { name: 'Settings' }))
+    const settings = await screen.findByRole('application', { name: 'Settings' })
+    const motionControl = within(settings).getByRole('radiogroup', { name: 'Motion preference' })
 
     expect(motionControl).toBeVisible()
-    expect(motionControl).toHaveClass('motion-mode-control--compact')
-    expect(menuBar.getAllByRole('radio')).toHaveLength(3)
+    expect(motionControl).not.toHaveClass('motion-mode-control--compact')
   })
 
   it('animates the active menu label and removes vertical movement for reduced motion', () => {
