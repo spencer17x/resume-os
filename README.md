@@ -72,7 +72,7 @@ corepack pnpm@10.33.0 install
 corepack pnpm@10.33.0 dev
 ```
 
-Installation enables three tracked hooks. `pre-commit` checks the exact index snapshot for blocked local/sensitive paths, common secret formats, whitespace/conflict markers, and staged-source ESLint failures without printing matched secret values. `commit-msg` enforces the repository's Conventional Commit subject and 100-character limit. `pre-push` applies both policies to every commit the push would introduce, preserves linear fast-forward-only `main` history, and keeps existing `vX.Y.Z` tags immutable. To restore all hooks in an existing checkout, run `corepack pnpm@10.33.0 hooks:install`.
+The repository does not install Git hooks or provide a lint command. Run the relevant type checks and tests explicitly before sharing a change.
 
 `pnpm dev` binds to `127.0.0.1:3001`. When that port is owned by another process, use a separate loopback port without killing an unrelated service:
 
@@ -126,14 +126,15 @@ The in-process route limiter remains defense-in-depth. Set `RESUME_OS_TRUSTED_PR
 
 ## Versioned releases
 
-Production is released from SemVer tags rather than directly from every `main` push:
+Production is released from SemVer tags through an explicit release operation rather than from every `main` push:
 
 ```text
-push main → CI → calculate SemVer → package version + CHANGELOG
-          → vX.Y.Z tag → GitHub Release → Vercel Production
+explicit release → calculate SemVer → package version + CHANGELOG
+                 → vX.Y.Z tag → GitHub Release
+manual tag deployment → Vercel Production
 ```
 
-Pull requests are optional. For a solo-maintained change, push a Conventional Commit directly to `main`; if a pull request is useful, use a Conventional Commit title and squash merge it. Local hooks provide fast feedback, while CI reuses the same title, commit-history, sensitive-file, secret, and whitespace policy before running type-checking, lint, tests, production extraction, and Playwright. Failed browser runs retain a seven-day trace artifact. The release workflow derives the next version from commits added since the previous release:
+Pull requests are optional. Commit and push operations do not run repository-managed hooks or CI checks. Run the relevant type checks, tests, production extraction smoke test, and Playwright suite explicitly when the change warrants them. When a release is explicitly requested, `release-it` derives the next version from commits added since the previous release:
 
 - `fix:` creates a patch release.
 - `feat:` creates a minor release.
@@ -141,7 +142,7 @@ Pull requests are optional. For a solo-maintained change, push a Conventional Co
 - `perf:` and `revert:` create a patch release.
 - `docs:`, `test:`, `chore:`, and `ci:` do not create a production release by themselves.
 
-`release-it` updates `package.json` and `CHANGELOG.md`, creates the version commit and immutable tag, and publishes the GitHub Release with the repository's built-in `GITHUB_TOKEN`. The only custom Actions secrets are `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID`. See [Deployment and data boundaries](docs/deployment.md#automated-release-and-deployment) for setup, deployment retry, rollback, and the complete lifecycle.
+`release-it` updates `package.json` and `CHANGELOG.md`, creates the version commit and immutable tag, and publishes the GitHub Release. The manual GitHub workflow accepts an existing release tag and deploys it to Vercel. The only custom Actions secrets are `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID`. See [Deployment and data boundaries](docs/deployment.md#manual-release-and-deployment) for setup, deployment retry, rollback, and the complete lifecycle.
 
 ## Deploy to Vercel
 

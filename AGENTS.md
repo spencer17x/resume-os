@@ -79,7 +79,7 @@ Preserve these product invariants:
 
 ## Runtime And Environment
 
-- Match CI with Node.js 22 and `pnpm@10.33.0`. Do not use npm or Yarn to install dependencies or generate another lockfile.
+- Use Node.js 22 and `pnpm@10.33.0`. Do not use npm or Yarn to install dependencies or generate another lockfile.
 - The default development server is local-only at `127.0.0.1:3001`. If that port is occupied, use another loopback port; do not terminate an unrelated process merely to reclaim the default port.
 - Keep secrets in untracked `.env.local` or the deployment secret store. `.env.example` must contain only safe placeholders, and server credentials must never be exposed through a `NEXT_PUBLIC_*` variable or client bundle.
 - Treat `RESUME_OS_ALLOWED_AI_HOSTS`, `RESUME_OS_AI_ACCESS_TOKEN`, `RESUME_OS_LOCAL_ONLY`, and `RESUME_OS_TRUSTED_PROXY` as security-boundary configuration. Do not weaken their semantics to make a request work.
@@ -91,7 +91,7 @@ Preserve these product invariants:
 - Use pnpm for dependency changes and commit `package.json` and `pnpm-lock.yaml` together. Do not hand-edit the lockfile.
 - Changes to `serverExternalPackages`, document parser dependencies, worker assets, or `outputFileTracingIncludes` require the production extraction smoke test.
 - Do not stage ignored build or local-state output such as `.next/`, `out/`, `.vercel/`, `.worktrees/`, or local environment files.
-- In normal feature and fix work, do not pre-bump `package.json`, hand-maintain `CHANGELOG.md`, or create version tags. The release workflow owns those artifacts.
+- In normal feature and fix work, do not pre-bump `package.json`, hand-maintain `CHANGELOG.md`, or create version tags. Release artifacts are created only when the user explicitly requests a release.
 
 ## Commands And Verification
 
@@ -106,21 +106,18 @@ Primary checks:
 
 ```bash
 corepack pnpm@10.33.0 typecheck
-corepack pnpm@10.33.0 lint
 corepack pnpm@10.33.0 test
 corepack pnpm@10.33.0 build
 corepack pnpm@10.33.0 test:e2e
 corepack pnpm@10.33.0 test:production-extraction
 ```
 
-`corepack pnpm@10.33.0 install` configures the tracked `.githooks/pre-commit`, `.githooks/commit-msg`, and `.githooks/pre-push` hooks. The first validates the exact staged snapshot, the second validates the commit subject, and the third validates every outgoing commit plus protected refs. If an existing checkout needs to restore them, run `corepack pnpm@10.33.0 hooks:install`.
-
 Verification policy:
 
 - Run the narrowest relevant Vitest file while iterating.
 - Keep unit and component tests colocated as `*.test.ts` or `*.test.tsx`; keep browser workflows in `tests/e2e/`. Add a regression test for a bug fix when the failure is reproducible.
 - Use synthetic resume and provider data in tests, fixtures, screenshots, and logs. Never copy a real resume, API key, or personal career history into the repository.
-- Before handing off a material code change, run `typecheck`, `lint`, and the full unit/integration suite.
+- Before handing off a material code change, run `typecheck` and the full unit/integration suite.
 - Run `build` for App Router, server/client boundary, configuration, dependency, or production-bundling changes.
 - Run `test:production-extraction` for document parsing, worker, dependency tracing, Next config, or deployment changes.
 - Run the relevant Playwright project for desktop/mobile routing, window management, responsive UI, or complete user-flow changes.
@@ -148,13 +145,12 @@ When asked to commit or use Commit and Push:
 Rules:
 
 - Allowed types: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`.
-- Use `feat`, never `feature`; PR title validation does not accept `feature`.
+- Use `feat`, never `feature`.
 - Use a lowercase type and optional lowercase scope. Useful scopes include `agent`, `studio`, `desktop`, `api`, `i18n`, `settings`, `docs`, `test`, `deps`, and `release`.
 - Keep the subject imperative, free of a trailing period, and at most 100 characters.
 - Use `!` for a breaking change, for example `feat(agent)!: replace persisted run schema`, and explain the migration in a `BREAKING CHANGE:` footer when useful.
 - Split unrelated changes into separate commits when they have independent purposes or release effects.
 - Do not amend an existing commit or force-push unless explicitly requested.
-- Do not bypass the tracked `pre-commit`, `commit-msg`, or `pre-push` hooks with `--no-verify`. Treat a hook rejection as a request to correct the staged files, commit subject, or outgoing history, not to disable validation.
 
 Examples:
 
@@ -167,14 +163,14 @@ test(desktop): cover restored window focus
 
 Release behavior:
 
-- A successful CI run on the current `main` revision starts the release workflow.
+- Releases are not started automatically. Creating a version commit, tag, and GitHub Release requires an explicit release request; the GitHub workflow only redeploys an existing release tag.
 - `fix`, `perf`, and `revert` create a patch release.
 - `feat` creates a minor release.
 - A breaking-change note creates a major release.
 - `docs`, `refactor`, `test`, `build`, `ci`, and `chore` do not create a release by themselves.
-- Let release-it create the version commit, `vX.Y.Z` tag, and GitHub Release. Do not manually create release tags unless explicitly handling a documented redeploy or recovery.
+- When a release is explicitly requested, let release-it create the version commit, `vX.Y.Z` tag, and GitHub Release. Do not manually create release tags unless explicitly handling a documented recovery.
 - Do not run `pnpm release`, deploy production, move a tag, or invoke the manual redeploy workflow unless the user explicitly requests that exact release operation.
-- PR titles must pass the same validator and 100-character limit as commit subjects. Prefer squash merge so the validated PR title becomes the release commit subject.
+- Prefer a Conventional Commit PR title and squash merge so the PR title becomes the release commit subject.
 
 ## Review Guidelines
 

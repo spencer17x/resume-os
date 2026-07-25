@@ -79,20 +79,20 @@ Chrome does not currently guarantee Chinese as a Prompt API input or output lang
 
 Users should still review the privacy and retention terms of their chosen hosting platform and OpenAI-compatible provider. “No Resume OS server database” is not a claim that network infrastructure or an external provider has no operational logs.
 
-## Automated release and deployment
+## Manual release and deployment
 
-The repository separates validation, versioning, and production deployment into explicit gates:
+The repository does not run a project CI workflow. Validation is performed explicitly before a release, and production deployment requires a manual workflow dispatch with an existing release tag:
 
 ```text
-Conventional Commit pushed to main
-  → CI / conventional-commits + change-policy + verify + e2e
+explicit verification and release request
   → release-it calculates the next SemVer version
   → package.json + CHANGELOG.md + version commit
   → immutable vX.Y.Z tag + GitHub Release
+manual Release workflow with that tag
   → Vercel production build and deployment from the released commit
 ```
 
-`.github/workflows/ci.yml` runs for pull requests and `main`; pull-request title edits also rerun the shared Conventional Commit title policy. Pull-request policy jobs execute the validator from the trusted target-branch revision, so a proposed change cannot weaken its own gate. The change-policy job examines every new commit rather than only the final tree, so a sensitive file or secret added and later removed in the same pushed range still fails. `.github/workflows/release.yml` is triggered only after a successful CI run for the current `main` revision. If another commit reaches `main` while an older run is finishing, the older run exits and the newer CI run owns the release. `vercel.json` disables Vercel's direct deployment for `main`, while unspecified feature branches retain Vercel Preview deployments. This prevents one commit from producing both a Git-based Production deployment and a version-based Production deployment.
+The repository does not install Git hooks, ship an ESLint command, or run `.github/workflows/ci.yml`. `.github/workflows/release.yml` never creates a release automatically; it validates an existing `vX.Y.Z` tag and GitHub Release before building and deploying that exact revision. `vercel.json` disables Vercel's direct deployment for `main`, while unspecified feature branches retain Vercel Preview deployments.
 
 No Release PR is created. Pull requests remain available for risky or collaborative changes, but they are not part of the required release path.
 
@@ -106,7 +106,7 @@ Add these repository Actions secrets:
 | `VERCEL_ORG_ID` | The linked Vercel project `orgId` from `.vercel/project.json`. |
 | `VERCEL_PROJECT_ID` | The linked Vercel project `projectId` from `.vercel/project.json`. |
 
-The workflow-level `GITHUB_TOKEN` default is read-only. Only the release job requests `contents: write`; the production deployment job stays read-only, and no personal release token is required. The repository Actions policy allows only GitHub-owned actions pinned to a full commit SHA. Keep this policy aligned with every `uses:` entry before introducing another action.
+The workflow-level `GITHUB_TOKEN` and both jobs are read-only. The repository Actions policy allows only GitHub-owned actions pinned to a full commit SHA. Keep this policy aligned with every `uses:` entry before introducing another action.
 
 Keep the remote repository settings aligned with these boundaries:
 
@@ -115,21 +115,13 @@ Keep the remote repository settings aligned with these boundaries:
 | Actions default workflow permissions | Read-only; workflows cannot approve pull requests |
 | Allowed Actions | GitHub-owned only; full-length commit SHA required |
 | `main` protection | Enforce for administrators; require linear history; disallow force pushes and deletion; ordinary fast-forward direct pushes remain allowed |
-| Pull-request merge methods | Merge commits disabled; squash and rebase enabled; squash subject comes from the validated PR title |
+| Pull-request merge methods | Merge commits disabled; squash and rebase enabled |
 | Secret scanning | Secret scanning and push protection enabled |
 | Code scanning | CodeQL default setup enabled for JavaScript/TypeScript and Actions |
 
-CodeQL runs as GitHub's default security-analysis workflow. The release workflow remains gated by the repository `CI` workflow, so treat any CodeQL alert as a security finding that must be reviewed rather than as a versioning signal.
+CodeQL may still run through GitHub's separately managed default setup. Treat any CodeQL alert as a security finding that must be reviewed rather than as a release signal.
 
-For the simplest solo-maintainer flow, ordinary fast-forward pushes to `main` are allowed. Dependency installation configures tracked `pre-commit`, `commit-msg`, and `pre-push` hooks under `.githooks/`. They validate the exact staged snapshot, hide matching secret values, enforce the shared Conventional Commit policy, scan every outgoing commit, reject non-linear or non-fast-forward `main` updates, and keep existing release tags immutable. CI repeats the commit and change policies before project checks, so `--no-verify`, another Git client, or a missing local hook cannot produce a successful release CI run with invalid commits. If a change uses a pull request, require these checks and use squash merge so its Conventional Commit title becomes the commit on `main`:
-
-- `CI / conventional-title`
-- `CI / conventional-commits`
-- `CI / change-policy`
-- `CI / verify`
-- `CI / e2e`
-
-When Playwright fails, `CI / e2e` uploads `.next/playwright-results` as a seven-day artifact so traces and error context remain available after the runner exits. Fixtures must remain synthetic because traces can contain rendered form values and mocked request details.
+Ordinary fast-forward pushes to `main` are allowed and no repository-managed status checks are required. Before creating a release, explicitly run the checks appropriate to the change and inspect commits for sensitive files, secrets, whitespace errors, and valid release metadata. Fixtures must remain synthetic because local Playwright traces can contain rendered form values and mocked request details.
 
 ### Version rules
 
@@ -143,13 +135,13 @@ The package baseline is `0.1.0`. Until the first version tag exists, release-it 
 | `perf(scope): ...` or `revert: ...` | Patch |
 | `docs:`, `test:`, `build:`, `ci:`, `chore:` | No release by itself |
 
-`release-it` accumulates all unreleased commits, chooses the highest required bump, updates `package.json` and `CHANGELOG.md`, commits `chore(release): vX.Y.Z [skip ci]`, creates the matching tag and GitHub Release, and then deploys that exact released commit to Vercel Production. The release commit does not start a second release cycle. Do not create or move version tags manually.
+When explicitly invoked, `release-it` accumulates all unreleased commits, chooses the highest required bump, updates `package.json` and `CHANGELOG.md`, commits `chore(release): vX.Y.Z [skip ci]`, and creates the matching tag and GitHub Release. Deployment is a separate manual workflow dispatch using that existing tag. Do not create or move version tags manually.
 
 If GitHub Release creation succeeds but the Vercel job fails, open **Actions → Release → Run workflow**, enter the existing `vX.Y.Z` tag, and rerun deployment. The manual path validates that both the immutable tag and GitHub Release already exist; it never recalculates or replaces the version.
 
 ### Rollback and hotfixes
 
-- For a normal fix, push a `fix:` commit to `main`. This produces a new patch version after CI and preserves forward-only release history.
+- For a normal fix, push a `fix:` commit to `main`. When a patch release is desired, explicitly run the release process after verification.
 - For an urgent traffic rollback, restore the previous deployment in Vercel, then follow with a `revert:` or `fix:` commit so Git history and the next patch version describe the production state.
 - Never move or overwrite an existing `vX.Y.Z` tag.
 
@@ -199,7 +191,6 @@ The 3 MiB/4 MiB application limits stay below Vercel Functions' documented [4.5 
 corepack pnpm@10.33.0 install --frozen-lockfile
 corepack pnpm@10.33.0 test
 corepack pnpm@10.33.0 typecheck
-corepack pnpm@10.33.0 lint
 corepack pnpm@10.33.0 build
 corepack pnpm@10.33.0 test:production-extraction
 ```

@@ -3,8 +3,6 @@
   "version": "0.3.0",
   "private": true,
   "scripts": {
-    "prepare": "node scripts/install-git-hooks.mjs",
-    "hooks:install": "node scripts/install-git-hooks.mjs",
     "dev": "RESUME_OS_LOCAL_ONLY=1 next dev --hostname 127.0.0.1 -p 3001",
     "build": "next build",
     "start": "RESUME_OS_LOCAL_ONLY=1 next start --hostname 127.0.0.1",
@@ -14,7 +12,6 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:update": "playwright test --update-snapshots",
-    "lint": "eslint .",
     "typecheck": "tsc --noEmit --incremental false",
     "release": "release-it --ci --config .release-it.cjs"
   },
@@ -52,8 +49,6 @@
     "@types/three": "^0.185.1",
     "@types/yauzl": "3.4.0",
     "autoprefixer": "latest",
-    "eslint": "^9.39.4",
-    "eslint-config-next": "latest",
     "fake-indexeddb": "^6.2.5",
     "jsdom": "^29.1.1",
     "postcss": "latest",
