@@ -26,7 +26,7 @@ type AmbientAgent = {
 const ambientAgents = [
   { appId: 'studio', storyRole: 'evidence', number: '01', label: 'Resume Studio', status: 'Analyze', x: 28, y: 17, color: 'var(--desktop-agent-studio)', labelSide: 'left', routeAngle: -145, routeLength: 31, routeArc: 54, delay: -1.8 },
   { appId: 'agent', storyRole: 'retrieve', number: '02', label: 'Resume Agent', status: 'Retrieve', x: 70, y: 14, color: 'var(--desktop-agent-agent)', labelSide: 'right', routeAngle: -45, routeLength: 29, routeArc: 66, delay: -4.4 },
-  { appId: 'jd-match', storyRole: 'jd', number: '03', label: 'JD Match', status: 'Match', x: 88, y: 43, color: 'var(--desktop-agent-match)', labelSide: 'right', routeAngle: 0, routeLength: 38, routeArc: 48, delay: -2.7 },
+  { appId: 'jd-match', storyRole: 'jd', number: '03', label: 'Target Job', status: 'Extract', x: 88, y: 43, color: 'var(--desktop-agent-match)', labelSide: 'right', routeAngle: 0, routeLength: 38, routeArc: 48, delay: -2.7 },
   { appId: 'resume-3d', storyRole: 'synthesize', number: '04', label: 'Resume 3D', status: 'Draft', x: 70, y: 70, color: 'var(--desktop-agent-resume-3d)', labelSide: 'right', routeAngle: 45, routeLength: 29, routeArc: 60, delay: -5.1 },
   { appId: 'projects', storyRole: 'rank', number: '05', label: 'Projects', status: 'Verify', x: 25, y: 70, color: 'var(--desktop-agent-projects)', labelSide: 'left', routeAngle: 145, routeLength: 32, routeArc: 54, delay: -3.5 },
   { appId: 'timeline', storyRole: 'verify', number: '06', label: 'Timeline', status: 'Ready', x: 10, y: 43, color: 'var(--desktop-agent-timeline)', labelSide: 'left', routeAngle: 180, routeLength: 40, routeArc: 44, delay: -0.8 }
@@ -319,7 +319,7 @@ export function DesktopAmbient({ subdued }: { subdued: boolean }) {
               </li>
             ))}
           </ol>
-          <p><span>Orchestration active</span><i /><span>6 agents online</span></p>
+          <p><span>Domain agent active</span><i /><span>6 workflow modules</span></p>
         </div>
       </div>
     </div>

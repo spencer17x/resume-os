@@ -1,6 +1,12 @@
 'use client'
 
-import { BriefcaseBusiness, LoaderCircle, ScanSearch } from 'lucide-react'
+import {
+  BriefcaseBusiness,
+  CircleStop,
+  ScanSearch,
+  Settings2,
+  TriangleAlert
+} from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
 import { useEffect, useRef, useState } from 'react'
 import { useResumeDraft } from '@/components/resume-draft-provider'
@@ -119,6 +125,7 @@ export function JDMatchApp({
     : { provider: reportState.provider, model: reportState.model }
   const visibleError = reportIsStale ? t('stale') : error
   const status = pending ? t('analyzing') : visibleError ? '' : visibleReport ? t('complete') : ''
+  const sandboxDraft = ['sample', 'ai-generated', 'ai-chat'].includes(activeDraft?.source ?? '')
 
   useEffect(() => () => requestRef.current?.controller.abort(), [])
   useEffect(() => { activeRef.current = activeDraft }, [activeDraft])
@@ -220,7 +227,7 @@ export function JDMatchApp({
 
     try {
       const jobDescription = jd.trim()
-      const prompt = buildJDMatchPrompt(jobDescription, locale, draft.data)
+      const prompt = buildJDMatchPrompt(jobDescription, locale)
       const taskInput: StructuredTaskInput<ProviderMatchResult> = {
         task: {
           kind: 'extract-job-requirements',
@@ -285,6 +292,10 @@ export function JDMatchApp({
     }
   }
 
+  function cancelAnalysis() {
+    requestRef.current?.controller.abort()
+  }
+
   async function saveRequirementCorrection(
     requirementId: string,
     revision: RequirementRevision
@@ -319,19 +330,12 @@ export function JDMatchApp({
     }
   }
 
-  async function createConfirmedWorkflow(confirmRemaining: boolean) {
+  async function createConfirmedWorkflow() {
     const current = reportState
     const draft = activeRef.current
     if (!current?.analysis || current.workflowPreference || reportIsStale || !draft) return
 
-    let matrix = current.analysis.matrix
-    if (confirmRemaining) {
-      for (const requirement of matrix.requirements) {
-        if (!requirement.userConfirmed) {
-          matrix = reviseRequirementMatrix(matrix, requirement.id, { userConfirmed: true })
-        }
-      }
-    }
+    const matrix = current.analysis.matrix
     if (matrix.requirements.some((requirement) => !requirement.userConfirmed)) return
 
     const analysis = jdRequirementAnalysisSchema.parse({
@@ -379,6 +383,16 @@ export function JDMatchApp({
           <h2 id="jd-match-title">{activeDraft.name}</h2>
           <p>{activeDraft.data.profile.name} · {activeDraft.data.targetRole || activeDraft.data.profile.title}</p>
         </header>
+        {sandboxDraft ? (
+          <aside className="resume-app-sandbox-warning" role="note">
+            <TriangleAlert size={15} aria-hidden="true" />
+            <div>
+              <strong>{t('sandboxWarningTitle')}</strong>
+              <p>{t('sandboxWarningDescription')}</p>
+              <a href={`/${locale}/studio`}>{t('sandboxWarningAction')}</a>
+            </div>
+          </aside>
+        ) : null}
         <label htmlFor="jd-match-input">{t('jobDescription')}</label>
         <textarea
           id="jd-match-input"
@@ -386,15 +400,25 @@ export function JDMatchApp({
           onChange={(event) => { setJd(event.target.value); setError('') }}
           placeholder={t('jobPlaceholder')}
         />
-        <button className="resume-app-primary" onClick={analyze} disabled={pending || cooldown > 0}>
-          {pending ? <LoaderCircle className="resume-app-spinner" size={15} /> : <ScanSearch size={15} />}
-          {pending ? t('analyzing') : t('analyze')}
+        <button
+          className="resume-app-primary"
+          onClick={() => pending ? cancelAnalysis() : void analyze()}
+          disabled={!pending && cooldown > 0}
+        >
+          {pending ? <CircleStop size={15} /> : <ScanSearch size={15} />}
+          {pending ? t('cancelAnalysis') : t('analyze')}
         </button>
         {downloadProgress !== null ? <div className="resume-app-download" role="status">
           <span>{t('localModelDownload', { percentage: Math.round(downloadProgress * 100) })}</span>
           <progress aria-label={t('localModelDownloadLabel')} value={downloadProgress} max={1} />
+          <a href={`/${locale}/settings`}><Settings2 size={13} aria-hidden="true" />{t('openSettings')}</a>
         </div> : null}
-        {visibleError && <p className="resume-app-error" role="alert">{visibleError}</p>}
+        {visibleError ? (
+          <div className="resume-app-error-block">
+            <p className="resume-app-error" role="alert">{visibleError}</p>
+            <a href={`/${locale}/settings`}><Settings2 size={13} aria-hidden="true" />{t('openSettings')}</a>
+          </div>
+        ) : null}
       </section>
       <section className="jd-match-app__report" aria-label={t('report')} aria-busy={pending}>
         <div className="resume-app-section-title">
@@ -500,13 +524,16 @@ function RequirementAssessment({
   workflowSaving: boolean
   correctingRequirementId: string
   onRevise: (requirementId: string, revision: RequirementRevision) => Promise<void>
-  onCreateWorkflow: (confirmRemaining: boolean) => Promise<void>
+  onCreateWorkflow: () => Promise<void>
 }) {
   const t = useTranslations('jdMatch.assessment')
   const locale = useLocale()
   const matches = new Map(analysis.matrix.matches.map((match) => [match.requirementId, match]))
   const confirmedCount = analysis.matrix.requirements.filter((requirement) => requirement.userConfirmed).length
   const unconfirmedCount = analysis.matrix.requirements.length - confirmedCount
+  const evidenceReviewStarted = analysis.matrix.matches.some(
+    (match) => match.factIds.length > 0 || match.status !== 'gap'
+  )
 
   return (
     <section className="jd-match-app__analysis" aria-labelledby="jd-match-analysis-title">
@@ -530,25 +557,29 @@ function RequirementAssessment({
         </div>
         <button
           type="button"
-          disabled={workflowSaving}
-          onClick={() => void onCreateWorkflow(unconfirmedCount > 0)}
+          disabled={workflowSaving || unconfirmedCount > 0}
+          onClick={() => void onCreateWorkflow()}
         >
           {workflowSaving
             ? t('savingWorkflow')
             : unconfirmedCount > 0
-              ? t('confirmAllAndCreate')
+              ? t('reviewRemaining', { count: unconfirmedCount })
               : t('createWorkflow')}
         </button>
       </div> : null}
       <div className="jd-match-app__scores" aria-label={t('scoreSummary')}>
         <article>
           <span>{t('coverage')}</span>
-          <strong>{formatPercentage(analysis.score.requirementCoverage, locale)}</strong>
+          <strong>{evidenceReviewStarted
+            ? formatPercentage(analysis.score.requirementCoverage, locale)
+            : t('pendingEvidence')}</strong>
           <p>{t('coverageHelp')}</p>
         </article>
         <article>
           <span>{t('evidenceScore')}</span>
-          <strong>{formatPercentage(analysis.score.evidenceCompleteness, locale)}</strong>
+          <strong>{evidenceReviewStarted
+            ? formatPercentage(analysis.score.evidenceCompleteness, locale)
+            : t('pendingEvidence')}</strong>
           <p>{t('evidenceHelp')}</p>
         </article>
         <article>
@@ -592,7 +623,9 @@ function RequirementAssessment({
               <p><b>{t('rationale')}</b>{match?.rationale ?? t('noAssessment')}</p>
               <p className="jd-match-app__evidence" data-missing={factIds.length === 0}>
                 <b>{t('evidence')}</b>
-                {factIds.length > 0 ? factIds.join(', ') : t('missingEvidence')}
+                {factIds.length > 0
+                  ? t('linkedEvidence', { count: factIds.length })
+                  : t('missingEvidence')}
               </p>
               <RequirementCorrection
                 key={`${requirement.id}:${analysis.matrix.inputFingerprint}`}

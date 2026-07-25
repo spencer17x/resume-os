@@ -19,6 +19,11 @@ const input = {
     id: 'fact-1', kind: 'experience' as const, text: 'Owned a platform',
     evidenceRefs: ['source-1'], verification: 'document-backed' as const,
     tags: [], createdAt: '2026-07-16T00:00:00.000Z', updatedAt: '2026-07-16T00:00:00.000Z'
+  }],
+  resumeTargets: [{
+    path: 'profile.summary.0',
+    current: 'Owned a platform',
+    transformations: ['rewrite', 'emphasize'] as Array<'rewrite' | 'emphasize'>
   }]
 }
 
@@ -39,7 +44,8 @@ describe('optimization plan prompt', () => {
       }],
       careerFacts: [{
         id: 'fact-1', text: 'Owned a platform', verification: 'document-backed'
-      }]
+      }],
+      resumeTargets: input.resumeTargets
     })
     expect(prompt.user).not.toContain('draft-1')
     expect(prompt.user).not.toContain('job-1')

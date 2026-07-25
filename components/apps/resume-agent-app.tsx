@@ -1,6 +1,15 @@
 'use client'
 
-import { ArrowRight, Check, CircleAlert, LoaderCircle, MessageSquareText, Sparkles, Trash2 } from 'lucide-react'
+import {
+  ArrowRight,
+  Check,
+  CircleAlert,
+  CircleStop,
+  MessageSquareText,
+  Settings2,
+  Sparkles,
+  Trash2
+} from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useResumeDraft } from '@/components/resume-draft-provider'
@@ -42,6 +51,11 @@ import {
 import { scoreRequirementMatrix, type JobRequirement, type ScoreResult } from '@/lib/agent/requirement-matrix'
 import { createResumeVariant } from '@/lib/agent/resume-variant'
 import {
+  isOperationalOptimizationPlanItem,
+  type OptimizationPlan
+} from '@/lib/agent/optimization-run'
+import { buildOptimizationPlanTargets } from '@/lib/agent/optimization-plan'
+import {
   ACTIVE_WORKFLOW_CHANGED_EVENT,
   discardOptimizationChangeSet,
   fingerprintOptimizationInputs,
@@ -49,7 +63,7 @@ import {
   persistOptimizationChangeSet,
   persistRunInputChange
 } from '@/lib/agent/workflow-persistence'
-import { createResumeId } from '@/lib/resume-model'
+import { createResumeId, type ResumeData } from '@/lib/resume-model'
 
 type ApiErrorBody = { code?: string; error?: unknown }
 
@@ -100,6 +114,7 @@ export function ResumeAgentApp({
   const [confirmedIds, setConfirmedIds] = useState<Set<string>>(() => new Set())
   const [error, setError] = useState('')
   const [pending, setPending] = useState(false)
+  const [downloadProgress, setDownloadProgress] = useState<number | null>(null)
   const [cooldown, setCooldown] = useState(0)
   const [workflowBaseline, setWorkflowBaseline] = useState<{
     runId: string
@@ -110,9 +125,18 @@ export function ResumeAgentApp({
   const activeRef = useRef(activeDraft)
   const workspaceRef = useRef(workspace)
 
-  const careerFacts = workspace?.facts ?? []
-  const requirements = workspace?.matrix.requirements ?? []
+  const careerFacts = useMemo(() => workspace?.facts ?? [], [workspace])
+  const requirements = useMemo(
+    () => workspace?.matrix.requirements ?? [],
+    [workspace]
+  )
   const run = workspace?.summary.run ?? null
+  const operationalRunPlan = useMemo(
+    () => run?.plan && activeDraft
+      ? operationalOptimizationPlanForResume(run.plan, activeDraft.data)
+      : null,
+    [activeDraft, run]
+  )
   const currentInputFingerprint = workspace && activeDraft
     ? optimizationInputFingerprint(workspace, activeDraft.data)
     : null
@@ -131,6 +155,11 @@ export function ResumeAgentApp({
     && run.sourceDraftId === activeDraft?.id
     && run.stage === 'generating-changes'
     && run.plan?.approvedAt
+    && !workflowInputIsStale
+    && operationalRunPlan
+  )
+  const hasLegacyUnsafePlan = Boolean(
+    run?.plan && activeDraft && !operationalRunPlan
   )
 
   useEffect(() => () => requestRef.current?.controller.abort(), [])
@@ -178,6 +207,15 @@ export function ResumeAgentApp({
     [selectedId, visibleChangeSet]
   )
   const applicableChanges = visibleChangeSet?.changes.filter(isResumeChangeApplicable) ?? []
+  const requirementLabels = useMemo(
+    () => new Map(requirements.map((requirement) => [requirement.id, requirement.text])),
+    [requirements]
+  )
+  const factLabels = useMemo(
+    () => new Map(careerFacts.map((fact) => [fact.id, fact.text])),
+    [careerFacts]
+  )
+  const instructionTemplates = t.raw('instructionTemplates') as string[]
 
   function synchronizeWorkspace(next: AgentWorkspace | null) {
     const draft = activeRef.current
@@ -235,6 +273,11 @@ export function ResumeAgentApp({
       return
     }
     const approvedPlan = activeWorkspace.summary.run.plan!
+    const operationalPlan = operationalOptimizationPlanForResume(approvedPlan, draft.data)
+    if (!operationalPlan) {
+      setError(t('legacyPlanUnsupported'))
+      return
+    }
 
     requestRef.current?.controller.abort()
     const controller = new AbortController()
@@ -245,6 +288,7 @@ export function ResumeAgentApp({
     const fingerprint = suggestionFingerprint(draft.id, draft.data, availableRequirements, facts)
     const generationInputFingerprint = optimizationInputFingerprint(activeWorkspace, draft.data)
     setPending(true)
+    setDownloadProgress(null)
     setError('')
 
     try {
@@ -257,7 +301,7 @@ export function ResumeAgentApp({
         requirements: approvedContext.requirements.map(({ id, text }) => ({ id, text })),
         requirementMatches: approvedContext.requirementMatches,
         careerFacts: approvedContext.facts.map(({ id, text, verification }) => ({ id, text, verification })),
-        optimizationPlan: approvedPlan
+        optimizationPlan: operationalPlan
       }
       const preference = readAiProviderPreference()
       const localContext = selectLocalRewriteContext(activeWorkspace, draft.data)
@@ -320,7 +364,10 @@ export function ResumeAgentApp({
               activeWorkspace.matrix.matches
             )
           },
-          signal: controller.signal
+          signal: controller.signal,
+          onDownloadProgress(progress) {
+            if (requestRef.current?.id === id) setDownloadProgress(progress)
+          }
         }
         result = await runPreferredProviderTask({
           preference,
@@ -372,8 +419,15 @@ export function ResumeAgentApp({
       if (controller.signal.aborted || requestRef.current?.id !== id) return
       setError(localizedError(caught, t))
     } finally {
-      if (requestRef.current?.id === id) setPending(false)
+      if (requestRef.current?.id === id) {
+        setPending(false)
+        setDownloadProgress(null)
+      }
     }
+  }
+
+  function cancelGeneration() {
+    requestRef.current?.controller.abort()
   }
 
   async function accept(ids: string[]) {
@@ -469,6 +523,7 @@ export function ResumeAgentApp({
         </header>
         <AgentWorkflowPanel
           activeDraftId={activeDraft.id}
+          resume={activeDraft.data}
           instruction={instruction}
           service={workflowService}
           workspaceSnapshot={workspace ?? undefined}
@@ -476,17 +531,37 @@ export function ResumeAgentApp({
         />
         <div className="resume-agent-app__form">
           <label htmlFor="agent-instruction">{t('instruction')}</label>
+          <p className="resume-agent-app__instruction-help">{t('instructionHelp')}</p>
+          <div className="resume-agent-app__instruction-templates" aria-label={t('instructionTemplatesLabel')}>
+            {instructionTemplates.map((template) => (
+              <button
+                key={template}
+                type="button"
+                disabled={pending}
+                onClick={() => setInstruction(template)}
+              >{template}</button>
+            ))}
+          </div>
           <textarea id="agent-instruction" value={instruction} onChange={(event) => setInstruction(event.target.value)} placeholder={t('instructionPlaceholder')} disabled={pending} />
           <button
             className="resume-app-primary"
-            onClick={analyze}
-            disabled={pending || cooldown > 0 || !canGenerateChanges}
+            onClick={() => pending ? cancelGeneration() : void analyze()}
+            disabled={!pending && (cooldown > 0 || !canGenerateChanges)}
           >
-            {pending ? <LoaderCircle className="resume-app-spinner" size={15} /> : <Sparkles size={15} />}
-            {pending ? t('analyzing') : t('analyze')}
+            {pending ? <CircleStop size={15} /> : <Sparkles size={15} />}
+            {pending ? t('cancelGeneration') : t('analyze')}
           </button>
+          {downloadProgress !== null ? <div className="resume-app-download" role="status">
+            <span>{t('localModelDownload', { percentage: Math.round(downloadProgress * 100) })}</span>
+            <progress aria-label={t('localModelDownloadLabel')} value={downloadProgress} max={1} />
+            <a href={`/${locale}/settings`}>
+              <Settings2 size={13} aria-hidden="true" />{t('openSettings')}
+            </a>
+          </div> : null}
           {!canGenerateChanges && !visibleChangeSet ? (
-            <p className="resume-agent-app__generation-lock">{t('generationLocked')}</p>
+            <p className="resume-agent-app__generation-lock">
+              {hasLegacyUnsafePlan ? t('legacyPlanUnsupported') : t('generationLocked')}
+            </p>
           ) : null}
           {visibleError && <p className="resume-app-error" role="alert">{visibleError}</p>}
         </div>
@@ -514,6 +589,8 @@ export function ResumeAgentApp({
                 <ChangeItem
                   key={change.id}
                   change={change}
+                  requirementLabels={requirementLabels}
+                  factLabels={factLabels}
                   selected={selected?.id === change.id}
                   confirmed={confirmedIds.has(change.id)}
                   onSelect={() => setSelectedId(change.id)}
@@ -556,7 +633,11 @@ export function ResumeAgentApp({
             <ArrowRight aria-hidden="true" size={18} />
             <article><h3>{t('after')}</h3><p>{displayValue(selected.proposed)}</p></article>
             <p className="resume-agent-app__reason">{selected.reason}</p>
-            <EvidenceDetails change={selected} />
+            <EvidenceDetails
+              change={selected}
+              requirementLabels={requirementLabels}
+              factLabels={factLabels}
+            />
           </div>
         ) : !variant && <p className="resume-app-empty">{t('noSuggestions')}</p>}
       </section>
@@ -564,8 +645,19 @@ export function ResumeAgentApp({
   )
 }
 
-function ChangeItem({ change, selected, confirmed, onSelect, onConfirm, onAccept }: {
+function ChangeItem({
+  change,
+  requirementLabels,
+  factLabels,
+  selected,
+  confirmed,
+  onSelect,
+  onConfirm,
+  onAccept
+}: {
   change: ResumeChange
+  requirementLabels: ReadonlyMap<string, string>
+  factLabels: ReadonlyMap<string, string>
   selected: boolean
   confirmed: boolean
   onSelect: () => void
@@ -590,7 +682,12 @@ function ChangeItem({ change, selected, confirmed, onSelect, onConfirm, onAccept
             <span>{t('confirmEvidence', { value: displayValue(change.proposed) })}</span>
           </label>
         )}
-        <EvidenceDetails change={change} compact />
+        <EvidenceDetails
+          change={change}
+          requirementLabels={requirementLabels}
+          factLabels={factLabels}
+          compact
+        />
       </div>
       <button
         className="resume-agent-app__accept"
@@ -602,19 +699,69 @@ function ChangeItem({ change, selected, confirmed, onSelect, onConfirm, onAccept
   )
 }
 
-function EvidenceDetails({ change, compact = false }: { change: ResumeChange; compact?: boolean }) {
+function EvidenceDetails({
+  change,
+  requirementLabels,
+  factLabels,
+  compact = false
+}: {
+  change: ResumeChange
+  requirementLabels: ReadonlyMap<string, string>
+  factLabels: ReadonlyMap<string, string>
+  compact?: boolean
+}) {
   const t = useTranslations('agent')
   const evidence = change.evidence
   return (
     <dl className="resume-agent-app__evidence" data-compact={compact}>
-      <div><dt>{t('evidence.requirements')}</dt><dd>{evidence.requirementIds.join(', ') || t('evidence.none')}</dd></div>
-      <div><dt>{t('evidence.facts')}</dt><dd>{evidence.factIds.join(', ') || t('evidence.none')}</dd></div>
+      <div><dt>{t('evidence.requirements')}</dt><dd>{describeEvidenceReferences(
+        evidence.requirementIds,
+        requirementLabels,
+        t('evidence.none'),
+        t('evidence.unavailable')
+      )}</dd></div>
+      <div><dt>{t('evidence.facts')}</dt><dd>{describeEvidenceReferences(
+        evidence.factIds,
+        factLabels,
+        t('evidence.none'),
+        t('evidence.unavailable')
+      )}</dd></div>
       <div><dt>{t('evidence.supportLabel')}</dt><dd>{t(`evidence.support.${evidence.support}`)}</dd></div>
       <div><dt>{t('evidence.matchLabel')}</dt><dd>{t(`evidence.match.${evidence.matchType}`)}</dd></div>
-      <div><dt>{t('evidence.confidence')}</dt><dd>{Math.round(evidence.confidence * 100)}%</dd></div>
       <div><dt>{t('evidence.transformationLabel')}</dt><dd>{t(`evidence.transformation.${evidence.transformation}`)}</dd></div>
     </dl>
   )
+}
+
+function describeEvidenceReferences(
+  ids: readonly string[],
+  labels: ReadonlyMap<string, string>,
+  empty: string,
+  unavailable: string
+) {
+  if (ids.length === 0) return empty
+  return ids.map((id) => labels.get(id) ?? unavailable).join(' · ')
+}
+
+function operationalOptimizationPlanForResume(
+  plan: OptimizationPlan,
+  resume: ResumeData
+) {
+  const targets = new Map(
+    buildOptimizationPlanTargets(resume).map((target) => [target.path, target])
+  )
+  const items = []
+  for (const item of plan.items) {
+    if (!isOperationalOptimizationPlanItem(item)) return null
+    const target = targets.get(item.targetPath)
+    if (!target?.transformations.includes(item.transformation)) return null
+    items.push({
+      ...item,
+      targetPath: item.targetPath,
+      transformation: item.transformation
+    })
+  }
+  return { ...plan, items }
 }
 
 function QuestionList({ questions, label }: { questions: string[]; label: string }) {
@@ -692,6 +839,7 @@ type LocalRewriteContext = {
     id: string
     requirementIds: string[]
     factIds: string[]
+    targetPath: string
     intent: string
     transformation: 'rewrite' | 'emphasize'
   }
@@ -716,6 +864,8 @@ function selectLocalRewriteContext(
 
   for (const item of plan.items) {
     if (
+      !isOperationalOptimizationPlanItem(item)
+      ||
       item.transformation !== 'rewrite'
       && item.transformation !== 'emphasize'
     ) continue
@@ -736,7 +886,8 @@ function selectLocalRewriteContext(
       factIds: match.factIds.filter((id) => factIds.has(id))
     }))
 
-    for (const target of leaves) {
+    const candidateTargets = leaves.filter((target) => target.path === item.targetPath)
+    for (const target of candidateTargets) {
       const score = localRewriteRelevance(
         target.original,
         facts.map(({ text }) => text),

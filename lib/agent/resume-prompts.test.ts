@@ -53,6 +53,7 @@ describe('resume prompts', () => {
         id: 'plan-1', approvedAt: '2026-07-16T08:00:00.000Z',
         item: {
           id: 'item-1', requirementIds: ['requirement-1'], factIds: ['fact-1'],
+          targetPath: 'experiences.0.bullets.0',
           intent: 'Clarify platform ownership.', transformation: 'rewrite'
         }
       }
@@ -74,6 +75,7 @@ describe('resume prompts', () => {
         id: 'plan-1', approvedAt: '2026-07-16T08:00:00.000Z',
         item: {
           id: 'item-1', requirementIds: ['requirement-1'], factIds: ['fact-1'],
+          targetPath: 'experiences.0.bullets.0',
           intent: 'Clarify platform ownership.', transformation: 'rewrite'
         }
       }

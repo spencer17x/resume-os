@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { scoreRequirementMatrix } from './requirement-matrix'
 import {
   createOptimizationRun,
+  optimizationRunSchema,
   OptimizationRunTransitionError,
   transitionOptimizationRun,
   type OptimizationRun
@@ -68,6 +69,7 @@ const plan = {
     id: 'item-1',
     requirementIds: ['req-1'],
     factIds: ['fact-1'],
+    targetPath: 'profile.summary.0',
     intent: 'Make the existing evidence easier to find.',
     transformation: 'emphasize' as const
   }]
@@ -155,6 +157,48 @@ describe('optimization run state machine', () => {
         type: 'propose-changes', changeSet, currentFingerprint: changeFingerprint
       }, times[3]),
       'INVALID_TRANSITION'
+    )
+  })
+
+  it('rejects unsafe or untargeted plans at the state-machine boundary', () => {
+    const run = runUntilEvidenceMapped()
+    const [{ targetPath: _targetPath, ...untargetedItem }] = plan.items
+
+    expectTransitionError(
+      () => transitionOptimizationRun(run, {
+        type: 'prepare-plan',
+        plan: { ...plan, items: [untargetedItem] }
+      }, times[3]),
+      'INVALID_PLAN_REFERENCE'
+    )
+    expectTransitionError(
+      () => transitionOptimizationRun(run, {
+        type: 'prepare-plan',
+        plan: {
+          ...plan,
+          items: [{
+            ...plan.items[0],
+            transformation: 'remove'
+          }]
+        }
+      }, times[3]),
+      'INVALID_PLAN_REFERENCE'
+    )
+  })
+
+  it('recovers older persisted plans for display but will not approve them', () => {
+    const [{ targetPath: _targetPath, ...legacyItem }] = plan.items
+    const legacyRun = optimizationRunSchema.parse({
+      ...runUntilEvidenceMapped(),
+      stage: 'awaiting-plan-approval',
+      plan: { ...plan, items: [legacyItem] },
+      updatedAt: times[4]
+    })
+
+    expect(legacyRun.plan?.items[0].targetPath).toBeUndefined()
+    expectTransitionError(
+      () => transitionOptimizationRun(legacyRun, { type: 'approve-plan' }, times[5]),
+      'INVALID_PLAN_REFERENCE'
     )
   })
 

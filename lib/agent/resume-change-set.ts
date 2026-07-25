@@ -270,6 +270,7 @@ export type ResumeChangePlan = {
   items: Array<{
     requirementIds: string[]
     factIds: string[]
+    targetPath?: string
     transformation: ResumeChangeEvidence['transformation']
   }>
 }
@@ -416,6 +417,7 @@ export function validateResumeChangesAgainstApprovedPlan(
     )
     const followsOnePlanItem = plan.items.some((item) => (
       item.transformation === change.evidence.transformation
+      && (!item.targetPath || item.targetPath === change.path)
       && change.evidence.requirementIds.every((id) => item.requirementIds.includes(id))
       && change.evidence.factIds.every((id) => item.factIds.includes(id))
     ))
@@ -759,8 +761,10 @@ function hasClaimContentSupport(
   if (typeof change.original === 'string' && typeof change.proposed === 'string') {
     const proposed = change.proposed
     if (!proposed.trim()) return false
-    return [change.original, ...citedFacts.map(({ text }) => text)]
-      .some((source) => sourceSupportsClaim(source, proposed))
+    const factSources = citedFacts.map(({ text }) => text)
+    return sourcesSupportClaim([change.original, ...factSources], proposed)
+      && supportsNumericBindings([change.original, ...factSources], proposed)
+      && supportsNewTokenRelations(change.original, factSources, proposed)
   }
   if (
     change.evidence.transformation === 'add-from-fact'
@@ -774,19 +778,46 @@ function hasClaimContentSupport(
     if (change.original.some((value) => normalizeClaimText(value) === normalizeClaimText(inserted))) {
       return false
     }
-    return citedFacts.some(({ text }) => sourceSupportsClaim(text, inserted))
+    return citedFacts.some(({ text }) => sourceSupportsClaimInOrder(text, inserted))
   }
   return false
 }
 
-function sourceSupportsClaim(source: string, claim: string) {
+function sourcesSupportClaim(sources: readonly string[], claim: string) {
   const claimSet = claimTokens(claim)
   if (claimSet.size === 0) return false
-  const sourceSet = claimTokens(source)
-  if ([...claimSet].some((token) => !sourceSet.has(token))) return false
-  if (containsNegation(source) && !containsNegation(claim)) return false
-  const claimSequence = claimTokenSequence(claim)
-  const sourceSequence = claimTokenSequence(source)
+  const sourceSets = sources.map((source) => ({
+    source,
+    tokens: claimTokens(source)
+  }))
+  const combined = new Set(sourceSets.flatMap(({ tokens }) => [...tokens]))
+  if ([...claimSet].some((token) => !combined.has(token))) return false
+
+  const minimumAnchorCount = Math.min(
+    claimSet.size,
+    Math.max(2, Math.ceil(claimSet.size / 3))
+  )
+  const anchoredSources = sourceSets.filter(({ tokens }) => (
+    [...claimSet].filter((token) => tokens.has(token)).length >= minimumAnchorCount
+  ))
+  if (anchoredSources.length === 0) return false
+  const anchoredTokens = new Set(
+    anchoredSources.flatMap(({ tokens }) => [...tokens])
+  )
+  if ([...claimSet].some((token) => !anchoredTokens.has(token))) return false
+  if (
+    !containsNegation(claim)
+    && anchoredSources.every(({ source }) => containsNegation(source))
+  ) {
+    return false
+  }
+  return true
+}
+
+function sourceSupportsClaimInOrder(source: string, claim: string) {
+  if (!sourcesSupportClaim([source], claim)) return false
+  const claimSequence = claimContentSequence(claim)
+  const sourceSequence = claimContentSequence(source)
   if (claimSequence.length === 0) return false
   for (let start = 0; start <= sourceSequence.length - claimSequence.length; start += 1) {
     if (claimSequence.every((token, index) => sourceSequence[start + index] === token)) {
@@ -796,11 +827,60 @@ function sourceSupportsClaim(source: string, claim: string) {
   return false
 }
 
-function claimTokenSequence(value: string) {
+function supportsNumericBindings(sources: readonly string[], claim: string) {
+  const claimSequence = claimContentSequence(claim)
+  const sourceSequences = sources.map(claimContentSequence)
+  return claimSequence.every((token, index) => {
+    if (!/\d/u.test(token)) return true
+    const next = claimSequence[index + 1]
+    const previous = claimSequence[index - 1]
+    return sourceSequences.some((source) => (
+      next
+        ? containsTokenPair(source, token, next)
+        : previous
+          ? containsTokenPair(source, previous, token)
+          : source.includes(token)
+    ))
+  })
+}
+
+function supportsNewTokenRelations(
+  original: string,
+  factSources: readonly string[],
+  claim: string
+) {
+  const originalTokens = claimTokens(original)
+  const claimSequence = claimContentSequence(claim)
+  const factSequences = factSources.map(claimContentSequence)
+  for (let index = 0; index < claimSequence.length; index += 1) {
+    const token = claimSequence[index]
+    if (originalTokens.has(token)) continue
+    const previous = claimSequence[index - 1]
+    const next = claimSequence[index + 1]
+    if (
+      (previous || next)
+      && !factSequences.some((source) => (
+        (previous ? containsTokenPair(source, previous, token) : false)
+        || (next ? containsTokenPair(source, token, next) : false)
+      ))
+    ) {
+      return false
+    }
+  }
+  return true
+}
+
+function containsTokenPair(sequence: readonly string[], first: string, second: string) {
+  return sequence.some((token, index) => (
+    token === first && sequence[index + 1] === second
+  ))
+}
+
+function claimContentSequence(value: string) {
   const normalized = value.normalize('NFKC').toLowerCase()
   return (normalized.match(
     /[a-z]\+\+|[a-z]#|\.net|[a-z][a-z0-9]*(?:[./-][a-z0-9]+)+|\p{Script=Han}|[\p{L}\p{N}]+/gu
-  ) ?? [])
+  ) ?? []).filter((token) => !claimFunctionWords.has(token))
 }
 
 function containsNegation(value: string) {

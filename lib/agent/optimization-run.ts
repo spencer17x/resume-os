@@ -29,6 +29,47 @@ export const AGENT_STAGES = [
   'abandoned'
 ] as const
 
+export const SAFE_OPTIMIZATION_TRANSFORMATIONS = [
+  'rewrite',
+  'emphasize',
+  'reorder',
+  'add-from-fact'
+] as const
+export type SafeOptimizationTransformation =
+  typeof SAFE_OPTIMIZATION_TRANSFORMATIONS[number]
+
+export function isSafeOptimizationTransformation(
+  value: string
+): value is SafeOptimizationTransformation {
+  return SAFE_OPTIMIZATION_TRANSFORMATIONS.some((candidate) => candidate === value)
+}
+
+export function isOperationalOptimizationPlanItem(item: {
+  transformation: string
+  targetPath?: string
+}): item is {
+  transformation: SafeOptimizationTransformation
+  targetPath: string
+} {
+  if (!isSafeOptimizationTransformation(item.transformation) || !item.targetPath) {
+    return false
+  }
+  const index = '(?:0|[1-9]\\d*)'
+  if (item.transformation === 'rewrite' || item.transformation === 'emphasize') {
+    return new RegExp(
+      `^(?:profile\\.summary\\.${index}|experiences\\.${index}\\.bullets\\.${index}|projects\\.${index}\\.(?:summary|highlights\\.${index}))$`,
+      'u'
+    ).test(item.targetPath)
+  }
+  if (item.transformation === 'add-from-fact') {
+    return new RegExp(
+      `^(?:experiences\\.${index}\\.bullets|projects\\.${index}\\.highlights)$`,
+      'u'
+    ).test(item.targetPath)
+  }
+  return item.targetPath === 'projects'
+}
+
 export const agentStageSchema = z.enum(AGENT_STAGES)
 export type AgentStage = z.infer<typeof agentStageSchema>
 
@@ -73,8 +114,13 @@ export const optimizationPlanItemSchema = z.object({
   id: stableIdSchema,
   requirementIds: z.array(stableIdSchema).min(1).max(100),
   factIds: z.array(stableIdSchema).max(100),
+  // Optional for backward-compatible parsing of plans persisted before target
+  // paths became part of the approval contract. New plan generation requires it.
+  targetPath: z.string().trim().min(1).max(240).optional(),
   intent: boundedTextSchema,
-  transformation: z.enum(['rewrite', 'emphasize', 'remove', 'reorder', 'add-from-fact'])
+  // `remove` remains parseable only so older persisted runs are recoverable.
+  // Every current plan-generation and approval boundary rejects it.
+  transformation: z.enum([...SAFE_OPTIMIZATION_TRANSFORMATIONS, 'remove'])
 }).strict().superRefine((item, context) => {
   addDuplicateIssues(item.requirementIds, context, ['requirementIds'], 'Requirement IDs must be unique')
   addDuplicateIssues(item.factIds, context, ['factIds'], 'Fact IDs must be unique')
@@ -383,6 +429,7 @@ export function transitionOptimizationRun(
     case 'prepare-plan':
       requireStage(run, ['evidence-mapped'])
       if (event.plan.approvedAt) throw new OptimizationRunTransitionError('INVALID_EVENT')
+      assertPlanIsOperational(event.plan)
       assertPlanReferences(run, event.plan)
       next = { ...run, stage: 'plan-ready', plan: event.plan, updatedAt: now }
       break
@@ -392,6 +439,7 @@ export function transitionOptimizationRun(
       break
     case 'approve-plan':
       requireStage(run, ['awaiting-plan-approval'])
+      assertPlanIsOperational(run.plan!)
       next = {
         ...run,
         stage: 'generating-changes',
@@ -423,6 +471,7 @@ export function transitionOptimizationRun(
       break
     case 'approve-changes': {
       requireStage(run, ['awaiting-change-approval'])
+      assertPlanIsOperational(run.plan!)
       const changeIds = new Set(run.changeSet!.changes.map((change) => change.id))
       if (new Set(event.acceptedChangeIds).size !== event.acceptedChangeIds.length) {
         throw new OptimizationRunTransitionError('UNKNOWN_CHANGE')
@@ -435,6 +484,7 @@ export function transitionOptimizationRun(
     }
     case 'apply':
       requireStage(run, ['validated'])
+      assertPlanIsOperational(run.plan!)
       if (event.currentFingerprint !== run.changeInputFingerprint) {
         throw new OptimizationRunTransitionError('FINGERPRINT_MISMATCH')
       }
@@ -530,7 +580,14 @@ function assertPlanReferences(run: OptimizationRun, plan: OptimizationPlan) {
   }
 }
 
+function assertPlanIsOperational(plan: OptimizationPlan) {
+  if (plan.items.some((item) => !isOperationalOptimizationPlanItem(item))) {
+    throw new OptimizationRunTransitionError('INVALID_PLAN_REFERENCE')
+  }
+}
+
 function assertChangesFollowPlan(run: OptimizationRun, changeSet: ResumeChangeSet) {
+  assertPlanIsOperational(run.plan!)
   try {
     validateResumeChangesAgainstApprovedPlan(changeSet, run.plan!, run.requirementMatches)
   } catch {

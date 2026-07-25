@@ -54,7 +54,7 @@ export function createJdMatchRoute(dependencies: {
         locale,
         source: 'sample'
       })
-      const prompt = buildJDMatchPrompt(input.jd, locale, activeResume)
+      const prompt = buildJDMatchPrompt(input.jd, locale)
       const { model, text } = await generateAgentText(prompt.user, {
         system: prompt.system,
         request,

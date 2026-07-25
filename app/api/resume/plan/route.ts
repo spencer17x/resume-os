@@ -54,7 +54,8 @@ export function createResumePlanRoute(dependencies: {
         targetJobId: input.data.targetJobId,
         requirements: input.data.requirements,
         requirementMatches: input.data.requirementMatches,
-        careerFacts: input.data.careerFacts
+        careerFacts: input.data.careerFacts,
+        resumeTargets: input.data.resumeTargets
       }, JSON.parse(json))
       return Response.json({ plan, model: result.model })
     } catch (error) {

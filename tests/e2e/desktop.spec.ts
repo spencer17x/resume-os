@@ -182,7 +182,7 @@ test('renders the AI agent constellation across desktop motion states and viewpo
   )).toEqual([
     'Resume Studio',
     'Resume Agent',
-    'JD Match',
+    'Target Job',
     'Resume 3D',
     'Resume Book',
     'Review & Export',

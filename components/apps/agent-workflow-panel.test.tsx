@@ -7,10 +7,35 @@ import type { AgentWorkspace } from '@/lib/agent/agent-workspace'
 import { ProviderRoutingError } from '@/lib/agent/providers'
 import {
   AgentWorkflowPanel,
+  rankCareerFactsForRequirement,
   selectPlanRelevantCareerFacts,
   type AgentWorkspaceService
 } from './agent-workflow-panel'
 import { ACTIVE_WORKFLOW_CHANGED_EVENT } from '@/lib/agent/workflow-persistence'
+import { normalizeResumeData } from '@/lib/resume-model'
+
+const resume = normalizeResumeData({
+  profile: {
+    name: 'Ada Candidate',
+    title: 'Engineer',
+    summary: ['Builds reliable systems'],
+    tags: [],
+    links: []
+  },
+  experiences: [],
+  projects: [],
+  skills: [],
+  education: [],
+  certifications: [],
+  awards: [],
+  languages: [],
+  openSource: [],
+  metadata: {
+    source: 'paste',
+    locale: 'en',
+    updatedAt: '2026-07-16T08:00:00.000Z'
+  }
+})
 
 const workspace = {
   summary: {
@@ -35,13 +60,33 @@ const workspace = {
     text: 'Led a related migration.',
     verification: 'imported'
   }],
-  matrix: {}
+  matrix: {
+    version: 1,
+    targetJobId: 'job-1',
+    inputFingerprint: 'fingerprint-1',
+    requirements: [{
+      id: 'requirement-1',
+      jobId: 'job-1',
+      text: 'Own a reliable platform migration',
+      category: 'experience',
+      priority: 'must',
+      weight: 5,
+      keywords: ['migration'],
+      userConfirmed: true
+    }],
+    matches: [{
+      requirementId: 'requirement-1',
+      factIds: ['fact-1'],
+      status: 'direct',
+      rationale: 'Direct evidence'
+    }]
+  }
 } as unknown as AgentWorkspace
 
 function renderPanel(service: AgentWorkspaceService, activeDraftId = 'draft-1') {
   return render(
     <NextIntlClientProvider locale="en" messages={en}>
-      <AgentWorkflowPanel activeDraftId={activeDraftId} service={service} />
+      <AgentWorkflowPanel activeDraftId={activeDraftId} resume={resume} service={service} />
     </NextIntlClientProvider>
   )
 }
@@ -49,6 +94,41 @@ function renderPanel(service: AgentWorkspaceService, activeDraftId = 'draft-1') 
 afterEach(() => cleanup())
 
 describe('AgentWorkflowPanel', () => {
+  it('links an empty Agent state directly to target-job setup', async () => {
+    const service: AgentWorkspaceService = {
+      load: vi.fn().mockResolvedValue(null),
+      linkFact: vi.fn(),
+      addFact: vi.fn(),
+      confirmGap: vi.fn(),
+      preparePlan: vi.fn(),
+      approvePlan: vi.fn()
+    }
+    renderPanel(service)
+
+    expect(await screen.findByRole('heading', { name: 'No active target-job run' })).toBeVisible()
+    expect(screen.getByRole('link', { name: 'Add a target job' }))
+      .toHaveAttribute('href', '/en/jd-match')
+  })
+
+  it('ranks likely career facts deterministically without treating them as confirmed', () => {
+    const facts = [{
+      id: 'fact-unrelated', kind: 'skill', text: 'Designed marketing illustrations',
+      evidenceRefs: ['source-1'], verification: 'imported', tags: ['design'],
+      createdAt: '2026-07-16T08:00:00.000Z', updatedAt: '2026-07-16T08:00:00.000Z'
+    }, {
+      id: 'fact-platform', kind: 'experience', text: 'Led a reliable platform migration',
+      evidenceRefs: ['source-2'], verification: 'imported', tags: ['platform'],
+      createdAt: '2026-07-16T08:00:00.000Z', updatedAt: '2026-07-16T08:00:00.000Z'
+    }] as AgentWorkspace['facts']
+    const requirement = workspace.matrix.requirements[0]
+
+    const ranked = rankCareerFactsForRequirement(requirement, facts)
+
+    expect(ranked.map(({ fact }) => fact.id)).toEqual(['fact-platform', 'fact-unrelated'])
+    expect(ranked[0].score).toBeGreaterThan(0)
+    expect(ranked[0].fact.verification).toBe('imported')
+  })
+
   it('sends planning only facts already referenced by the requirement matrix', () => {
     const facts = [
       {
@@ -117,6 +197,9 @@ describe('AgentWorkflowPanel', () => {
 
     const question = await screen.findByRole('heading', { name: 'Do you have migration evidence?' })
     const card = question.closest('article') as HTMLElement
+    expect(within(card).getByText(
+      'Suggested by deterministic text overlap. Verify it before linking.'
+    )).toBeVisible()
     await user.selectOptions(within(card).getByRole('combobox', { name: 'Match strength' }), 'partial')
     await user.click(within(card).getByRole('button', { name: 'Link & confirm fact' }))
 
@@ -186,6 +269,7 @@ describe('AgentWorkflowPanel', () => {
         id: 'item-1',
         requirementIds: ['requirement-1'],
         factIds: ['fact-1'],
+        targetPath: 'profile.summary.0',
         intent: 'Clarify verified impact.',
         transformation: 'emphasize'
       }]
@@ -223,7 +307,12 @@ describe('AgentWorkflowPanel', () => {
     }
     render(
       <NextIntlClientProvider locale="en" messages={en}>
-        <AgentWorkflowPanel activeDraftId="draft-1" instruction="Tailor for platform leadership" service={service} />
+        <AgentWorkflowPanel
+          activeDraftId="draft-1"
+          resume={resume}
+          instruction="Tailor for platform leadership"
+          service={service}
+        />
       </NextIntlClientProvider>
     )
 
@@ -235,10 +324,56 @@ describe('AgentWorkflowPanel', () => {
     expect(await screen.findByText('Emphasize the confirmed migration fact.')).toBeVisible()
     expect(screen.getByText('Chrome Built-in AI · browser-managed')).toBeVisible()
     expect(screen.getByText('Clarify verified impact.')).toBeVisible()
+    expect(screen.getByText('profile.summary.0')).toBeVisible()
+    expect(screen.getByText('Builds reliable systems')).toBeVisible()
+    expect(screen.getByText('Own a reliable platform migration')).toBeVisible()
+    expect(screen.getByText('Led a related migration.')).toBeVisible()
+    expect(screen.queryByText('requirement-1')).not.toBeInTheDocument()
+    expect(screen.queryByText('fact-1')).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Approve plan' }))
     await waitFor(() => expect(approvePlan).toHaveBeenCalledOnce())
     expect(await screen.findByText('Plan approved. Evidence-linked change generation is now unlocked.')).toBeVisible()
+  })
+
+  it('keeps recovered plans without a safe target path non-actionable', async () => {
+    const legacyWorkspace = {
+      ...workspace,
+      summary: {
+        ...workspace.summary,
+        run: {
+          ...workspace.summary.run,
+          stage: 'awaiting-plan-approval',
+          questions: [],
+          plan: {
+            id: 'legacy-plan',
+            summary: 'Recovered legacy plan.',
+            items: [{
+              id: 'legacy-item',
+              requirementIds: ['requirement-1'],
+              factIds: ['fact-1'],
+              intent: 'Rewrite without a bound target.',
+              transformation: 'rewrite'
+            }]
+          }
+        }
+      }
+    } as AgentWorkspace
+    const service: AgentWorkspaceService = {
+      load: vi.fn().mockResolvedValue(legacyWorkspace),
+      linkFact: vi.fn(),
+      addFact: vi.fn(),
+      confirmGap: vi.fn(),
+      preparePlan: vi.fn(),
+      approvePlan: vi.fn()
+    }
+    renderPanel(service)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'This recovered plan does not meet the current safe-target contract.'
+    )
+    expect(screen.getByRole('button', { name: 'Approve plan' })).toBeDisabled()
+    expect(service.approvePlan).not.toHaveBeenCalled()
   })
 
   it('explains that cloud fallback is disabled when the local plan task is unavailable', async () => {
@@ -260,7 +395,12 @@ describe('AgentWorkflowPanel', () => {
     }
     render(
       <NextIntlClientProvider locale="en" messages={en}>
-        <AgentWorkflowPanel activeDraftId="draft-1" instruction="Tailor safely" service={service} />
+        <AgentWorkflowPanel
+          activeDraftId="draft-1"
+          resume={resume}
+          instruction="Tailor safely"
+          service={service}
+        />
       </NextIntlClientProvider>
     )
 

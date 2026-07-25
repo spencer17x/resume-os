@@ -572,7 +572,7 @@ describe('resume change sets', () => {
     })).toEqual(set)
   })
 
-  it('rejects wording reorders that are not supported in-order by one source', () => {
+  it('accepts bounded wording reorders when every claim token remains anchored', () => {
     const set = parseModelResumeChangeSet({
       summary: 'Wording-only rewrite',
       changes: [change({
@@ -581,13 +581,13 @@ describe('resume change sets', () => {
       })]
     })
 
-    expectChangeError(() => validateResumeChangeEvidence(set, {
+    expect(validateResumeChangeEvidence(set, {
       facts: [{
         id: 'fact-1', text: 'Maintained internal documentation',
         verification: 'document-backed'
       }],
       requirements: [{ id: 'requirement-1' }]
-    }), 'EVIDENCE_REFERENCE_INVALID')
+    })).toEqual(set)
   })
 
   it('accepts Chinese claim content supplied by the cited fact text', () => {
@@ -890,6 +890,47 @@ describe('resume change sets', () => {
       })]
     }, plan, [matches[0], { ...matches[1], status: 'gap' }]))
       .toMatchObject({ changes: [{ evidence: { matchType: 'gap', support: 'unsupported' } }] })
+  })
+
+  it('binds generated changes to the exact target path approved in new plans', () => {
+    const plan = {
+      approvedAt: '2026-07-16T08:00:00.000Z',
+      items: [{
+        requirementIds: ['requirement-1'],
+        factIds: ['fact-1'],
+        targetPath: 'experiences.0.bullets.0',
+        transformation: 'rewrite' as const
+      }]
+    }
+    const matches = [{
+      requirementId: 'requirement-1',
+      factIds: ['fact-1'],
+      status: 'direct' as const
+    }]
+
+    expectChangeError(
+      () => validateResumeChangesAgainstApprovedPlan(
+        {
+          summary: 'Wrong target',
+          changes: [change({
+            path: 'profile.summary.0',
+            original: 'Old summary',
+            proposed: 'New summary'
+          })]
+        },
+        plan,
+        matches
+      ),
+      'INVALID_CHANGE_SET'
+    )
+    expect(() => validateResumeChangesAgainstApprovedPlan(
+      {
+        summary: 'Approved target',
+        changes: [change()]
+      },
+      plan,
+      matches
+    )).not.toThrow()
   })
 
   it('does not let a supported change borrow a gap or an ambiguous persisted match', () => {

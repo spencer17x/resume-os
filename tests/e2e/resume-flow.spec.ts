@@ -151,6 +151,11 @@ async function installAiMocks(page: Page) {
         text: string
         verification: 'imported' | 'user-confirmed' | 'document-backed'
       }>
+      resumeTargets: Array<{
+        path: string
+        current: string | string[]
+        transformations: string[]
+      }>
     }>(route)
     expectExactKeys(body, [
       'locale',
@@ -159,7 +164,8 @@ async function installAiMocks(page: Page) {
       'targetJobId',
       'requirements',
       'requirementMatches',
-      'careerFacts'
+      'careerFacts',
+      'resumeTargets'
     ])
     expect(body.locale).toBe('en')
     expect(body.instruction).toBe('Emphasize verified platform impact')
@@ -178,6 +184,14 @@ async function installAiMocks(page: Page) {
     })
     expect(fact).toBeDefined()
     expect(match.factIds).toEqual([fact!.id])
+    const bulletTarget = body.resumeTargets.find(({ path }) => (
+      path === 'experiences.0.bullets.0'
+    ))
+    const summaryTarget = body.resumeTargets.find(({ path }) => (
+      path === 'profile.summary.0'
+    ))
+    expect(bulletTarget).toBeDefined()
+    expect(summaryTarget).toBeDefined()
 
     await json(route, {
       plan: {
@@ -187,7 +201,15 @@ async function installAiMocks(page: Page) {
           id: 'plan-item-rewrite',
           requirementIds: [requirement.id],
           factIds: [fact!.id],
+          targetPath: bulletTarget!.path,
           intent: 'Make verified AI platform impact explicit without changing career history.',
+          transformation: 'rewrite'
+        }, {
+          id: 'plan-item-summary',
+          requirementIds: [requirement.id],
+          factIds: [fact!.id],
+          targetPath: summaryTarget!.path,
+          intent: 'Carry the same verified impact into the existing summary.',
           transformation: 'rewrite'
         }]
       },
@@ -218,6 +240,7 @@ async function installAiMocks(page: Page) {
         items: Array<{
           requirementIds: string[]
           factIds: string[]
+          targetPath?: string
           transformation: string
         }>
       }
@@ -317,15 +340,16 @@ test('builds a reviewable Evidence Agent run and saves a variant without mutatin
   const masterBefore = await readActiveMaster(page)
 
   await page.goto('/en/jd-match')
-  const jdMatch = page.getByRole('application', { name: 'JD Match' })
+  const jdMatch = page.getByRole('application', { name: 'Target Job' })
   await jdMatch.getByRole('textbox', { name: 'Job description' }).fill(jobDescription)
-  await jdMatch.getByRole('button', { name: 'Analyze match' }).click()
-  await expect(jdMatch.getByRole('heading', { name: 'Requirement matrix' })).toBeVisible()
+  await jdMatch.getByRole('button', { name: 'Extract requirements' }).click()
+  await expect(jdMatch.getByRole('heading', { name: 'Extracted requirement matrix' })).toBeVisible()
   await expect(jdMatch.getByRole('heading', {
     name: 'Lead reliable AI platform delivery across product teams.'
   })).toBeVisible()
-  await expect(jdMatch.getByText('Evidence gap', { exact: true })).toBeVisible()
-  await jdMatch.getByRole('button', { name: 'Confirm all & create Agent run' }).click()
+  await expect(jdMatch.getByText('Not yet mapped', { exact: true })).toBeVisible()
+  await jdMatch.getByRole('button', { name: 'Confirm requirement' }).click()
+  await jdMatch.getByRole('button', { name: 'Create Agent run' }).click()
   await expect(jdMatch.getByText('Target job and resumable Agent run saved in this browser.')).toBeVisible()
 
   const dock = page.getByRole('navigation', { name: 'Dock' })
@@ -353,11 +377,13 @@ test('builds a reviewable Evidence Agent run and saves a variant without mutatin
     'Plan approved. Evidence-linked change generation is now unlocked.'
   )).toBeVisible()
 
-  await agent.getByRole('button', { name: 'Analyze resume' }).click()
+  await agent.getByRole('button', { name: 'Generate change proposals' }).click()
   await expect(agent.getByText('Two evidence-linked rewrites ready for review.')).toBeVisible()
   const firstChange = agent.locator('.resume-agent-app__change').first()
-  await expect(firstChange.getByText('requirement-', { exact: false })).toBeVisible()
-  await expect(firstChange.getByText('fact:career:', { exact: false })).toBeVisible()
+  await expect(firstChange.getByText(
+    'Lead reliable AI platform delivery across product teams.'
+  )).toBeVisible()
+  await expect(firstChange.getByText(originalBullet)).toBeVisible()
 
   await agent.getByRole('checkbox', {
     name: `I verified this change is accurate: ${proposedBullet}`

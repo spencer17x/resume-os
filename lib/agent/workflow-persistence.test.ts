@@ -290,13 +290,14 @@ describe('workflow persistence', () => {
     await store.put('optimizationRuns', evidenceMapped)
     const plan = {
       id: 'plan-1',
-      summary: 'Remove unsupported emphasis from this target-job variant.',
+      summary: 'Clarify the requirement gap without adding unsupported evidence.',
       items: [{
         id: 'plan-item-1',
         requirementIds: [workflow.matrix.requirements[0].id],
         factIds: [],
-        intent: 'Avoid claiming experience that the user confirmed is a gap.',
-        transformation: 'remove' as const
+        targetPath: 'profile.summary.0',
+        intent: 'Keep the summary aligned with the confirmed evidence boundary.',
+        transformation: 'rewrite' as const
       }]
     }
 
@@ -468,6 +469,7 @@ async function changePersistenceHarness(approvePlan: boolean) {
     id: 'plan-1', summary: 'Emphasize the confirmed migration evidence.',
     items: [{
       id: 'item-1', requirementIds: [requirement.id], factIds: [fact.id],
+      targetPath: 'profile.summary.0',
       intent: 'Make the migration evidence easy to find.', transformation: 'emphasize' as const
     }]
   }

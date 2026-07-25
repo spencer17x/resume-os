@@ -14,7 +14,15 @@ import {
 import { createAgentErrorResponse, generateAgentText } from '@/lib/agent/openai'
 import { buildOptimizeResumePrompt } from '@/lib/agent/resume-prompts'
 import { normalizeResumeData, resumeLocaleSchema } from '@/lib/resume-model'
-import { optimizationPlanSchema } from '@/lib/agent/optimization-run'
+import {
+  isOperationalOptimizationPlanItem,
+  optimizationPlanSchema,
+  type SafeOptimizationTransformation
+} from '@/lib/agent/optimization-run'
+import {
+  buildOptimizationPlanTargets,
+  type OptimizationPlanTarget
+} from '@/lib/agent/optimization-plan'
 import { requirementMatchSchema } from '@/lib/agent/requirement-matrix'
 import { apiErrorResponse, guardAiRequest, type AiRequestGuard } from '@/lib/server/request-guard'
 import { readLimitedJson, requestJsonErrorResponse } from '@/lib/server/request-json'
@@ -72,16 +80,6 @@ export function createResumeOptimizeRoute(dependencies: {
 
     const input = optimizeRequestSchema.safeParse(rawInput)
     if (!input.success) return apiErrorResponse('INVALID_REQUEST', 400)
-    if (
-      !approvedPlanMatchesRequestContext(
-        input.data.optimizationPlan,
-        input.data.requirements,
-        input.data.requirementMatches,
-        input.data.careerFacts
-      )
-    ) {
-      return apiErrorResponse('INVALID_REQUEST', 400)
-    }
 
     let resume
     try {
@@ -92,9 +90,28 @@ export function createResumeOptimizeRoute(dependencies: {
     } catch {
       return apiErrorResponse('INVALID_REQUEST', 400)
     }
+    const operationalPlan = operationalOptimizationPlan(
+      input.data.optimizationPlan,
+      buildOptimizationPlanTargets(resume)
+    )
+    if (
+      !operationalPlan
+      || !approvedPlanMatchesRequestContext(
+        operationalPlan,
+        input.data.requirements,
+        input.data.requirementMatches,
+        input.data.careerFacts
+      )
+    ) {
+      return apiErrorResponse('INVALID_REQUEST', 400)
+    }
 
     try {
-      const prompt = buildOptimizeResumePrompt({ ...input.data, resume })
+      const prompt = buildOptimizeResumePrompt({
+        ...input.data,
+        resume,
+        optimizationPlan: operationalPlan
+      })
       const result = await generateAgentText(prompt.user, {
         system: prompt.system,
         request,
@@ -110,7 +127,7 @@ export function createResumeOptimizeRoute(dependencies: {
       )
       validateResumeChangesAgainstApprovedPlan(
         changeSet,
-        input.data.optimizationPlan,
+        operationalPlan,
         input.data.requirementMatches
       )
       validateResumeChangeCandidates(resume, changeSet)
@@ -133,6 +150,26 @@ export function createResumeOptimizeRoute(dependencies: {
       }
       return createAgentErrorResponse(error)
     }
+  }
+}
+
+function operationalOptimizationPlan(
+  plan: z.infer<typeof optimizationPlanSchema>,
+  targets: readonly OptimizationPlanTarget[]
+) {
+  const targetsByPath = new Map(targets.map((target) => [target.path, target]))
+  if (plan.items.some((item) => {
+    if (!isOperationalOptimizationPlanItem(item)) return true
+    const target = targetsByPath.get(item.targetPath)
+    return !target?.transformations.includes(item.transformation)
+  })) return null
+  return {
+    ...plan,
+    items: plan.items.map((item) => ({
+      ...item,
+      targetPath: item.targetPath!,
+      transformation: item.transformation as SafeOptimizationTransformation
+    }))
   }
 }
 

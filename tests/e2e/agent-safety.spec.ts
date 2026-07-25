@@ -151,16 +151,17 @@ test('Chrome local JD extraction never invokes a Resume OS AI route', async ({ p
   await setProviderPreference(page, 'chrome-built-in', false)
 
   await page.goto('/en/jd-match')
-  const app = page.getByRole('application', { name: 'JD Match' })
+  const app = page.getByRole('application', { name: 'Target Job' })
   await app.getByRole('textbox', { name: 'Job description' }).fill(targetJob.description)
-  await app.getByRole('button', { name: 'Analyze match' }).click()
+  await app.getByRole('button', { name: 'Extract requirements' }).click()
 
-  await expect(app.getByRole('heading', { name: 'Requirement matrix' })).toBeVisible()
+  await expect(app.getByRole('heading', { name: 'Extracted requirement matrix' })).toBeVisible()
   await expect(app.getByRole('heading', { name: requirement.text })).toBeVisible()
   await expect(app.getByText(/Chrome Built-in AI \(Beta\)/)).toBeVisible()
   expect(apiRequests).toEqual([])
   await expect.poll(() => readActiveWorkflowPreference(page)).toBeNull()
-  await app.getByRole('button', { name: 'Confirm all & create Agent run' }).click()
+  await app.getByRole('button', { name: 'Confirm requirement' }).click()
+  await app.getByRole('button', { name: 'Create Agent run' }).click()
   await expect.poll(() => readDomainRecords(page, 'optimizationRuns')).toHaveLength(1)
 })
 
@@ -215,9 +216,9 @@ test('local unavailability with fallback disabled keeps manual resume work usabl
   await setProviderPreference(page, 'automatic', false)
 
   await page.goto('/en/jd-match')
-  const matchApp = page.getByRole('application', { name: 'JD Match' })
+  const matchApp = page.getByRole('application', { name: 'Target Job' })
   await matchApp.getByRole('textbox', { name: 'Job description' }).fill(targetJob.description)
-  await matchApp.getByRole('button', { name: 'Analyze match' }).click()
+  await matchApp.getByRole('button', { name: 'Extract requirements' }).click()
 
   await expect(matchApp.getByRole('alert')).toContainText('cloud fallback is disabled')
   expect(apiRequests).toEqual([])
@@ -482,6 +483,7 @@ function optimizationRun(input: {
         id: 'plan-item-safety',
         requirementIds: [requirement.id],
         factIds: input.matrix.matches.flatMap((match) => match.factIds),
+        targetPath: 'profile.summary.0',
         intent: 'Make the available platform evidence easy to review.',
         transformation: 'rewrite'
       }],
@@ -594,12 +596,13 @@ async function setProviderPreference(
 
 async function completeCoreWorkflowFromJd(page: Page) {
   await page.goto('/en/jd-match')
-  const matchApp = page.getByRole('application', { name: 'JD Match' })
+  const matchApp = page.getByRole('application', { name: 'Target Job' })
   await matchApp.getByRole('textbox', { name: 'Job description' }).fill(targetJob.description)
-  await matchApp.getByRole('button', { name: 'Analyze match' }).click()
-  await expect(matchApp.getByRole('heading', { name: 'Requirement matrix' })).toBeVisible()
+  await matchApp.getByRole('button', { name: 'Extract requirements' }).click()
+  await expect(matchApp.getByRole('heading', { name: 'Extracted requirement matrix' })).toBeVisible()
   await expect(matchApp.getByRole('heading', { name: requirement.text })).toBeVisible()
-  await matchApp.getByRole('button', { name: 'Confirm all & create Agent run' }).click()
+  await matchApp.getByRole('button', { name: 'Confirm requirement' }).click()
+  await matchApp.getByRole('button', { name: 'Create Agent run' }).click()
   await expect(matchApp.getByText(
     'Target job and resumable Agent run saved in this browser.'
   )).toBeVisible()
@@ -624,7 +627,7 @@ async function completeCoreWorkflowFromJd(page: Page) {
     'Plan approved. Evidence-linked change generation is now unlocked.'
   )).toBeVisible()
 
-  await agent.getByRole('button', { name: 'Analyze resume' }).click()
+  await agent.getByRole('button', { name: 'Generate change proposals' }).click()
   await expect(agent.getByText(workflowChangeSummary)).toBeVisible()
   await agent.getByRole('checkbox', {
     name: `I verified this change is accurate: ${boundedProposal}`
@@ -696,6 +699,9 @@ async function installChromeWorkflowLanguageModel(page: Page) {
             ) {
               const requirements = input.requirements as Array<{ id: string }>
               const facts = input.careerFacts as Array<{ id: string }>
+              const targets = input.resumeTargets as Array<{ path: string }>
+              const target = targets.find(({ path }) => path === 'experiences.0.bullets.0')
+              if (!target) throw new Error('Expected a bounded experience-bullet target.')
               return JSON.stringify({
                 id: 'plan-chrome-e2e',
                 summary: planSummary,
@@ -703,6 +709,7 @@ async function installChromeWorkflowLanguageModel(page: Page) {
                   id: 'plan-item-chrome-e2e',
                   requirementIds: [requirements[0].id],
                   factIds: [facts[0].id],
+                  targetPath: target.path,
                   intent: 'Make the confirmed platform evidence explicit.',
                   transformation: 'rewrite'
                 }]
@@ -810,7 +817,12 @@ async function installCloudWorkflowRoutes(page: Page) {
       const body = request.postDataJSON() as {
         requirements: Array<{ id: string }>
         careerFacts: Array<{ id: string }>
+        resumeTargets: Array<{ path: string }>
       }
+      const target = body.resumeTargets.find(({ path }) => (
+        path === 'experiences.0.bullets.0'
+      ))
+      if (!target) throw new Error('Expected a bounded experience-bullet target.')
       await fulfillJson(route, {
         plan: {
           id: 'plan-cloud-e2e',
@@ -819,6 +831,7 @@ async function installCloudWorkflowRoutes(page: Page) {
             id: 'plan-item-cloud-e2e',
             requirementIds: [body.requirements[0].id],
             factIds: [body.careerFacts[0].id],
+            targetPath: target.path,
             intent: 'Make the confirmed platform evidence explicit.',
             transformation: 'rewrite'
           }]

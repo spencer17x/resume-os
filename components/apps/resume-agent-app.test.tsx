@@ -57,9 +57,11 @@ const plan = {
   approvedAt: '2026-07-16T08:01:00.000Z',
   items: [{
     id: 'plan-item-1', requirementIds: ['requirement-1'], factIds: ['fact-1'],
+    targetPath: 'profile.summary.0',
     intent: 'Emphasize reliable AI systems.', transformation: 'emphasize' as const
   }, {
     id: 'plan-item-2', requirementIds: ['requirement-2'], factIds: ['fact-2'],
+    targetPath: 'experiences.0.bullets.0',
     intent: 'Rewrite platform delivery clearly.', transformation: 'rewrite' as const
   }]
 }
@@ -186,7 +188,7 @@ async function requestSuggestions(
 ) {
   await screen.findByText('Ada Resume')
   await user.type(screen.getByRole('textbox', { name: 'Optimization instruction' }), 'Improve my impact')
-  const analyze = screen.getByRole('button', { name: 'Analyze resume' })
+  const analyze = screen.getByRole('button', { name: 'Generate change proposals' })
   await waitFor(() => expect(analyze).toBeEnabled())
   await user.click(analyze)
   await screen.findByText(expectedSummary)
@@ -253,6 +255,24 @@ afterEach(() => {
 })
 
 describe('ResumeAgentApp', () => {
+  it('offers structured instruction templates without submitting them automatically', async () => {
+    const user = userEvent.setup()
+    renderAgent()
+    const instruction = await screen.findByRole('textbox', {
+      name: 'Optimization instruction'
+    })
+    const template = screen.getByRole('button', {
+      name: 'Make experience bullets concise and action-led; keep role, employer, dates, and scope unchanged.'
+    })
+
+    await user.click(template)
+
+    expect(instruction).toHaveValue(
+      'Make experience bullets concise and action-led; keep role, employer, dates, and scope unchanged.'
+    )
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('directs users without an active draft to Studio and does not modify sample data', () => {
     renderAgent(false)
     expect(screen.getByRole('heading', { name: 'Create a resume draft first' })).toBeVisible()
@@ -279,7 +299,7 @@ describe('ResumeAgentApp', () => {
     renderAgent()
     await screen.findByText('Ada Resume')
     await user.type(screen.getByRole('textbox', { name: 'Optimization instruction' }), 'Improve my impact')
-    const analyze = screen.getByRole('button', { name: 'Analyze resume' })
+    const analyze = screen.getByRole('button', { name: 'Generate change proposals' })
     expect(analyze).toBeDisabled()
     expect(fetchMock).not.toHaveBeenCalled()
 
@@ -314,14 +334,15 @@ describe('ResumeAgentApp', () => {
     expect(screen.getByText('How many teams were involved?')).toBeVisible()
     const preview = screen.getByRole('region', { name: 'Before and after preview' })
     expect(within(preview).getByText('Builds systems')).toBeVisible()
-    expect(within(preview).getByText('Built verified AI systems')).toBeVisible()
+    expect(within(preview).getAllByText('Built verified AI systems')).toHaveLength(2)
     expect(screen.getAllByText('Accuracy verification required')).toHaveLength(2)
     expect(screen.getByText('Review and verify every AI-proposed change for accuracy before accepting it.')).toBeVisible()
     expect(screen.getByRole('checkbox', { name: 'I verified this change is accurate: Built verified AI systems' })).not.toBeChecked()
     expect(screen.getByRole('checkbox', { name: 'I verified this change is accurate: Owned platform delivery' })).not.toBeChecked()
     expect(screen.getByRole('button', { name: 'Accept Built verified AI systems' })).toBeDisabled()
-    expect(screen.getAllByText('fact-1').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Built verified AI systems').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Verified').length).toBeGreaterThan(0)
+    expect(screen.queryByText('Confidence')).not.toBeInTheDocument()
     expect(screen.getByText('Generated with OpenAI-compatible · test-model')).toBeVisible()
     expect(screen.getByTestId('snapshot-count')).toHaveTextContent('0')
   })
@@ -583,7 +604,7 @@ describe('ResumeAgentApp', () => {
     renderAgent()
     await screen.findByText('Ada Resume')
     await user.type(screen.getByRole('textbox', { name: 'Optimization instruction' }), 'Improve')
-    await user.click(screen.getByRole('button', { name: 'Analyze resume' }))
+    await user.click(screen.getByRole('button', { name: 'Generate change proposals' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'AI returned suggestions that could not be verified.'
@@ -598,7 +619,7 @@ describe('ResumeAgentApp', () => {
     renderAgent()
     await screen.findByText('Ada Resume')
     await user.type(screen.getByRole('textbox', { name: 'Optimization instruction' }), 'Improve')
-    const analyze = screen.getByRole('button', { name: 'Analyze resume' })
+    const analyze = screen.getByRole('button', { name: 'Generate change proposals' })
     await waitFor(() => expect(analyze).toBeEnabled())
     await user.click(analyze)
 
@@ -616,7 +637,7 @@ describe('ResumeAgentApp', () => {
     renderAgent()
     await screen.findByText('Ada Resume')
     await user.type(screen.getByRole('textbox', { name: 'Optimization instruction' }), 'Improve')
-    const analyze = screen.getByRole('button', { name: 'Analyze resume' })
+    const analyze = screen.getByRole('button', { name: 'Generate change proposals' })
     await waitFor(() => expect(analyze).toBeEnabled())
     await user.click(analyze)
 
@@ -687,7 +708,7 @@ describe('ResumeAgentApp', () => {
     const user = userEvent.setup()
     renderAgent()
     await waitFor(() => expect(
-      screen.getByRole('button', { name: 'Analyze resume' })
+      screen.getByRole('button', { name: 'Generate change proposals' })
     ).toBeEnabled())
 
     await user.click(screen.getByRole('button', { name: 'External update', hidden: true }))
@@ -696,7 +717,7 @@ describe('ResumeAgentApp', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'The resume changed while the Agent was working.'
     )
-    expect(screen.getByRole('button', { name: 'Analyze resume' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Generate change proposals' })).toBeDisabled()
     expect(runPersistence.saveChangeSet).not.toHaveBeenCalled()
     expect(fetchMock).not.toHaveBeenCalled()
   })
@@ -728,7 +749,7 @@ describe('ResumeAgentApp', () => {
     expect(screen.queryByText('Two focused improvements')).not.toBeInTheDocument()
     expect(screen.getByTestId('title-value')).toHaveTextContent('Engineer')
     expect(screen.getByTestId('snapshot-count')).toHaveTextContent('0')
-    expect(screen.getByRole('button', { name: 'Analyze resume' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Generate change proposals' })).toBeEnabled()
   })
 
   it('preserves the active draft when a request fails', async () => {
@@ -737,7 +758,7 @@ describe('ResumeAgentApp', () => {
     renderAgent()
     await screen.findByText('Ada Resume')
     await user.type(screen.getByRole('textbox', { name: 'Optimization instruction' }), 'Improve')
-    const analyze = screen.getByRole('button', { name: 'Analyze resume' })
+    const analyze = screen.getByRole('button', { name: 'Generate change proposals' })
     await waitFor(() => expect(analyze).toBeEnabled())
     await user.click(analyze)
 
@@ -747,6 +768,31 @@ describe('ResumeAgentApp', () => {
     expect(screen.getByTestId('snapshot-count')).toHaveTextContent('0')
   })
 
+  it('lets the user cancel in-flight change generation', async () => {
+    const user = userEvent.setup()
+    let signal: AbortSignal | undefined
+    fetchMock.mockImplementationOnce((_input, init) => new Promise((_resolve, reject) => {
+      signal = init?.signal ?? undefined
+      signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')))
+    }))
+    renderAgent()
+    await screen.findByText('Ada Resume')
+    await user.type(
+      screen.getByRole('textbox', { name: 'Optimization instruction' }),
+      'Improve'
+    )
+    const generate = screen.getByRole('button', { name: 'Generate change proposals' })
+    await waitFor(() => expect(generate).toBeEnabled())
+    await user.click(generate)
+    await user.click(screen.getByRole('button', { name: 'Cancel generation' }))
+
+    await waitFor(() => expect(signal?.aborted).toBe(true))
+    await waitFor(() => expect(
+      screen.getByRole('button', { name: 'Generate change proposals' })
+    ).toBeEnabled())
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
   it('ignores a stale response after the active resume changes', async () => {
     const user = userEvent.setup()
     let resolve!: (response: Response) => void
@@ -754,7 +800,7 @@ describe('ResumeAgentApp', () => {
     renderAgent()
     await screen.findByText('Ada Resume')
     await user.type(screen.getByRole('textbox', { name: 'Optimization instruction' }), 'Improve')
-    const analyze = screen.getByRole('button', { name: 'Analyze resume' })
+    const analyze = screen.getByRole('button', { name: 'Generate change proposals' })
     await waitFor(() => expect(analyze).toBeEnabled())
     await user.click(analyze)
     await user.click(screen.getByRole('button', { name: 'External update', hidden: true }))

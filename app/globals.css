@@ -1305,6 +1305,10 @@ a {
 .resume-agent-app__form textarea:first-of-type { min-height: 92px; }
 .resume-agent-app__form textarea:last-of-type { min-height: 72px; }
 .resume-agent-app__generation-lock { color: #d6a849; font-size: 10px; line-height: 1.45; }
+.resume-agent-app__instruction-help { margin: 0; color: var(--theme-muted); font-size: 11px; line-height: 1.5; }
+.resume-agent-app__instruction-templates { display: flex; gap: 5px; overflow-x: auto; padding-bottom: 2px; }
+.resume-agent-app__instruction-templates button { min-height: 32px; flex: 0 0 min(240px, 78%); border: 1px solid var(--theme-line); border-radius: 5px; background: var(--theme-panel-strong); padding: 6px 8px; color: var(--theme-muted); font: inherit; font-size: 10px; line-height: 1.4; text-align: left; }
+.resume-agent-app__instruction-templates button:hover { border-color: color-mix(in srgb, var(--theme-accent) 48%, var(--theme-line)); color: var(--theme-fog); }
 
 .resume-app-primary,
 .resume-app-secondary,
@@ -1313,7 +1317,16 @@ a {
 .resume-app-secondary { border: 1px solid var(--theme-line); background: var(--theme-panel-strong); }
 .resume-app-spinner { animation: resume-studio-spin 800ms linear infinite; }
 .resume-app-error { padding: 8px 9px; border-left: 3px solid #d85f56; background: color-mix(in srgb, #d85f56 10%, var(--theme-panel)); color: #d85f56; line-height: 1.45; }
+.resume-app-error-block { display: grid; gap: 6px; }
+.resume-app-error-block .resume-app-error { margin: 0; }
+.resume-app-error-block > a,
+.resume-app-download > a { display: inline-flex; min-height: 28px; align-items: center; gap: 5px; justify-self: start; color: var(--theme-accent-soft); font-size: 10px; font-weight: 700; text-decoration: none; }
 .resume-app-empty { padding: 18px 14px; color: var(--theme-muted); line-height: 1.55; }
+.resume-app-sandbox-warning { display: flex; gap: 8px; border: 1px solid color-mix(in srgb, #d6a849 50%, var(--theme-line)); border-radius: 6px; background: color-mix(in srgb, #d6a849 8%, var(--theme-panel)); padding: 9px; color: #d6a849; }
+.resume-app-sandbox-warning > svg { flex: 0 0 auto; margin-top: 2px; }
+.resume-app-sandbox-warning strong { color: var(--theme-fog); font-size: 11px; }
+.resume-app-sandbox-warning p { margin-top: 3px; color: var(--theme-muted); font-size: 10px; line-height: 1.45; }
+.resume-app-sandbox-warning a { display: inline-block; margin-top: 5px; color: var(--theme-accent-soft); font-size: 10px; font-weight: 700; }
 
 .resume-agent-app__response { display: grid; gap: 10px; margin: 0 13px 13px; padding: 11px; border: 1px solid color-mix(in srgb, var(--theme-accent) 32%, var(--theme-line)); border-radius: 6px; background: color-mix(in srgb, var(--theme-accent) 7%, var(--theme-panel)); line-height: 1.5; animation: resume-app-rise 260ms ease-out both; }
 .resume-agent-app__questions span { color: var(--theme-accent-soft); font-size: 10px; font-weight: 700; text-transform: uppercase; }
@@ -1326,6 +1339,13 @@ a {
 .agent-workflow-panel > header h3 { font-size: 13px; }
 .agent-workflow-panel > header p,
 .agent-workflow-panel > p { color: var(--theme-muted); font-size: 10px; line-height: 1.45; }
+.agent-workflow-panel__next { display: inline-flex; min-height: 34px; align-items: center; justify-content: center; gap: 6px; border: 1px solid color-mix(in srgb, var(--theme-accent) 58%, var(--theme-line)); border-radius: 5px; background: color-mix(in srgb, var(--theme-accent) 12%, var(--theme-panel)); padding: 6px 9px; color: var(--theme-fog); font-size: 11px; font-weight: 700; text-decoration: none; }
+.agent-workflow-panel__steps { display: flex; gap: 5px; margin: 0; overflow-x: auto; padding: 0 0 2px; list-style: none; }
+.agent-workflow-panel__steps li { display: flex; min-width: 108px; align-items: center; gap: 5px; color: var(--theme-muted); font-size: 9px; line-height: 1.25; }
+.agent-workflow-panel__steps li > span { display: grid; width: 20px; height: 20px; flex: 0 0 20px; place-items: center; border: 1px solid var(--theme-line); border-radius: 50%; background: var(--theme-panel-strong); font-size: 9px; font-variant-numeric: tabular-nums; }
+.agent-workflow-panel__steps li[data-complete='true'] { color: #54b883; }
+.agent-workflow-panel__steps li[data-current='true'] { color: var(--theme-fog); font-weight: 700; }
+.agent-workflow-panel__steps li:is([data-complete='true'], [data-current='true']) > span { border-color: color-mix(in srgb, var(--theme-accent) 62%, var(--theme-line)); color: var(--theme-accent-soft); }
 .agent-workflow-panel__questions { display: grid; gap: 8px; }
 .agent-workflow-panel__question { display: grid; gap: 7px; border: 1px solid var(--theme-line); border-radius: 6px; background: var(--theme-panel-strong); padding: 9px; }
 .agent-workflow-panel__question h4 { margin: 0; overflow-wrap: anywhere; font-size: 11px; line-height: 1.45; }
@@ -1335,6 +1355,7 @@ a {
 .agent-workflow-panel__question textarea { min-height: 58px; }
 .agent-workflow-panel__existing,
 .agent-workflow-panel__new-fact { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; align-items: end; }
+.agent-workflow-panel__suggestion { margin: -2px 0 0; color: var(--theme-accent-soft) !important; font-size: 9px !important; line-height: 1.4 !important; }
 .agent-workflow-panel__new-fact label:first-child { grid-column: 1 / -1; }
 .agent-workflow-panel__question button { display: inline-flex; min-height: 30px; align-items: center; justify-content: center; gap: 4px; border: 1px solid var(--theme-line); border-radius: 4px; background: var(--theme-panel); padding: 4px 7px; color: var(--theme-fog); font: inherit; }
 .agent-workflow-panel__gap { color: #d6a849 !important; }
@@ -1349,8 +1370,12 @@ a {
 .agent-workflow-panel__plan li { display: grid; gap: 2px; padding-left: 2px; color: var(--theme-fog); font-size: 10px; line-height: 1.4; }
 .agent-workflow-panel__plan li strong { color: var(--theme-accent-soft); font-size: 9px; text-transform: uppercase; }
 .agent-workflow-panel__plan li small { color: var(--theme-muted); overflow-wrap: anywhere; }
+.agent-workflow-panel__plan-details { display: grid; gap: 5px; margin: 4px 0 0; padding: 7px; border: 1px solid var(--theme-line); border-radius: 5px; background: var(--theme-panel-strong); }
+.agent-workflow-panel__plan-details div { display: grid; gap: 2px; }
+.agent-workflow-panel__plan-details dt { color: var(--theme-muted); font-size: 9px; font-weight: 700; text-transform: uppercase; }
+.agent-workflow-panel__plan-details dd { margin: 0; overflow-wrap: anywhere; color: var(--theme-fog); font-size: 10px; line-height: 1.4; }
 .agent-workflow-panel__plan-action > button,
-.agent-workflow-panel__plan > button { min-height: 32px; border: 1px solid color-mix(in srgb, var(--theme-accent) 58%, var(--theme-line)); border-radius: 4px; background: color-mix(in srgb, var(--theme-accent) 15%, var(--theme-panel)); padding: 5px 9px; color: var(--theme-fog); font: inherit; font-weight: 700; }
+.agent-workflow-panel__plan > button { display: inline-flex; min-height: 32px; align-items: center; justify-content: center; gap: 5px; border: 1px solid color-mix(in srgb, var(--theme-accent) 58%, var(--theme-line)); border-radius: 4px; background: color-mix(in srgb, var(--theme-accent) 15%, var(--theme-panel)); padding: 5px 9px; color: var(--theme-fog); font: inherit; font-weight: 700; }
 .agent-workflow-panel button:disabled { cursor: not-allowed; opacity: .58; }
 .resume-app-download { display: grid; gap: 4px; color: var(--theme-muted); font-size: 10px; }
 .resume-app-download progress { width: 100%; height: 5px; accent-color: var(--theme-accent); }
@@ -1398,7 +1423,10 @@ a {
 .jd-match-app__input > label,
 .jd-match-app__input > textarea,
 .jd-match-app__input > button,
-.jd-match-app__input > .resume-app-error { margin-inline: 14px; }
+.jd-match-app__input > .resume-app-error,
+.jd-match-app__input > .resume-app-download,
+.jd-match-app__input > .resume-app-error-block,
+.jd-match-app__input > .resume-app-sandbox-warning { margin-inline: 14px; }
 .jd-match-app__input > label { margin-top: 14px; }
 .jd-match-app__input > textarea { width: auto; }
 .jd-match-app__input textarea { min-height: 230px; flex: 1; }

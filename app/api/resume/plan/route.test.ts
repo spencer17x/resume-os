@@ -33,7 +33,12 @@ const validRequest = {
     requirementId: 'requirement-1', factIds: ['fact-1'], status: 'direct',
     rationale: 'The career fact directly supports the requirement.'
   }],
-  careerFacts: [careerFact]
+  careerFacts: [careerFact],
+  resumeTargets: [{
+    path: 'profile.summary.0',
+    current: 'Built reliable platforms.',
+    transformations: ['rewrite', 'emphasize']
+  }]
 }
 
 const validPlan = {
@@ -41,6 +46,7 @@ const validPlan = {
   summary: 'Emphasize the strongest evidence.',
   items: [{
     id: 'item-1', requirementIds: ['requirement-1'], factIds: ['fact-1'],
+    targetPath: 'profile.summary.0',
     intent: 'Surface verified TypeScript platform ownership.', transformation: 'emphasize'
   }]
 }
@@ -81,7 +87,8 @@ describe('POST /api/resume/plan', () => {
       }],
       careerFacts: [{
         id: careerFact.id, text: careerFact.text, verification: careerFact.verification
-      }]
+      }],
+      resumeTargets: validRequest.resumeTargets
     })
     expect(options).toEqual(expect.objectContaining({
       abortSignal: expect.any(AbortSignal),
@@ -122,7 +129,8 @@ describe('POST /api/resume/plan', () => {
       }]
     }],
     [{ ...validRequest, requirementMatches: [{ ...validRequest.requirementMatches[0], requirementId: 'unknown' }] }],
-    [{ ...validRequest, careerFacts: [] }]
+    [{ ...validRequest, careerFacts: [] }],
+    [{ ...validRequest, resumeTargets: [] }]
   ])('rejects invalid or cross-context request data before provider work', async (body) => {
     const response = await post(request(body))
     expect(response.status).toBe(400)
@@ -135,6 +143,7 @@ describe('POST /api/resume/plan', () => {
     { ...validPlan, approvedAt: '2026-07-16T00:00:00.000Z' },
     { ...validPlan, items: [{ ...validPlan.items[0], requirementIds: ['unknown'] }] },
     { ...validPlan, items: [{ ...validPlan.items[0], factIds: ['unknown'] }] },
+    { ...validPlan, items: [{ ...validPlan.items[0], targetPath: 'profile.summary.99' }] },
     { ...validPlan, items: [{ ...validPlan.items[0], factIds: [], transformation: 'add-from-fact' }] }
   ])('rejects model output that escapes the plan/evidence boundary', async (modelPlan) => {
     agentMocks.generateAgentText.mockResolvedValueOnce({

@@ -1,8 +1,17 @@
 'use client'
 
-import { CheckCircle2, CircleHelp, Link2, Plus, TriangleAlert } from 'lucide-react'
+import {
+  ArrowRight,
+  CheckCircle2,
+  CircleHelp,
+  CircleStop,
+  Link2,
+  Plus,
+  Settings2,
+  TriangleAlert
+} from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   confirmAgentQuestionGap,
   loadActiveAgentWorkspace,
@@ -13,8 +22,10 @@ import {
 import { createDomainStore, type CareerFact } from '@/lib/agent/domain-store'
 import { aiFetch } from '@/lib/agent/browser-config'
 import {
+  buildOptimizationPlanTargets,
   OPTIMIZATION_PLAN_JSON_SCHEMA,
-  prepareOptimizationPlan
+  prepareOptimizationPlan,
+  type OptimizationPlanTarget
 } from '@/lib/agent/optimization-plan'
 import { buildOptimizationPlanPrompt } from '@/lib/agent/optimization-plan-prompt'
 import { readAiProviderPreference } from '@/lib/agent/provider-preference'
@@ -26,14 +37,21 @@ import {
   runPreferredProviderTask,
   type StructuredTaskInput
 } from '@/lib/agent/providers'
-import type { OptimizationPlan } from '@/lib/agent/optimization-run'
+import type {
+  AgentStage,
+  OptimizationPlan
+} from '@/lib/agent/optimization-run'
+import { isOperationalOptimizationPlanItem } from '@/lib/agent/optimization-run'
 import {
   ACTIVE_WORKFLOW_CHANGED_EVENT,
   approveOptimizationPlan,
   persistOptimizationPlan,
   saveActiveWorkflowPreference
 } from '@/lib/agent/workflow-persistence'
-import { createResumeId } from '@/lib/resume-model'
+import {
+  createResumeId,
+  type ResumeData
+} from '@/lib/resume-model'
 
 export interface AgentWorkspaceService {
   load(): Promise<AgentWorkspace | null>
@@ -66,6 +84,7 @@ export interface AgentWorkspaceService {
     workspace: AgentWorkspace
     instruction: string
     locale: 'zh' | 'en'
+    resumeTargets: OptimizationPlanTarget[]
     signal?: AbortSignal
     onDownloadProgress?: (progress: number) => void
     now: string
@@ -81,12 +100,14 @@ export interface AgentWorkspaceService {
 
 export function AgentWorkflowPanel({
   activeDraftId,
+  resume,
   instruction = '',
   service: serviceOverride,
   workspaceSnapshot,
   onWorkspaceChange
 }: {
   activeDraftId: string
+  resume: ResumeData
   instruction?: string
   service?: AgentWorkspaceService
   workspaceSnapshot?: AgentWorkspace | null
@@ -178,6 +199,11 @@ export function AgentWorkflowPanel({
       setError(t('instructionRequired'))
       return
     }
+    const resumeTargets = buildOptimizationPlanTargets(resume)
+    if (resumeTargets.length === 0) {
+      setError(t('noSafeTargets'))
+      return
+    }
     planControllerRef.current?.abort()
     const controller = new AbortController()
     planControllerRef.current = controller
@@ -189,6 +215,7 @@ export function AgentWorkflowPanel({
         workspace,
         instruction: instruction.trim(),
         locale,
+        resumeTargets,
         signal: controller.signal,
         onDownloadProgress: setDownloadProgress,
         now: new Date().toISOString()
@@ -222,8 +249,18 @@ export function AgentWorkflowPanel({
     }
   }
 
+  function cancelPlan() {
+    planControllerRef.current?.abort()
+  }
+
   async function approvePlan() {
     if (!workspace || workspace.summary.run.stage !== 'awaiting-plan-approval') return
+    if (workspace.summary.run.plan?.items.some(
+      (item) => !isOperationalOptimizationPlanItem(item)
+    )) {
+      setError(t('legacyPlanUnsupported'))
+      return
+    }
     setPlanPending(true)
     setError('')
     try {
@@ -255,17 +292,36 @@ export function AgentWorkflowPanel({
     return <section className="agent-workflow-panel" aria-label={t('title')}>
       <header><CircleHelp size={16} aria-hidden="true" /><h3>{t('noRun')}</h3></header>
       <p>{t('noRunDescription')}</p>
+      <WorkflowSteps current={0} />
+      <a className="agent-workflow-panel__next" href={`/${locale}/jd-match`}>
+        {t('openTargetJob')}<ArrowRight size={14} aria-hidden="true" />
+      </a>
     </section>
   }
   if (workspace.summary.run.sourceDraftId !== activeDraftId) {
     return <section className="agent-workflow-panel" aria-label={t('title')}>
       <header><TriangleAlert size={16} aria-hidden="true" /><h3>{t('differentDraft')}</h3></header>
       <p>{t('differentDraftDescription')}</p>
+      <a className="agent-workflow-panel__next" href={`/${locale}/jd-match`}>
+        {t('analyzeCurrentDraft')}<ArrowRight size={14} aria-hidden="true" />
+      </a>
     </section>
   }
 
   const run = workspace.summary.run
   const openQuestions = run.questions.filter((question) => question.status === 'open')
+  const planTargets = new Map(
+    buildOptimizationPlanTargets(resume).map((target) => [target.path, target])
+  )
+  const planIsOperational = run.plan?.items.every((item) => {
+    if (!isOperationalOptimizationPlanItem(item)) return false
+    const target = planTargets.get(item.targetPath)
+    return target?.transformations.includes(item.transformation) ?? false
+  }) ?? true
+  const requirementsById = new Map(
+    workspace.matrix.requirements.map((requirement) => [requirement.id, requirement.text])
+  )
+  const factsById = new Map(workspace.facts.map((fact) => [fact.id, fact.text]))
 
   return (
     <section className="agent-workflow-panel" aria-labelledby="agent-workflow-title" data-stage={run.stage}>
@@ -274,6 +330,7 @@ export function AgentWorkflowPanel({
         <h3 id="agent-workflow-title">{workspace.summary.targetJob.title}</h3>
         <p>{t(`stages.${run.stage}`)}</p>
       </header>
+      <WorkflowSteps current={workflowStep(run.stage)} />
       {error ? <p className="resume-app-error" role="alert">{error}</p> : null}
       {openQuestions.length > 0 ? (
         <div className="agent-workflow-panel__questions">
@@ -281,6 +338,9 @@ export function AgentWorkflowPanel({
             <AgentQuestionCard
               key={question.id}
               question={question}
+              requirement={workspace.matrix.requirements.find(
+                ({ id }) => id === question.requirementId
+              )}
               facts={workspace.facts}
               pending={pendingQuestionId === question.id}
               onLinkFact={(factId, status) => runQuestionAction(question.id, async (current) => service.linkFact({
@@ -316,12 +376,19 @@ export function AgentWorkflowPanel({
           <p className="agent-workflow-panel__ready">
             <CheckCircle2 size={15} aria-hidden="true" />{t('evidenceReady')}
           </p>
-          <button type="button" disabled={planPending} onClick={() => void preparePlan()}>
-            {planPending ? t('preparingPlan') : t('preparePlan')}
+          <button
+            type="button"
+            onClick={() => planPending ? cancelPlan() : void preparePlan()}
+          >
+            {planPending ? <CircleStop size={13} aria-hidden="true" /> : null}
+            {planPending ? t('cancelPlan') : t('preparePlan')}
           </button>
           {downloadProgress !== null ? <div className="resume-app-download" role="status">
             <span>{t('localModelDownload', { percentage: Math.round(downloadProgress * 100) })}</span>
             <progress aria-label={t('localModelDownloadLabel')} value={downloadProgress} max={1} />
+            <a href={`/${locale}/settings`}>
+              <Settings2 size={13} aria-hidden="true" />{t('openSettings')}
+            </a>
           </div> : null}
         </div>
       ) : run.plan ? (
@@ -335,16 +402,52 @@ export function AgentWorkflowPanel({
             <li key={item.id}>
               <strong>{t(`transformations.${item.transformation}`)}</strong>
               <span>{item.intent}</span>
-              <small>{t('planReferences', {
-                requirements: item.requirementIds.join(', '),
-                facts: item.factIds.join(', ') || t('none')
-              })}</small>
+              <dl className="agent-workflow-panel__plan-details">
+                <div>
+                  <dt>{t('targetPath')}</dt>
+                  <dd>{item.targetPath ?? t('legacyTarget')}</dd>
+                </div>
+                <div>
+                  <dt>{t('currentContent')}</dt>
+                  <dd>{formatPlanTarget(
+                    item.targetPath ? planTargets.get(item.targetPath)?.current : undefined,
+                    t('legacyTarget')
+                  )}</dd>
+                </div>
+                <div>
+                  <dt>{t('planRequirements')}</dt>
+                  <dd>{resolveReferenceText(
+                    item.requirementIds,
+                    requirementsById,
+                    t('unavailableReference'),
+                    t('none')
+                  )}</dd>
+                </div>
+                <div>
+                  <dt>{t('planFacts')}</dt>
+                  <dd>{resolveReferenceText(
+                    item.factIds,
+                    factsById,
+                    t('unavailableReference'),
+                    t('none')
+                  )}</dd>
+                </div>
+              </dl>
             </li>
           ))}</ol>
           {run.stage === 'awaiting-plan-approval' ? (
-            <button type="button" disabled={planPending} onClick={() => void approvePlan()}>
+            <>
+              {!planIsOperational ? (
+                <p className="resume-app-error" role="alert">{t('legacyPlanUnsupported')}</p>
+              ) : null}
+              <button
+                type="button"
+                disabled={planPending || !planIsOperational}
+                onClick={() => void approvePlan()}
+              >
               {planPending ? t('approvingPlan') : t('approvePlan')}
-            </button>
+              </button>
+            </>
           ) : (
             <p className="agent-workflow-panel__ready">
               <CheckCircle2 size={15} aria-hidden="true" />{t('planApproved')}
@@ -362,6 +465,7 @@ export function AgentWorkflowPanel({
 
 function AgentQuestionCard({
   question,
+  requirement,
   facts,
   pending,
   onLinkFact,
@@ -369,6 +473,7 @@ function AgentQuestionCard({
   onConfirmGap
 }: {
   question: AgentWorkspace['summary']['run']['questions'][number]
+  requirement?: AgentWorkspace['matrix']['requirements'][number]
   facts: CareerFact[]
   pending: boolean
   onLinkFact: (factId: string, status: 'direct' | 'partial') => Promise<void>
@@ -376,7 +481,12 @@ function AgentQuestionCard({
   onConfirmGap: () => Promise<void>
 }) {
   const t = useTranslations('agent.workflow')
-  const [factId, setFactId] = useState(facts[0]?.id ?? '')
+  const rankedFacts = useMemo(
+    () => rankCareerFactsForRequirement(requirement, facts),
+    [facts, requirement]
+  )
+  const suggestedFactId = rankedFacts[0]?.score > 0 ? rankedFacts[0].fact.id : ''
+  const [factId, setFactId] = useState(suggestedFactId || rankedFacts[0]?.fact.id || '')
   const [answer, setAnswer] = useState('')
   const [status, setStatus] = useState<'direct' | 'partial'>('direct')
   const [kind, setKind] = useState<CareerFact['kind']>('experience')
@@ -394,8 +504,8 @@ function AgentQuestionCard({
       <div className="agent-workflow-panel__existing">
         <label>
           <span>{t('existingFact')}</span>
-          <select value={factId} onChange={(event) => setFactId(event.target.value)} disabled={pending || facts.length === 0}>
-            {facts.length === 0 ? <option value="">{t('noFacts')}</option> : facts.map((fact) => (
+          <select value={factId} onChange={(event) => setFactId(event.target.value)} disabled={pending || rankedFacts.length === 0}>
+            {rankedFacts.length === 0 ? <option value="">{t('noFacts')}</option> : rankedFacts.map(({ fact }) => (
               <option key={fact.id} value={fact.id}>{fact.text} · {t(`verification.${fact.verification}`)}</option>
             ))}
           </select>
@@ -404,6 +514,9 @@ function AgentQuestionCard({
           <Link2 size={13} aria-hidden="true" />{t('linkFact')}
         </button>
       </div>
+      {suggestedFactId ? (
+        <p className="agent-workflow-panel__suggestion">{t('suggestedFact')}</p>
+      ) : null}
       <div className="agent-workflow-panel__new-fact">
         <label>
           <span>{t('newFact')}</span>
@@ -426,6 +539,106 @@ function AgentQuestionCard({
       </button>
     </article>
   )
+}
+
+export function rankCareerFactsForRequirement(
+  requirement: AgentWorkspace['matrix']['requirements'][number] | undefined,
+  facts: readonly CareerFact[]
+) {
+  if (!requirement) return facts.map((fact) => ({ fact, score: 0 }))
+  const requirementText = [
+    requirement.text,
+    ...requirement.keywords
+  ].join(' ')
+  const requirementTerms = evidenceTerms(requirementText)
+  const compactRequirement = compactEvidenceText(requirementText)
+
+  return facts.map((fact) => {
+    const factText = [
+      fact.text,
+      ...(fact.tags ?? []),
+      fact.context?.company,
+      fact.context?.role,
+      fact.context?.project
+    ].filter(Boolean).join(' ')
+    const factTerms = evidenceTerms(factText)
+    const compactFact = compactEvidenceText(factText)
+    const overlap = [...requirementTerms].filter((term) => factTerms.has(term)).length
+    const containment = compactRequirement.length >= 4
+      && compactFact.length >= 4
+      && (
+        compactRequirement.includes(compactFact)
+        || compactFact.includes(compactRequirement)
+      )
+      ? 8
+      : 0
+    return { fact, score: overlap * 3 + containment }
+  }).sort((left, right) => (
+    right.score - left.score || left.fact.id.localeCompare(right.fact.id)
+  ))
+}
+
+function evidenceTerms(value: string) {
+  const normalized = value.normalize('NFKC').toLocaleLowerCase()
+  const terms = new Set(
+    (normalized.match(/[\p{L}\p{N}]+/gu) ?? [])
+      .filter((term) => term.length > 1)
+  )
+  const han = [...normalized.matchAll(/[\p{Script=Han}]+/gu)]
+    .map(([match]) => match)
+    .join('')
+  for (let index = 0; index < han.length - 1; index += 1) {
+    terms.add(han.slice(index, index + 2))
+  }
+  return terms
+}
+
+function compactEvidenceText(value: string) {
+  return value.normalize('NFKC').toLocaleLowerCase().replace(/[^\p{L}\p{N}]/gu, '')
+}
+
+function WorkflowSteps({ current }: { current: number }) {
+  const t = useTranslations('agent.workflow')
+  const steps = t.raw('steps') as string[]
+  return (
+    <ol className="agent-workflow-panel__steps" aria-label={t('progress')}>
+      {steps.map((step, index) => (
+        <li
+          key={step}
+          data-complete={index < current}
+          data-current={index === current}
+          aria-current={index === current ? 'step' : undefined}
+        >
+          <span>{index + 1}</span>{step}
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+function workflowStep(stage: AgentStage) {
+  if (stage === 'draft') return 0
+  if (['requirements-ready', 'awaiting-answers', 'evidence-mapped'].includes(stage)) return 1
+  if (['plan-ready', 'awaiting-plan-approval'].includes(stage)) return 2
+  if (['generating-changes', 'awaiting-change-approval', 'validated'].includes(stage)) return 3
+  if (stage === 'applied') return 4
+  return 0
+}
+
+function formatPlanTarget(value: OptimizationPlanTarget['current'] | undefined, fallback: string) {
+  if (typeof value === 'string') return value || fallback
+  if (Array.isArray(value)) return value.join(' · ') || '—'
+  return fallback
+}
+
+function resolveReferenceText(
+  ids: readonly string[],
+  values: ReadonlyMap<string, string>,
+  unavailable: string,
+  empty: string
+) {
+  if (ids.length === 0) return empty
+  return ids.map((id) => values.get(id) ?? unavailable).join(' · ')
 }
 
 export function createAgentWorkspaceService(): AgentWorkspaceService {
@@ -451,7 +664,8 @@ export function createAgentWorkspaceService(): AgentWorkspaceService {
         targetJobId: input.workspace.summary.run.targetJobId,
         requirements: input.workspace.matrix.requirements,
         requirementMatches: input.workspace.summary.run.requirementMatches,
-        careerFacts: relevantFacts
+        careerFacts: relevantFacts,
+        resumeTargets: input.resumeTargets
       }
       const request = {
         locale: input.locale,

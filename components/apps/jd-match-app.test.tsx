@@ -33,9 +33,9 @@ const resume = normalizeResumeData({
   metadata: { source: 'paste', locale: 'en', updatedAt: '2026-07-13T00:00:00.000Z' }
 })
 
-function seededStorage() {
+function seededStorage(source: 'paste' | 'sample' = 'paste') {
   const storage = new MemoryStorage()
-  const draft = createResumeDraft(resume, { id: 'ada', name: 'Ada Resume', source: 'paste' })
+  const draft = createResumeDraft(resume, { id: 'ada', name: 'Ada Resume', source })
   writeDraftState(storage, { activeDraftId: draft.id, drafts: [draft] })
   return storage
 }
@@ -45,11 +45,12 @@ function renderMatch(
   workflowPersistence?: JDMatchWorkflowPersistence,
   requirementPersistence?: JDMatchRequirementPersistence,
   stalePersistence?: JDMatchStalePersistence,
-  workflowSummaryLoader?: JDMatchWorkflowSummaryLoader
+  workflowSummaryLoader?: JDMatchWorkflowSummaryLoader,
+  source: 'paste' | 'sample' = 'paste'
 ) {
   return render(
     <NextIntlClientProvider locale="en" messages={en}>
-      <ResumeDraftProviderCore locale="en" storage={seed ? seededStorage() : null}>
+      <ResumeDraftProviderCore locale="en" storage={seed ? seededStorage(source) : null}>
         <Probe />
         <JDMatchApp
           workflowPersistence={workflowPersistence}
@@ -99,6 +100,14 @@ function analysisFor(jobDescription: string) {
 
 const analysis = analysisFor('Seeking a platform engineer')
 
+async function reviewAllRequirements(user: ReturnType<typeof userEvent.setup>) {
+  for (let index = 0; index < sections.requirements.length; index += 1) {
+    const [next] = await screen.findAllByRole('button', { name: 'Confirm requirement' })
+    await user.click(next)
+  }
+  await user.click(screen.getByRole('button', { name: 'Create Agent run' }))
+}
+
 function response(body: unknown, status = 200, headers?: HeadersInit) {
   return { ok: status >= 200 && status < 300, status, headers: new Headers(headers), json: async () => body } as Response
 }
@@ -125,6 +134,15 @@ afterEach(() => {
 })
 
 describe('JDMatchApp', () => {
+  it('warns that sandbox resumes cannot become verified career evidence', async () => {
+    renderMatch(true, undefined, undefined, undefined, undefined, 'sample')
+
+    expect(await screen.findByText('This is fictional sandbox data')).toBeVisible()
+    expect(screen.getByRole('link', {
+      name: 'Open Studio to paste or upload a trusted resume'
+    })).toHaveAttribute('href', '/en/studio')
+  })
+
   it('keeps the inset JD textarea within its application column', () => {
     const css = readFileSync('app/globals.css', 'utf8')
     expect(css).toMatch(/\.jd-match-app__input\s*>\s*textarea\s*{[^}]*width:\s*auto;/)
@@ -135,32 +153,32 @@ describe('JDMatchApp', () => {
     renderMatch()
     await screen.findByText('Ada Resume')
     await user.type(screen.getByRole('textbox', { name: 'Job description' }), 'Seeking a platform engineer')
-    await user.click(screen.getByRole('button', { name: 'Analyze match' }))
+    await user.click(screen.getByRole('button', { name: 'Extract requirements' }))
 
     expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({
       jd: 'Seeking a platform engineer', locale: 'en',
       resume: expect.objectContaining({ profile: expect.objectContaining({ name: 'Ada Candidate' }) })
     })
-    const report = await screen.findByRole('region', { name: 'JD match report' })
+    const report = await screen.findByRole('region', { name: 'Extracted job requirements' })
     expect(within(report).queryByText(/Match Score/)).not.toBeInTheDocument()
     expect(within(report).getByRole('heading', { name: 'Interview Prep' })).toBeVisible()
     expect(within(report).getByText('OpenAI-compatible · test-model')).toBeVisible()
-    expect(within(report).getByText('Requirement coverage')).toBeVisible()
-    expect(within(report).getByText('Evidence completeness')).toBeVisible()
+    expect(within(report).getByText('Verified requirement coverage')).toBeVisible()
+    expect(within(report).getByText('Verified evidence completeness')).toBeVisible()
     expect(within(report).getByText('Structure & readability')).toBeVisible()
     expect(within(report).getByText('Alignment rubric: resume-os-alignment-v1')).toBeVisible()
     expect(within(report).getByText('Structure rubric: resume-os-structure-v1')).toBeVisible()
     expect(within(report).getByText(/^Input fingerprint: fnv1a:/)).toBeVisible()
     expect(within(report).getByText('15%')).toBeVisible()
-    expect(within(report).getAllByText('0%')).toHaveLength(2)
+    expect(within(report).getAllByText('Pending evidence review')).toHaveLength(2)
     expect(within(report).getByRole('heading', { name: 'TypeScript ownership' })).toBeVisible()
     const firstRequirement = within(report).getByRole('heading', { name: 'TypeScript ownership' }).closest('[role="listitem"]') as HTMLElement
     expect(within(firstRequirement).getByText('Must', { selector: 'dd' })).toBeVisible()
     expect(within(firstRequirement).getByText('TypeScript', { selector: 'dd' })).toBeVisible()
-    expect(within(report).getAllByText('Evidence gap')).toHaveLength(3)
+    expect(within(report).getAllByText('Not yet mapped')).toHaveLength(3)
     expect(within(report).getAllByText('Missing — no verified career evidence is linked.')).toHaveLength(3)
     expect(report.querySelector('pre')).not.toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent('JD match report ready.')
+    expect(screen.getByRole('status')).toHaveTextContent('Job requirements are ready for review.')
   })
 
   it('creates the resumable Agent run only after every requirement is confirmed', async () => {
@@ -173,13 +191,13 @@ describe('JDMatchApp', () => {
     renderMatch(true, workflowPersistence)
     await screen.findByText('Ada Resume')
     await user.type(screen.getByRole('textbox', { name: 'Job description' }), 'Platform role')
-    await user.click(screen.getByRole('button', { name: 'Analyze match' }))
+    await user.click(screen.getByRole('button', { name: 'Extract requirements' }))
 
     expect(await screen.findByText('0 of 3 confirmed')).toBeVisible()
     expect(workflowPersistence).not.toHaveBeenCalled()
     expect(window.localStorage.getItem('resume-os-active-workflow-v1')).toBeNull()
 
-    await user.click(screen.getByRole('button', { name: 'Confirm all & create Agent run' }))
+    await reviewAllRequirements(user)
     expect(await screen.findByText('Target job and resumable Agent run saved in this browser.')).toBeVisible()
     expect(workflowPersistence).toHaveBeenCalledWith(expect.objectContaining({
       sourceDraftId: 'ada',
@@ -203,7 +221,7 @@ describe('JDMatchApp', () => {
     renderMatch(true, workflowPersistence)
     await screen.findByText('Ada Resume')
     await user.type(screen.getByRole('textbox', { name: 'Job description' }), 'Platform role')
-    await user.click(screen.getByRole('button', { name: 'Analyze match' }))
+    await user.click(screen.getByRole('button', { name: 'Extract requirements' }))
 
     const requirement = (await screen.findByRole('heading', { name: 'TypeScript ownership' }))
       .closest('[role="listitem"]') as HTMLElement
@@ -212,7 +230,7 @@ describe('JDMatchApp', () => {
     expect(await screen.findByText('1 of 3 confirmed')).toBeVisible()
     expect(workflowPersistence).not.toHaveBeenCalled()
     expect(window.localStorage.getItem('resume-os-active-workflow-v1')).toBeNull()
-    expect(screen.getByRole('button', { name: 'Confirm all & create Agent run' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Review 2 remaining' })).toBeDisabled()
   })
 
   it('refreshes persisted requirement matches after the active Agent workflow changes', async () => {
@@ -227,8 +245,8 @@ describe('JDMatchApp', () => {
     renderMatch(true, workflowPersistence, undefined, undefined, workflowSummaryLoader)
     await screen.findByText('Ada Resume')
     await user.type(screen.getByRole('textbox', { name: 'Job description' }), 'Platform role')
-    await user.click(screen.getByRole('button', { name: 'Analyze match' }))
-    await user.click(await screen.findByRole('button', { name: 'Confirm all & create Agent run' }))
+    await user.click(screen.getByRole('button', { name: 'Extract requirements' }))
+    await reviewAllRequirements(user)
     await screen.findByText('Target job and resumable Agent run saved in this browser.')
 
     const persistedAnalysis = workflowPersistence.mock.calls[0][0].analysis
@@ -252,7 +270,7 @@ describe('JDMatchApp', () => {
     })
     act(() => window.dispatchEvent(new Event(ACTIVE_WORKFLOW_CHANGED_EVENT)))
     await waitFor(() => expect(workflowSummaryLoader).toHaveBeenCalledOnce())
-    expect(screen.getAllByText('Evidence gap')).toHaveLength(3)
+    expect(screen.getAllByText('Not yet mapped')).toHaveLength(3)
 
     workflowSummaryLoader.mockResolvedValue({
       preference,
@@ -268,7 +286,7 @@ describe('JDMatchApp', () => {
     const requirement = (await screen.findByRole('heading', { name: 'TypeScript ownership' }))
       .closest('[role="listitem"]') as HTMLElement
     expect(await within(requirement).findByText('Direct match')).toBeVisible()
-    expect(within(requirement).getByText('fact-agent-1')).toBeVisible()
+    expect(within(requirement).getByText('1 verified career fact linked.')).toBeVisible()
     expect(within(requirement).getByText(/Agent linked a confirmed career fact/)).toBeVisible()
     expect(workflowSummaryLoader).toHaveBeenCalledTimes(2)
   })
@@ -284,8 +302,8 @@ describe('JDMatchApp', () => {
     renderMatch(true, workflowPersistence, requirementPersistence)
     await screen.findByText('Ada Resume')
     await user.type(screen.getByRole('textbox', { name: 'Job description' }), 'Platform role')
-    await user.click(screen.getByRole('button', { name: 'Analyze match' }))
-    await user.click(await screen.findByRole('button', { name: 'Confirm all & create Agent run' }))
+    await user.click(screen.getByRole('button', { name: 'Extract requirements' }))
+    await reviewAllRequirements(user)
     await screen.findByText('Target job and resumable Agent run saved in this browser.')
 
     const requirement = (await screen.findByRole('heading', { name: 'TypeScript ownership' }))
@@ -327,8 +345,8 @@ describe('JDMatchApp', () => {
     await screen.findByText('Ada Resume')
     const input = screen.getByRole('textbox', { name: 'Job description' })
     await user.type(input, 'Platform role')
-    await user.click(screen.getByRole('button', { name: 'Analyze match' }))
-    await user.click(await screen.findByRole('button', { name: 'Confirm all & create Agent run' }))
+    await user.click(screen.getByRole('button', { name: 'Extract requirements' }))
+    await reviewAllRequirements(user)
     await screen.findByText('Target job and resumable Agent run saved in this browser.')
 
     await user.type(input, ' changed')
@@ -347,11 +365,11 @@ describe('JDMatchApp', () => {
     renderMatch()
     await screen.findByText('Ada Resume')
     await user.type(screen.getByRole('textbox', { name: 'Job description' }), 'Platform role')
-    await user.click(screen.getByRole('button', { name: 'Analyze match' }))
+    await user.click(screen.getByRole('button', { name: 'Extract requirements' }))
 
     expect(await screen.findByText('Platform work')).toBeVisible()
     expect(screen.getByText('OpenAI-compatible · test-model')).toBeVisible()
-    expect(screen.queryByText('Requirement coverage')).not.toBeInTheDocument()
+    expect(screen.queryByText('Verified requirement coverage')).not.toBeInTheDocument()
   })
 
   it('runs JD extraction in Chrome without sending resume data to the cloud', async () => {
@@ -372,9 +390,9 @@ describe('JDMatchApp', () => {
     renderMatch()
     await screen.findByText('Ada Resume')
     await user.type(screen.getByRole('textbox', { name: 'Job description' }), 'Local platform role')
-    await user.click(screen.getByRole('button', { name: 'Analyze match' }))
+    await user.click(screen.getByRole('button', { name: 'Extract requirements' }))
 
-    expect(await screen.findByText('Requirement coverage')).toBeVisible()
+    expect(await screen.findByText('Verified requirement coverage')).toBeVisible()
     expect(screen.getByText('Chrome Built-in AI (Beta) · browser-managed')).toBeVisible()
     expect(prompt).toHaveBeenCalledWith(expect.stringContaining('Local platform role'), expect.objectContaining({
       responseConstraint: expect.objectContaining({ additionalProperties: false })
@@ -412,13 +430,13 @@ describe('JDMatchApp', () => {
     renderMatch()
     await screen.findByText('Ada Resume')
     await user.type(screen.getByRole('textbox', { name: 'Job description' }), 'Local platform role')
-    await user.click(screen.getByRole('button', { name: 'Analyze match' }))
+    await user.click(screen.getByRole('button', { name: 'Extract requirements' }))
 
     expect(await screen.findByText('Chrome local model download: 42%')).toBeVisible()
     expect(screen.getByRole('progressbar', { name: 'Chrome local model download progress' })).toHaveAttribute('value', '0.42')
 
     resolvePrompt(JSON.stringify(sections))
-    expect(await screen.findByText('Requirement coverage')).toBeVisible()
+    expect(await screen.findByText('Verified requirement coverage')).toBeVisible()
     if (originalActivation) Object.defineProperty(navigator, 'userActivation', originalActivation)
     else Reflect.deleteProperty(navigator, 'userActivation')
   })
@@ -432,7 +450,7 @@ describe('JDMatchApp', () => {
     renderMatch()
     await screen.findByText('Ada Resume')
     await user.type(screen.getByRole('textbox', { name: 'Job description' }), 'Local-only role')
-    await user.click(screen.getByRole('button', { name: 'Analyze match' }))
+    await user.click(screen.getByRole('button', { name: 'Extract requirements' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Chrome local model is unavailable')
     expect(fetchMock).not.toHaveBeenCalled()
@@ -450,10 +468,10 @@ describe('JDMatchApp', () => {
     renderMatch()
     await screen.findByText('Ada Resume')
     await user.type(screen.getByRole('textbox', { name: 'Job description' }), 'Platform role')
-    await user.click(screen.getByRole('button', { name: 'Analyze match' }))
+    await user.click(screen.getByRole('button', { name: 'Extract requirements' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('AI returned a report that could not be verified.')
-    expect(screen.queryByText('Requirement coverage')).not.toBeInTheDocument()
+    expect(screen.queryByText('Verified requirement coverage')).not.toBeInTheDocument()
   })
 
   it('rejects a structure score that was not derived from the active resume', async () => {
@@ -468,7 +486,7 @@ describe('JDMatchApp', () => {
     renderMatch()
     await screen.findByText('Ada Resume')
     await user.type(screen.getByRole('textbox', { name: 'Job description' }), 'Platform role')
-    await user.click(screen.getByRole('button', { name: 'Analyze match' }))
+    await user.click(screen.getByRole('button', { name: 'Extract requirements' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('AI returned a report that could not be verified.')
   })
@@ -479,7 +497,7 @@ describe('JDMatchApp', () => {
     renderMatch()
     await screen.findByText('Ada Resume')
     await user.type(screen.getByRole('textbox', { name: 'Job description' }), 'Platform role')
-    await user.click(screen.getByRole('button', { name: 'Analyze match' }))
+    await user.click(screen.getByRole('button', { name: 'Extract requirements' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('AI returned a report that could not be verified.')
     expect(screen.getAllByRole('alert')).toHaveLength(1)
@@ -494,15 +512,15 @@ describe('JDMatchApp', () => {
     renderMatch()
     await screen.findByText('Ada Resume')
     await user.type(screen.getByRole('textbox', { name: 'Job description' }), 'Platform role')
-    await user.click(screen.getByRole('button', { name: 'Analyze match' }))
-    expect(screen.getByRole('status')).toHaveTextContent('Analyzing match')
+    await user.click(screen.getByRole('button', { name: 'Extract requirements' }))
+    expect(screen.getByRole('status')).toHaveTextContent('Extracting requirements')
 
     resolve(response({ report: 'legacy', sections, model: 'test-model' }))
     expect(await screen.findByText('Platform work')).toBeVisible()
-    expect(screen.getByRole('status')).toHaveTextContent('JD match report ready.')
+    expect(screen.getByRole('status')).toHaveTextContent('Job requirements are ready for review.')
 
     fetchMock.mockResolvedValueOnce(response({ code: 'AI_UNAVAILABLE' }, 502))
-    await user.click(screen.getByRole('button', { name: 'Analyze match' }))
+    await user.click(screen.getByRole('button', { name: 'Extract requirements' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('AI service is temporarily unavailable.')
     expect(screen.getAllByRole('alert')).toHaveLength(1)
     expect(screen.getByRole('status')).toBeEmptyDOMElement()
@@ -514,11 +532,11 @@ describe('JDMatchApp', () => {
     await screen.findByText('Ada Resume')
     const input = screen.getByRole('textbox', { name: 'Job description' })
     await user.type(input, 'Platform role')
-    await user.click(screen.getByRole('button', { name: 'Analyze match' }))
-    expect(await screen.findByText('Requirement coverage')).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Extract requirements' }))
+    expect(await screen.findByText('Verified requirement coverage')).toBeVisible()
 
     await user.type(input, ' updated')
-    expect(screen.queryByText('Requirement coverage')).not.toBeInTheDocument()
+    expect(screen.queryByText('Verified requirement coverage')).not.toBeInTheDocument()
     expect(screen.getByRole('alert')).toHaveTextContent('The job description or active resume changed.')
     expect(screen.getAllByRole('alert')).toHaveLength(1)
     expect(screen.getByRole('status')).toBeEmptyDOMElement()
@@ -529,11 +547,11 @@ describe('JDMatchApp', () => {
     renderMatch()
     await screen.findByText('Ada Resume')
     await user.type(screen.getByRole('textbox', { name: 'Job description' }), 'Platform role')
-    await user.click(screen.getByRole('button', { name: 'Analyze match' }))
-    expect(await screen.findByText('Requirement coverage')).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Extract requirements' }))
+    expect(await screen.findByText('Verified requirement coverage')).toBeVisible()
 
     await user.click(screen.getByText('Update active resume'))
-    await waitFor(() => expect(screen.queryByText('Requirement coverage')).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.queryByText('Verified requirement coverage')).not.toBeInTheDocument())
     expect(screen.getByRole('alert')).toHaveTextContent('The job description or active resume changed.')
   })
 
@@ -548,11 +566,31 @@ describe('JDMatchApp', () => {
     await screen.findByText('Ada Resume')
     const input = screen.getByRole('textbox', { name: 'Job description' })
     await user.type(input, 'Platform role')
-    await user.click(screen.getByRole('button', { name: 'Analyze match' }))
+    await user.click(screen.getByRole('button', { name: 'Extract requirements' }))
     await user.type(input, ' changed')
 
     await waitFor(() => expect(signal?.aborted).toBe(true))
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Analyze match' })).toBeEnabled())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Extract requirements' })).toBeEnabled())
+  })
+
+  it('lets the user cancel an in-flight requirement extraction', async () => {
+    const user = userEvent.setup()
+    let signal: AbortSignal | undefined
+    fetchMock.mockImplementationOnce((_input, init) => new Promise((_resolve, reject) => {
+      signal = init?.signal ?? undefined
+      signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')))
+    }))
+    renderMatch()
+    await screen.findByText('Ada Resume')
+    await user.type(screen.getByRole('textbox', { name: 'Job description' }), 'Platform role')
+    await user.click(screen.getByRole('button', { name: 'Extract requirements' }))
+    await user.click(screen.getByRole('button', { name: 'Cancel extraction' }))
+
+    await waitFor(() => expect(signal?.aborted).toBe(true))
+    await waitFor(() => expect(
+      screen.getByRole('button', { name: 'Extract requirements' })
+    ).toBeEnabled())
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it('preserves the job description on failure and supports localized retry timing', async () => {
@@ -562,12 +600,12 @@ describe('JDMatchApp', () => {
     await screen.findByText('Ada Resume')
     const input = screen.getByRole('textbox', { name: 'Job description' })
     await user.type(input, 'Keep this role description')
-    await user.click(screen.getByRole('button', { name: 'Analyze match' }))
+    await user.click(screen.getByRole('button', { name: 'Extract requirements' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Too many requests. Try again in 1 second.')
     expect(screen.getByRole('alert')).not.toHaveTextContent('raw provider detail')
     expect(input).toHaveValue('Keep this role description')
-    expect(screen.getByRole('button', { name: 'Analyze match' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Extract requirements' })).toBeDisabled()
   })
 
   it('directs users without an active draft to Studio', () => {

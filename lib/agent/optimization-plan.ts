@@ -3,6 +3,7 @@ import { careerFactSchema } from './domain-store'
 import {
   OPTIMIZATION_RUN_VERSION,
   OptimizationRunTransitionError,
+  SAFE_OPTIMIZATION_TRANSFORMATIONS,
   optimizationPlanSchema,
   transitionOptimizationRun,
   type OptimizationPlan,
@@ -13,23 +14,48 @@ import {
   MAX_JOB_REQUIREMENTS,
   requirementMatchSchema
 } from './requirement-matrix'
-import { resumeLocaleSchema } from '@/lib/resume-model'
+import {
+  resumeLocaleSchema,
+  type ResumeData
+} from '@/lib/resume-model'
 
 export const MAX_OPTIMIZATION_PLAN_BODY_BYTES = 256_000
 export const MAX_OPTIMIZATION_PLAN_OUTPUT_BYTES = 64_000
 export const MAX_OPTIMIZATION_PLAN_FACTS = 500
+export const MAX_OPTIMIZATION_PLAN_TARGETS = 500
+
+const safeTransformationSchema = z.enum(SAFE_OPTIMIZATION_TRANSFORMATIONS)
 
 const stableIdSchema = z.string()
   .min(1)
   .max(160)
   .refine((value) => value === value.trim(), 'ID must not contain surrounding whitespace')
 
+export const optimizationPlanTargetSchema = z.object({
+  path: z.string().trim().min(1).max(240),
+  current: z.union([
+    z.string().max(20_000),
+    z.array(z.string().max(2_000)).max(100)
+  ]),
+  transformations: z.array(safeTransformationSchema).min(1).max(4)
+}).strict().superRefine((target, context) => {
+  const unique = new Set(target.transformations)
+  if (unique.size !== target.transformations.length) {
+    context.addIssue({
+      code: 'custom',
+      path: ['transformations'],
+      message: 'Target transformations must be unique'
+    })
+  }
+})
+
 const contextFields = {
   sourceDraftId: stableIdSchema,
   targetJobId: stableIdSchema,
   requirements: z.array(jobRequirementSchema).min(1).max(MAX_JOB_REQUIREMENTS),
   requirementMatches: z.array(requirementMatchSchema).min(1).max(MAX_JOB_REQUIREMENTS),
-  careerFacts: z.array(careerFactSchema).max(MAX_OPTIMIZATION_PLAN_FACTS)
+  careerFacts: z.array(careerFactSchema).max(MAX_OPTIMIZATION_PLAN_FACTS),
+  resumeTargets: z.array(optimizationPlanTargetSchema).min(1).max(MAX_OPTIMIZATION_PLAN_TARGETS)
 } as const
 
 export const optimizationPlanContextSchema = z.object(contextFields)
@@ -56,7 +82,7 @@ export const OPTIMIZATION_PLAN_JSON_SCHEMA = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['id', 'requirementIds', 'factIds', 'intent', 'transformation'],
+        required: ['id', 'requirementIds', 'factIds', 'targetPath', 'intent', 'transformation'],
         properties: {
           id: { type: 'string', minLength: 1, maxLength: 160 },
           requirementIds: {
@@ -72,6 +98,7 @@ export const OPTIMIZATION_PLAN_JSON_SCHEMA = {
             uniqueItems: true,
             items: { type: 'string', minLength: 1, maxLength: 160 }
           },
+          targetPath: { type: 'string', minLength: 1, maxLength: 240 },
           intent: { type: 'string', minLength: 1, maxLength: 2_000 },
           transformation: {
             type: 'string',
@@ -85,6 +112,7 @@ export const OPTIMIZATION_PLAN_JSON_SCHEMA = {
 
 export type OptimizationPlanContext = z.infer<typeof optimizationPlanContextSchema>
 export type OptimizationPlanRequest = z.infer<typeof optimizationPlanRequestSchema>
+export type OptimizationPlanTarget = z.infer<typeof optimizationPlanTargetSchema>
 
 export class OptimizationPlanPreparationError extends Error {
   constructor(readonly code: 'INVALID_CONTEXT' | 'INVALID_PLAN') {
@@ -118,7 +146,17 @@ export function prepareOptimizationPlan(
     throw new OptimizationPlanPreparationError('INVALID_PLAN')
   }
   const factsById = new Map(context.careerFacts.map((fact) => [fact.id, fact]))
+  const targetsByPath = new Map(context.resumeTargets.map((target) => [target.path, target]))
   if (planResult.data.items.some((item) => item.transformation === 'remove')) {
+    throw new OptimizationPlanPreparationError('INVALID_PLAN')
+  }
+  if (planResult.data.items.some((item) => {
+    if (!item.targetPath) return true
+    const target = targetsByPath.get(item.targetPath)
+    return !target || !target.transformations.includes(
+      item.transformation as z.infer<typeof safeTransformationSchema>
+    )
+  })) {
     throw new OptimizationPlanPreparationError('INVALID_PLAN')
   }
   if (planResult.data.items.some((item) => item.factIds.some((factId) => {
@@ -166,6 +204,7 @@ function validateContextReferences(
     requirements: Array<z.infer<typeof jobRequirementSchema>>
     requirementMatches: Array<z.infer<typeof requirementMatchSchema>>
     careerFacts: Array<z.infer<typeof careerFactSchema>>
+    resumeTargets: OptimizationPlanTarget[]
   },
   context: z.RefinementCtx
 ) {
@@ -229,4 +268,89 @@ function validateContextReferences(
       }
     })
   })
+
+  const targetPaths = new Set<string>()
+  input.resumeTargets.forEach((target, targetIndex) => {
+    if (targetPaths.has(target.path)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['resumeTargets', targetIndex, 'path'],
+        message: 'Resume target paths must be unique'
+      })
+    }
+    targetPaths.add(target.path)
+  })
+}
+
+export function buildOptimizationPlanTargets(resume: ResumeData): OptimizationPlanTarget[] {
+  const targets: OptimizationPlanTarget[] = []
+  const add = (target: OptimizationPlanTarget) => {
+    if (targets.length < MAX_OPTIMIZATION_PLAN_TARGETS) targets.push(target)
+  }
+
+  resume.profile.summary.forEach((current, index) => {
+    if (current.trim()) {
+      add({
+        path: `profile.summary.${index}`,
+        current,
+        transformations: ['rewrite', 'emphasize']
+      })
+    }
+  })
+
+  resume.experiences.forEach((experience, experienceIndex) => {
+    experience.bullets.forEach((current, bulletIndex) => {
+      if (current.trim()) {
+        add({
+          path: `experiences.${experienceIndex}.bullets.${bulletIndex}`,
+          current,
+          transformations: ['rewrite', 'emphasize']
+        })
+      }
+    })
+    add({
+      path: `experiences.${experienceIndex}.bullets`,
+      current: experience.bullets,
+      transformations: ['add-from-fact']
+    })
+  })
+
+  resume.projects.forEach((project, projectIndex) => {
+    if (project.summary.trim()) {
+      add({
+        path: `projects.${projectIndex}.summary`,
+        current: project.summary,
+        transformations: ['rewrite', 'emphasize']
+      })
+    }
+    project.highlights.forEach((current, highlightIndex) => {
+      if (current.trim()) {
+        add({
+          path: `projects.${projectIndex}.highlights.${highlightIndex}`,
+          current,
+          transformations: ['rewrite', 'emphasize']
+        })
+      }
+    })
+    add({
+      path: `projects.${projectIndex}.highlights`,
+      current: project.highlights,
+      transformations: ['add-from-fact']
+    })
+  })
+
+  const projectIds = resume.projects.map(({ id }) => id)
+  if (
+    projectIds.length > 1
+    && projectIds.every((id) => id.trim())
+    && new Set(projectIds).size === projectIds.length
+  ) {
+    add({
+      path: 'projects',
+      current: projectIds,
+      transformations: ['reorder']
+    })
+  }
+
+  return targets
 }

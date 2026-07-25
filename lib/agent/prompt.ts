@@ -21,8 +21,7 @@ export function buildResumeAgentPrompt(userMessage: string, locale: Locale = 'zh
   }
 }
 
-export function buildJDMatchPrompt(jd: string, locale: Locale = 'zh', resume?: ResumeData) {
-  void resume
+export function buildJDMatchPrompt(jd: string, locale: Locale = 'zh') {
   const language = locale === 'zh' ? 'Chinese' : 'English'
 
   return {

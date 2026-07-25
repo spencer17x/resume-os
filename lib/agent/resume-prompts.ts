@@ -1,4 +1,5 @@
 import type { ResumeData, ResumeLocale } from '@/lib/resume-model'
+import type { SafeOptimizationTransformation } from './optimization-run'
 
 const resumeJsonContract = `{
   "profile": { "name": string, "title": string, "summary": string[], "tags": string[], "location"?: string, "email"?: string, "phone"?: string, "github"?: string, "blog"?: string, "links"?: [{ "label": string, "url": string }] },
@@ -82,8 +83,9 @@ export function buildOptimizeResumePrompt(input: {
       id: string
       requirementIds: string[]
       factIds: string[]
+      targetPath: string
       intent: string
-      transformation: 'rewrite' | 'emphasize' | 'remove' | 'reorder' | 'add-from-fact'
+      transformation: SafeOptimizationTransformation
     }>
   }
 }) {
@@ -100,6 +102,7 @@ export function buildOptimizeResumePrompt(input: {
       'Every change must include an evidence object with requirementIds, factIds, matchType, support, confidence, and transformation.',
       'Never return scoreImpact or any model-authored score. Deterministic scoring is computed separately from persisted evidence.',
       'Only generate changes when optimizationPlan is present with approvedAt. Every change must stay within an approved plan item: use its transformation and only its requirementIds and factIds.',
+      'When an approved plan item contains targetPath, every change using that item must use exactly that path.',
       'Use only requirement IDs and career-fact IDs supplied in the user JSON. Never invent an ID.',
       'A cited fact must be linked to the same cited requirement in requirementMatches; never combine a requirement from one match with a fact from another.',
       'A change is applicable only when it references at least one supplied requirement and at least one supplied supporting career fact.',
@@ -143,6 +146,7 @@ export function buildLocalResumeRewritePrompt(input: {
       id: string
       requirementIds: string[]
       factIds: string[]
+      targetPath: string
       intent: string
       transformation: 'rewrite' | 'emphasize'
     }

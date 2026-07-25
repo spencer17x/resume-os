@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildOptimizationPlanTargets,
   OPTIMIZATION_PLAN_JSON_SCHEMA,
   OptimizationPlanPreparationError,
   optimizationPlanRequestSchema,
   parseOptimizationPlanContext,
   prepareOptimizationPlan
 } from './optimization-plan'
+import { normalizeResumeData } from '@/lib/resume-model'
 
 const requirement = {
   id: 'requirement-1',
@@ -39,7 +41,12 @@ const context = {
     status: 'direct' as const,
     rationale: 'The fact directly supports the requirement.'
   }],
-  careerFacts: [careerFact]
+  careerFacts: [careerFact],
+  resumeTargets: [{
+    path: 'profile.summary.0',
+    current: 'Built reliable platforms.',
+    transformations: ['rewrite', 'emphasize'] as Array<'rewrite' | 'emphasize'>
+  }]
 }
 
 const plan = {
@@ -49,12 +56,65 @@ const plan = {
     id: 'item-1',
     requirementIds: ['requirement-1'],
     factIds: ['fact-1'],
+    targetPath: 'profile.summary.0',
     intent: 'Make the verified platform work easier to find.',
     transformation: 'emphasize' as const
   }]
 }
 
 describe('optimization plan boundary', () => {
+  it('builds a deterministic whitelist of safe, reviewable resume targets', () => {
+    const targets = buildOptimizationPlanTargets(normalizeResumeData({
+      profile: {
+        name: 'Ada',
+        title: 'Engineer',
+        summary: ['Builds reliable systems'],
+        tags: [],
+        links: []
+      },
+      experiences: [{
+        company: 'Example',
+        role: 'Engineer',
+        period: '2024',
+        tags: [],
+        bullets: ['Owned platform delivery']
+      }],
+      projects: [{
+        id: 'project-1',
+        name: 'Platform',
+        type: 'Work',
+        tags: [],
+        summary: 'A reliable platform',
+        highlights: ['Reduced failures']
+      }],
+      skills: [],
+      education: [],
+      certifications: [],
+      awards: [],
+      languages: [],
+      openSource: [],
+      metadata: {
+        source: 'paste',
+        locale: 'en',
+        updatedAt: '2026-07-16T00:00:00.000Z'
+      }
+    }))
+
+    expect(targets).toContainEqual({
+      path: 'profile.summary.0',
+      current: 'Builds reliable systems',
+      transformations: ['rewrite', 'emphasize']
+    })
+    expect(targets).toContainEqual({
+      path: 'experiences.0.bullets',
+      current: ['Owned platform delivery'],
+      transformations: ['add-from-fact']
+    })
+    expect(targets).not.toContainEqual(expect.objectContaining({
+      path: 'profile.name'
+    }))
+  })
+
   it('prepares an unapproved evidence-linked plan through the run state machine without mutation', () => {
     const beforeContext = structuredClone(context)
     const beforePlan = structuredClone(plan)
@@ -73,6 +133,11 @@ describe('optimization plan boundary', () => {
     expectPreparationError(() => prepareOptimizationPlan(context, {
       ...plan,
       items: [{ ...plan.items[0], factIds: ['fact-unknown'] }]
+    }), 'INVALID_PLAN')
+
+    expectPreparationError(() => prepareOptimizationPlan(context, {
+      ...plan,
+      items: [{ ...plan.items[0], targetPath: 'profile.summary.99' }]
     }), 'INVALID_PLAN')
 
     const secondFact = { ...careerFact, id: 'fact-2' }
@@ -96,6 +161,10 @@ describe('optimization plan boundary', () => {
     expectPreparationError(() => prepareOptimizationPlan(context, {
       ...plan,
       items: [{ ...plan.items[0], transformation: 'remove' }]
+    }), 'INVALID_PLAN')
+    expectPreparationError(() => prepareOptimizationPlan(context, {
+      ...plan,
+      items: [{ ...plan.items[0], targetPath: undefined }]
     }), 'INVALID_PLAN')
     expect(OPTIMIZATION_PLAN_JSON_SCHEMA.properties.items.items.properties.transformation.enum)
       .not.toContain('remove')
@@ -147,6 +216,7 @@ describe('optimization plan boundary', () => {
 
     expect(OPTIMIZATION_PLAN_JSON_SCHEMA.additionalProperties).toBe(false)
     expect(OPTIMIZATION_PLAN_JSON_SCHEMA.required).toEqual(['id', 'summary', 'items'])
+    expect(OPTIMIZATION_PLAN_JSON_SCHEMA.properties.items.items.required).toContain('targetPath')
     expect(JSON.stringify(OPTIMIZATION_PLAN_JSON_SCHEMA)).not.toMatch(/approvedAt|score/i)
   })
 })

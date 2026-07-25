@@ -299,7 +299,7 @@ describe('DesktopShell', () => {
     expect(launcher.getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual([
       'Resume Studio',
       'Resume Agent',
-      'JD Match',
+      'Target Job',
       'Resume 3D',
       'Resume Book',
       'Review & Export',

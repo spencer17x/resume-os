@@ -34,9 +34,11 @@ const defaultWorkflowContext = {
     approvedAt: '2026-07-16T08:00:00.000Z',
     items: [{
       id: 'rewrite-1', requirementIds: ['requirement-1'], factIds: ['fact-1'],
+      targetPath: 'experiences.0.bullets.0',
       intent: 'Rewrite platform evidence clearly.', transformation: 'rewrite' as const
     }, {
       id: 'emphasize-1', requirementIds: ['requirement-1'], factIds: ['fact-1'],
+      targetPath: 'profile.summary.0',
       intent: 'Emphasize platform evidence.', transformation: 'emphasize' as const
     }]
   }
@@ -208,6 +210,7 @@ describe('POST /api/resume/optimize', () => {
       approvedAt: '2026-07-16T08:00:00.000Z',
       items: [{
         id: 'item-1', requirementIds: ['requirement-1'], factIds: ['fact-1'],
+        targetPath: 'profile.summary.0',
         intent: 'Make verified reliability work easier to find.',
         transformation: 'emphasize' as const
       }]
@@ -249,6 +252,53 @@ describe('POST /api/resume/optimize', () => {
       }
     }))
     expect(unknownFact.status).toBe(400)
+    expect(agentMocks.generateAgentText).not.toHaveBeenCalled()
+
+    const legacyRemoval = await post(request({
+      resume: customResume,
+      locale: 'en',
+      instruction: 'Improve',
+      ...context,
+      optimizationPlan: {
+        ...optimizationPlan,
+        items: [{
+          ...optimizationPlan.items[0],
+          transformation: 'remove'
+        }]
+      }
+    }))
+    expect(legacyRemoval.status).toBe(400)
+    expect(agentMocks.generateAgentText).not.toHaveBeenCalled()
+
+    const untargeted = await post(request({
+      resume: customResume,
+      locale: 'en',
+      instruction: 'Improve',
+      ...context,
+      optimizationPlan: {
+        ...optimizationPlan,
+        items: optimizationPlan.items.map(
+          ({ targetPath: _targetPath, ...item }) => item
+        )
+      }
+    }))
+    expect(untargeted.status).toBe(400)
+    expect(agentMocks.generateAgentText).not.toHaveBeenCalled()
+
+    const protectedTarget = await post(request({
+      resume: customResume,
+      locale: 'en',
+      instruction: 'Improve',
+      ...context,
+      optimizationPlan: {
+        ...optimizationPlan,
+        items: [{
+          ...optimizationPlan.items[0],
+          targetPath: 'profile.name'
+        }]
+      }
+    }))
+    expect(protectedTarget.status).toBe(400)
     expect(agentMocks.generateAgentText).not.toHaveBeenCalled()
 
     agentMocks.generateAgentText.mockResolvedValueOnce(modelResponse({
@@ -415,14 +465,14 @@ describe('POST /api/resume/optimize', () => {
     agentMocks.generateAgentText.mockResolvedValueOnce(modelResponse({
         summary: 'Keep model confirmation',
         changes: [{
-          id: 'confirm-1', path: 'profile.title', original: 'Engineer',
-          proposed: 'Platform Engineer', reason: 'Needs verification', needsConfirmation: true
+          id: 'confirm-1', path: 'experiences.0.bullets.0', original: 'Owned delivery',
+          proposed: 'Owned platform delivery', reason: 'Needs verification', needsConfirmation: true
         }], questions: []
     }))
     const confirmed = await post(request({
       resume: customResume, locale: 'en', instruction: 'Improve',
       careerFacts: [{
-        id: 'fact-1', text: 'Platform Engineer', verification: 'document-backed'
+        id: 'fact-1', text: 'Owned platform delivery', verification: 'document-backed'
       }]
     }))
     expect(confirmed.status).toBe(200)
