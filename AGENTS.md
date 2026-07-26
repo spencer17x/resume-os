@@ -190,14 +190,25 @@ test(desktop): cover restored window focus
 
 Release behavior:
 
-- Releases are not started automatically. Creating a version commit, tag, and GitHub Release requires an explicit release request; the GitHub workflow only redeploys an existing release tag.
+- Releases are not started automatically. Preparing a version pull request and
+  publishing its merged main revision both require an explicit release request.
 - `fix`, `perf`, and `revert` create a patch release.
 - `feat` creates a minor release.
 - A breaking-change note creates a major release.
 - `docs`, `refactor`, `test`, `build`, `ci`, and `chore` do not create a release by themselves.
-- When a release is explicitly requested, let release-it create the version commit, `vX.Y.Z` tag, and GitHub Release. Do not manually create release tags unless explicitly handling a documented recovery.
-- Do not run `pnpm release`, deploy production, move a tag, or invoke the manual redeploy workflow unless the user explicitly requests that exact release operation.
-- Prefer a Conventional Commit PR title and squash merge so the PR title becomes the release commit subject.
+- When a release is explicitly requested, create a `release/*` branch and let
+  release-it create only the version and changelog commit. It must not tag,
+  publish, or push directly to protected `main`.
+- Push the release branch, open a `chore(release): vX.Y.Z` pull request, and
+  merge only after the required `Repository check` succeeds.
+- After merge, invoke the manual Release workflow with the tag and full merged
+  `main` commit SHA. The workflow revalidates that revision before it creates or
+  confirms the tag and GitHub Release and deploys production.
+- Do not run `pnpm release`, deploy production, move a tag, or invoke the manual
+  Release workflow unless the user explicitly requests that exact release
+  operation.
+- Prefer a squash merge so the validated release PR title becomes the release
+  commit subject on `main`.
 
 ## Review Guidelines
 

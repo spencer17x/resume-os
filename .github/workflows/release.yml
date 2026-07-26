@@ -4,7 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing vX.Y.Z release tag to redeploy
+        description: vX.Y.Z tag to create or redeploy
+        required: true
+        type: string
+      sha:
+        description: Full main commit SHA produced by the merged release PR
         required: true
         type: string
 
@@ -17,11 +21,13 @@ concurrency:
 
 jobs:
   release:
+    name: Resolve main release revision
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
-      release_created: ${{ steps.result.outputs.release_created }}
+      release_exists: ${{ steps.result.outputs.release_exists }}
       sha: ${{ steps.result.outputs.sha }}
+      tag_exists: ${{ steps.result.outputs.tag_exists }}
       tag_name: ${{ steps.result.outputs.tag_name }}
       version: ${{ steps.result.outputs.version }}
     steps:
@@ -36,6 +42,7 @@ jobs:
         id: result
         env:
           MANUAL_TAG: ${{ inputs.tag }}
+          MANUAL_SHA: ${{ inputs.sha }}
           GH_TOKEN: ${{ github.token }}
         run: |
           release_tag="$MANUAL_TAG"
@@ -43,22 +50,53 @@ jobs:
             echo "The release tag must match vX.Y.Z."
             exit 1
           fi
-          if ! git rev-parse --verify --quiet "refs/tags/$release_tag" >/dev/null; then
-            echo "Tag $release_tag does not exist."
+          if ! printf '%s\n' "$MANUAL_SHA" | grep -Eq '^[0-9a-fA-F]{40}$'; then
+            echo "The release SHA must be a full 40-character commit SHA."
             exit 1
           fi
-          gh release view "$release_tag" --repo "$GITHUB_REPOSITORY" >/dev/null
 
-          release_sha="$(git rev-list -n 1 "$release_tag")"
+          git fetch --force --tags origin
+          release_sha="$(git rev-parse --verify "$MANUAL_SHA^{commit}")"
+          if ! git merge-base --is-ancestor "$release_sha" origin/main; then
+            echo "Commit $release_sha is not reachable from origin/main."
+            exit 1
+          fi
+
           release_version="${release_tag#v}"
-          package_version="$(git show "$release_tag:package.json" | node -e "let data=''; process.stdin.on('data', chunk => data += chunk); process.stdin.on('end', () => console.log(JSON.parse(data).version));")"
+          package_version="$(git show "$release_sha:package.json" | node -e "let data=''; process.stdin.on('data', chunk => data += chunk); process.stdin.on('end', () => console.log(JSON.parse(data).version));")"
           if [ "$release_version" != "$package_version" ]; then
             echo "Tag $release_tag does not match package.json version $package_version."
             exit 1
           fi
 
-          echo "release_created=true" >> "$GITHUB_OUTPUT"
+          if git rev-parse --verify --quiet "refs/tags/$release_tag" >/dev/null; then
+            tagged_sha="$(git rev-list -n 1 "$release_tag")"
+            if [ "$tagged_sha" != "$release_sha" ]; then
+              echo "Tag $release_tag already points to $tagged_sha, not $release_sha."
+              exit 1
+            fi
+            tag_exists=true
+          else
+            tag_exists=false
+          fi
+
+          if [ "$tag_exists" = "false" ]; then
+            release_subject="$(git show -s --format=%s "$release_sha")"
+            if [ "$release_subject" != "chore(release): $release_tag" ]; then
+              echo "New release commit must be titled chore(release): $release_tag."
+              exit 1
+            fi
+          fi
+
+          if gh release view "$release_tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            release_exists=true
+          else
+            release_exists=false
+          fi
+
+          echo "release_exists=$release_exists" >> "$GITHUB_OUTPUT"
           echo "sha=$release_sha" >> "$GITHUB_OUTPUT"
+          echo "tag_exists=$tag_exists" >> "$GITHUB_OUTPUT"
           echo "tag_name=$release_tag" >> "$GITHUB_OUTPUT"
           echo "version=$release_version" >> "$GITHUB_OUTPUT"
 
@@ -91,11 +129,50 @@ jobs:
       - name: Run release quality check
         run: pnpm check
 
-  deploy-production:
-    if: needs.release.outputs.release_created == 'true'
+  publish-release:
+    name: Publish tag and GitHub Release
     needs:
       - release
       - quality-release
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_EXISTS: ${{ needs.release.outputs.release_exists }}
+      RELEASE_SHA: ${{ needs.release.outputs.sha }}
+      RELEASE_TAG: ${{ needs.release.outputs.tag_name }}
+      TAG_EXISTS: ${{ needs.release.outputs.tag_exists }}
+    steps:
+      - name: Create or validate GitHub Release
+        run: |
+          if [ "$RELEASE_EXISTS" = "true" ]; then
+            release_url="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json url --jq .url)"
+          elif [ "$TAG_EXISTS" = "true" ]; then
+            release_url="$(gh release create "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --verify-tag \
+              --title "$RELEASE_TAG" \
+              --generate-notes)"
+          else
+            release_url="$(gh release create "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$RELEASE_SHA" \
+              --title "$RELEASE_TAG" \
+              --generate-notes)"
+          fi
+
+          echo "### GitHub Release" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Version: $RELEASE_TAG" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Commit: $RELEASE_SHA" >> "$GITHUB_STEP_SUMMARY"
+          echo "- URL: $release_url" >> "$GITHUB_STEP_SUMMARY"
+
+  deploy-production:
+    needs:
+      - release
+      - quality-release
+      - publish-release
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:

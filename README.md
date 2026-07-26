@@ -141,18 +141,19 @@ The in-process route limiter remains defense-in-depth. Set `RESUME_OS_TRUSTED_PR
 Production is released from SemVer tags through an explicit release operation rather than from every `main` push:
 
 ```text
-explicit release → calculate SemVer → package version + CHANGELOG
-                 → vX.Y.Z tag → GitHub Release
-manual tag deployment → Vercel Production
+release branch → calculate SemVer → package version + CHANGELOG commit
+               → pull request → Repository check → protected main
+manual tag + full main SHA → recheck → GitHub Release → Vercel Production
 ```
 
-Pull requests are optional unless repository protection requires them. Optional
-local hooks provide early feedback only after an explicit `pnpm hooks:install`;
-`pnpm check` and the GitHub Actions Quality workflow are authoritative. Run the
-production extraction smoke test and relevant Playwright suite explicitly when
-a change warrants them because those checks are not part of the default Quality
-job. When a release is explicitly requested, `release-it` derives the next
-version from commits added since the previous release:
+Release changes use a pull request so protected `main` never needs a direct
+release commit. Optional local hooks provide early feedback only after an
+explicit `pnpm hooks:install`; `pnpm check` and the GitHub Actions Quality
+workflow are authoritative. Run the production extraction smoke test and
+relevant Playwright suite explicitly when a change warrants them because those
+checks are not part of the default Quality job. When a release is explicitly
+requested, create a `release/*` branch and run `pnpm release`; release-it derives
+the next version from commits added since the previous release:
 
 - `fix:` creates a patch release.
 - `feat:` creates a minor release.
@@ -160,7 +161,17 @@ version from commits added since the previous release:
 - `perf:` and `revert:` create a patch release.
 - `docs:`, `test:`, `chore:`, and `ci:` do not create a production release by themselves.
 
-`release-it` updates `package.json` and `CHANGELOG.md`, creates the version commit and immutable tag, and publishes the GitHub Release. The manual GitHub workflow accepts an existing release tag, reruns `pnpm check` against that exact revision, and only then deploys it to Vercel. The only custom Actions secrets are `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID`. See [Deployment and data boundaries](docs/deployment.md#quality-release-and-deployment) for setup, deployment retry, rollback, and the complete lifecycle.
+`release-it` updates `package.json` and `CHANGELOG.md` and creates only the
+`chore(release): vX.Y.Z` commit. It does not tag, push, or publish a GitHub
+Release. Push the release branch, open a pull request with the same title, and
+merge only after the required `Repository check` succeeds. Then manually run
+the Release workflow with `vX.Y.Z` and the full merged `main` commit SHA. The
+workflow verifies main ancestry and package version, reruns `pnpm check`, creates
+or validates the immutable tag and GitHub Release, and only then deploys to
+Vercel. The only custom Actions secrets are `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and
+`VERCEL_PROJECT_ID`. See
+[Deployment and data boundaries](docs/deployment.md#quality-release-and-deployment)
+for setup, deployment retry, rollback, and the complete lifecycle.
 
 ## Deploy to Vercel
 

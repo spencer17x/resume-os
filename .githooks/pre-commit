@@ -14,8 +14,7 @@ fi
 
 deny_regex='(^|/)\.env($|\.)|(^|/).*\.pem$|(^|/).*\.p12$|(^|/)id_rsa|(^|/)sessions/|(^|/)\.local/|credentials|secret'
 
-IFS=$'\n'
-for path in $(git diff --cached --name-only --diff-filter=ACMR); do
+while IFS= read -r -d '' path; do
   [ -z "$path" ] && continue
   if printf '%s' "$path" | grep -Eiq "$deny_regex"; then
     case "$path" in
@@ -26,11 +25,12 @@ for path in $(git diff --cached --name-only --diff-filter=ACMR); do
   fi
   case "$path" in
     *.sh)
-      if [ -f "$path" ]; then
-        bash -n "$path"
+      if ! git show ":$path" | bash -n; then
+        echo "pre-commit: staged shell syntax is invalid: $path" >&2
+        exit 1
       fi
       ;;
   esac
-done
+done < <(git diff --cached --name-only --diff-filter=ACMR -z)
 
 exit 0
