@@ -79,26 +79,54 @@ Chrome does not currently guarantee Chinese as a Prompt API input or output lang
 
 Users should still review the privacy and retention terms of their chosen hosting platform and OpenAI-compatible provider. “No Resume OS server database” is not a claim that network infrastructure or an external provider has no operational logs.
 
-## Manual release and deployment
+## Quality, release, and deployment
 
-The repository does not run a project CI workflow. Validation is performed explicitly before a release, and production deployment requires a manual workflow dispatch with an existing release tag:
+The repository runs the `Quality` workflow for pull requests and pushes to
+`main`. It validates pull request titles and runs the authoritative `pnpm check`
+(typecheck, unit/integration tests, and a production build). Release preparation,
+publication, and production deployment remain explicit operations:
 
 ```text
 explicit verification and release request
+  → create release/* from current main
   → release-it calculates the next SemVer version
-  → package.json + CHANGELOG.md + version commit
-  → immutable vX.Y.Z tag + GitHub Release
-manual Release workflow with that tag
-  → Vercel production build and deployment from the released commit
+  → package.json + CHANGELOG.md + local version commit
+  → push release branch and open chore(release): vX.Y.Z PR
+  → required Repository check succeeds
+  → squash merge into protected main
+manual Release workflow from main with vX.Y.Z + full merged main SHA
+  → verify main ancestry and package version
+  → pnpm check against that exact revision
+  → resolve live remote tag + GitHub Release state
+  → create or validate immutable tag + published stable GitHub Release
+  → revalidate live publication state without deployment credentials
+  → Vercel production build and deployment from the released revision
 ```
 
-The repository does not install Git hooks, ship an ESLint command, or run `.github/workflows/ci.yml`. `.github/workflows/release.yml` never creates a release automatically; it validates an existing `vX.Y.Z` tag and GitHub Release before building and deploying that exact revision. `vercel.json` disables Vercel's direct deployment for `main`, while unspecified feature branches retain Vercel Preview deployments.
+The repository ships optional versioned hooks under `.githooks`; contributors
+may explicitly enable them with `pnpm hooks:install` for early feedback.
+Dependency installation never enables hooks, and `pnpm check` plus CI remain
+authoritative. There is no whole-tree ESLint or Prettier gate yet because
+introducing one safely would require an application-wide rewrite.
+`.github/workflows/release.yml` never creates a release
+automatically. A manual dispatch must run from the `main` ref and names both the
+intended `vX.Y.Z` tag and the full merged `main` SHA. The workflow validates that
+immutable input, reruns the handoff check, reads live remote state immediately
+before any publication write, and verifies the resulting non-draft,
+non-prerelease Release against the immutable tag and SHA. The deployment job
+performs the same live verification before any step can read Vercel secrets.
+Reusing the same exact published tag and SHA safely redeploys an existing
+release.
+`vercel.json` disables Vercel's direct deployment for `main`, while unspecified
+feature branches retain Vercel Preview deployments.
 
-No Release PR is created. Pull requests remain available for risky or collaborative changes, but they are not part of the required release path.
+Every version change uses a release pull request. This gives the resulting main
+revision its required GitHub Actions check before any tag or GitHub Release is
+created and avoids relying on an administrator bypass.
 
 ### One-time GitHub configuration
 
-Add these repository Actions secrets:
+Add these secrets to the `production` GitHub Environment:
 
 | Secret | Purpose |
 | --- | --- |
@@ -106,7 +134,19 @@ Add these repository Actions secrets:
 | `VERCEL_ORG_ID` | The linked Vercel project `orgId` from `.vercel/project.json`. |
 | `VERCEL_PROJECT_ID` | The linked Vercel project `projectId` from `.vercel/project.json`. |
 
-The workflow-level `GITHUB_TOKEN` and both jobs are read-only. The repository Actions policy allows only GitHub-owned actions pinned to a full commit SHA. Keep this policy aligned with every `uses:` entry before introducing another action.
+The workflow-level `GITHUB_TOKEN`, revision-resolution job, quality job, and
+deployment job are read-only. Only the narrowly scoped `Publish tag and GitHub
+Release` job receives `contents: write`; it runs after release quality succeeds.
+Configure the `production` Environment deployment branch policy to allow only
+protected branches. All three Vercel values belong to that Environment so they
+are unavailable to other jobs and refs. During the current migration,
+`VERCEL_ORG_ID` and `VERCEL_PROJECT_ID` are Environment secrets;
+`VERCEL_TOKEN` remains a repository secret only until its value can be rotated
+or re-entered, and must be moved into the Environment before the next production
+release.
+The repository Actions policy allows only GitHub-owned actions pinned to a full
+commit SHA. Keep this policy aligned with every `uses:` entry before introducing
+another action.
 
 Keep the remote repository settings aligned with these boundaries:
 
@@ -114,18 +154,27 @@ Keep the remote repository settings aligned with these boundaries:
 | --- | --- |
 | Actions default workflow permissions | Read-only; workflows cannot approve pull requests |
 | Allowed Actions | GitHub-owned only; full-length commit SHA required |
-| `main` protection | Enforce for administrators; require linear history; disallow force pushes and deletion; ordinary fast-forward direct pushes remain allowed |
+| `main` protection | Enforce for administrators; require pull requests, linear history, and the strict up-to-date `Repository check` from the GitHub Actions App; disallow force pushes and deletion |
 | Pull-request merge methods | Merge commits disabled; squash and rebase enabled |
+| `production` Environment | Deployment branches restricted to protected branches; all Vercel credentials stored as Environment secrets |
 | Secret scanning | Secret scanning and push protection enabled |
 | Code scanning | CodeQL default setup enabled for JavaScript/TypeScript and Actions |
 
 CodeQL may still run through GitHub's separately managed default setup. Treat any CodeQL alert as a security finding that must be reviewed rather than as a release signal.
 
-Ordinary fast-forward pushes to `main` are allowed and no repository-managed status checks are required. Before creating a release, explicitly run the checks appropriate to the change and inspect commits for sensitive files, secrets, whitespace errors, and valid release metadata. Fixtures must remain synthetic because local Playwright traces can contain rendered form values and mocked request details.
+Require the exact `Repository check` context produced by the GitHub Actions App;
+similarly named contexts must not satisfy branch protection. Because the release
+commit reaches `main` through a checked pull request, strict status checks and
+administrator enforcement remain enabled throughout the release. Before opening
+that pull request, inspect commits for sensitive files, secrets, whitespace
+errors, and valid release metadata. Fixtures must remain synthetic because local
+Playwright traces can contain rendered form values and mocked request details.
 
 ### Version rules
 
-The package baseline is `0.1.0`. Until the first version tag exists, release-it examines repository history but ignores commits that do not match a releasable Conventional Commit type.
+The current package baseline is `0.3.0`. Release-it examines commits since the
+previous version tag and ignores commits that do not match a releasable
+Conventional Commit type.
 
 | Conventional Commit | SemVer result |
 | --- | --- |
@@ -135,13 +184,40 @@ The package baseline is `0.1.0`. Until the first version tag exists, release-it 
 | `perf(scope): ...` or `revert: ...` | Patch |
 | `docs:`, `test:`, `build:`, `ci:`, `chore:` | No release by itself |
 
-When explicitly invoked, `release-it` accumulates all unreleased commits, chooses the highest required bump, updates `package.json` and `CHANGELOG.md`, commits `chore(release): vX.Y.Z [skip ci]`, and creates the matching tag and GitHub Release. Deployment is a separate manual workflow dispatch using that existing tag. Do not create or move version tags manually.
+When explicitly invoked from a clean `release/*` branch, `release-it`
+accumulates all unreleased commits, chooses the highest required bump, updates
+`package.json` and `CHANGELOG.md`, and commits `chore(release): vX.Y.Z`. Its Git
+tag, push, and GitHub Release operations are disabled. Push that branch, open a
+pull request whose title matches the generated commit, and squash merge after
+`Repository check` succeeds.
 
-If GitHub Release creation succeeds but the Vercel job fails, open **Actions → Release → Run workflow**, enter the existing `vX.Y.Z` tag, and rerun deployment. The manual path validates that both the immutable tag and GitHub Release already exist; it never recalculates or replaces the version.
+After merge, open **Actions → Release → Run workflow** and enter both `vX.Y.Z`
+and the full merge commit SHA now reachable from `main`; leave the workflow ref
+set to `main`. The workflow fails closed for any other dispatch ref, a non-main
+commit, version mismatch, malformed SHA, or inconsistent live publication state.
+It reruns `pnpm check`, then applies this state matrix immediately before
+publication:
+
+| Live tag / Release state | Result |
+| --- | --- |
+| Tag missing; Release missing | Create both after the release-commit check |
+| Tag points to another SHA | Reject |
+| Exact tag exists; Release missing | Publish a Release from the verified tag |
+| Release exists; tag missing | Reject |
+| Release is a draft | Reject |
+| Release is a prerelease | Reject |
+| Exact tag and stable published Release exist | No-op publication; allow an idempotent redeploy |
+
+After a create or no-op, the workflow resolves the remote tag to its commit and
+verifies the published Release again. Deployment repeats that live check before
+accessing Vercel credentials. If Vercel deployment fails, rerun the workflow
+with the same tag and SHA; the existing release is validated rather than
+recalculated or replaced. Never move or overwrite a version tag.
 
 ### Rollback and hotfixes
 
-- For a normal fix, push a `fix:` commit to `main`. When a patch release is desired, explicitly run the release process after verification.
+- For a normal fix, merge a `fix:` pull request into `main`. When a patch
+  release is desired, prepare and merge a separate release pull request.
 - For an urgent traffic rollback, restore the previous deployment in Vercel, then follow with a `revert:` or `fix:` commit so Git history and the next patch version describe the production state.
 - Never move or overwrite an existing `vX.Y.Z` tag.
 
@@ -162,12 +238,12 @@ Vercel is the supported zero-server-management topology because it runs the Next
 ### Deployment steps
 
 1. Keep the GitHub repository connected to the existing Vercel project so feature branches receive Preview deployments.
-2. Store the Vercel token, organization ID, and project ID in GitHub Actions secrets. Do not commit `.vercel/`.
+2. Store the Vercel token, organization ID, and project ID as secrets on the protected `production` GitHub Environment, whose deployment branch policy allows only protected branches. Do not commit `.vercel/`.
 3. Build from source on the GitHub-hosted Linux runner. The release workflow uses `vercel build --prod` and `vercel deploy --prebuilt --prod`; do not upload a `.next` output built on macOS because PDF extraction includes platform-native canvas code.
 4. Set `RESUME_OS_TRUSTED_PROXY=vercel` in Preview and Production. Keep `RESUME_OS_LOCAL_ONLY` unset.
 5. Add only the exact additional BYOK provider hosts users need. Treat this list as an SSRF boundary.
 6. Add a Vercel Firewall or another distributed rate limit for `/api/`. The built-in process-memory limiter is defense-in-depth and is not shared by serverless instances.
-7. Push a releasable Conventional Commit to `main` and confirm that its `vX.Y.Z` GitHub Release produces the Production deployment.
+7. After explicit release creation, dispatch the Release workflow with the existing `vX.Y.Z` tag and confirm that tagged quality validation and the Production deployment both succeed.
 8. Open Settings on Production, select the intended provider mode, and run the corresponding AI check.
 9. Import both a TXT and a representative PDF/DOCX; complete a JD analysis, save an agent run, reload, and verify IndexedDB recovery on the deployed origin.
 
@@ -188,11 +264,9 @@ The 3 MiB/4 MiB application limits stay below Vercel Functions' documented [4.5 
 ### Verification
 
 ```bash
-corepack pnpm@10.33.0 install --frozen-lockfile
-corepack pnpm@10.33.0 test
-corepack pnpm@10.33.0 typecheck
-corepack pnpm@10.33.0 build
-corepack pnpm@10.33.0 test:production-extraction
+corepack pnpm@11.17.0 install --frozen-lockfile
+corepack pnpm@11.17.0 check
+corepack pnpm@11.17.0 test:production-extraction
 ```
 
 For a public deployment, also verify the browser network panel: Chrome-local tasks must not call cloud routes, Automatic mode with fallback disabled must stop locally, and cloud tasks must call only the same-origin API before the configured provider.

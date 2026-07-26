@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# Optional pre-push early feedback: commit subjects + typecheck/unit (not e2e).
+# The complete authoritative gate is pnpm check in CI.
+# Bash 3.2 compatible.
+set -euo pipefail
+
+# Deliberately lighter than the authoritative check so opt-in hooks stay responsive.
+: "${CHECK_CMD:=pnpm typecheck && pnpm test}"
+
+ROOT=$(git rev-parse --show-toplevel)
+VALIDATOR="$ROOT/scripts/validate-commit-message.sh"
+
+if [ ! -f "$VALIDATOR" ]; then
+  echo "pre-push: missing $VALIDATOR" >&2
+  exit 1
+fi
+
+if [ ! -x "$VALIDATOR" ]; then
+  chmod +x "$VALIDATOR" || true
+fi
+
+zero=0000000000000000000000000000000000000000
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ -z "${local_sha:-}" ] && continue
+  if [ "$local_sha" = "$zero" ]; then
+    continue
+  fi
+
+  if [ "$remote_sha" = "$zero" ]; then
+    if git rev-parse --verify origin/main >/dev/null 2>&1; then
+      base=$(git merge-base origin/main "$local_sha" 2>/dev/null || true)
+      if [ -n "$base" ]; then
+        range="${base}..${local_sha}"
+      else
+        range="$local_sha"
+      fi
+    elif git rev-parse --verify main >/dev/null 2>&1; then
+      base=$(git merge-base main "$local_sha" 2>/dev/null || true)
+      if [ -n "$base" ]; then
+        range="${base}..${local_sha}"
+      else
+        range="$local_sha"
+      fi
+    else
+      range="$local_sha"
+    fi
+  else
+    range="${remote_sha}..${local_sha}"
+  fi
+
+  for sha in $(git rev-list --no-merges "$range" 2>/dev/null || true); do
+    [ -z "$sha" ] && continue
+    msg=$(git log -1 --format=%B "$sha")
+    if ! printf '%s' "$msg" | "$VALIDATOR"; then
+      echo "pre-push: invalid commit subject on $sha ($local_ref)" >&2
+      exit 1
+    fi
+  done
+done
+
+if [ -n "${CHECK_CMD:-}" ]; then
+  (cd "$ROOT" && eval "$CHECK_CMD")
+fi
+
+exit 0

@@ -1,5 +1,5 @@
 const PATCH_TYPES = new Set(["fix", "perf", "revert"]);
-const FEATURE_TYPES = new Set(["feat", "feature"]);
+const FEATURE_TYPES = new Set(["feat"]);
 
 function recommendRelease(commits) {
   let level = null;
@@ -25,20 +25,18 @@ function recommendRelease(commits) {
 
 module.exports = {
   git: {
-    requireBranch: "main",
+    requireBranch: "release/*",
     requireCleanWorkingDir: true,
-    requireUpstream: true,
+    requireUpstream: false,
     requireCommits: true,
     commit: true,
-    commitMessage: "chore(release): v${version} [skip ci]",
-    tag: true,
+    commitMessage: "chore(release): v${version}",
+    tag: false,
     tagName: "v${version}",
-    tagAnnotation: "Release v${version}",
-    push: true,
+    push: false,
   },
   github: {
-    release: true,
-    releaseName: "v${version}",
+    release: false,
   },
   npm: {
     publish: false,

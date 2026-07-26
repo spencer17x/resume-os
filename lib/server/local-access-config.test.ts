@@ -12,8 +12,16 @@ describe('local AI process scripts', () => {
     readFileSync(join(process.cwd(), 'package.json'), 'utf8')
   ) as PackageJson
 
-  it('keeps the workspace on pnpm 10.33.0', () => {
-    expect(packageJson.packageManager).toBe('pnpm@10.33.0')
+  it('keeps the workspace on pnpm 11.17.0', () => {
+    expect(packageJson.packageManager).toBe('pnpm@11.17.0')
+  })
+
+  it('defines check as typecheck, unit tests, and a production build', () => {
+    expect(packageJson.scripts?.check).toBe('node scripts/check.mjs')
+    const checkScript = readFileSync(join(process.cwd(), 'scripts/check.mjs'), 'utf8')
+    expect(checkScript).toContain("run('typecheck')")
+    expect(checkScript).toContain("run('test')")
+    expect(checkScript).toContain("run('build')")
   })
 
   it.each(['dev', 'start'])('binds %s to loopback and explicitly enables local-only mode', (scriptName) => {

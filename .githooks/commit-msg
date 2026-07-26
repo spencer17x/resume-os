@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# commit-msg: Conventional Commits via portable validator.
+set -euo pipefail
+
+ROOT=$(git rev-parse --show-toplevel)
+VALIDATOR="$ROOT/scripts/validate-commit-message.sh"
+
+if [ ! -f "$VALIDATOR" ]; then
+  echo "commit-msg: missing $VALIDATOR" >&2
+  exit 1
+fi
+
+if [ ! -x "$VALIDATOR" ]; then
+  chmod +x "$VALIDATOR" || true
+fi
+
+exec "$VALIDATOR" --allow-fixup "$1"
