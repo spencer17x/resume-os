@@ -12,11 +12,24 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
 const fixtures: string[] = []
+const isolatedGitEnv = { ...process.env }
+
+for (const name of execFileSync('git', ['rev-parse', '--local-env-vars'], {
+  encoding: 'utf8',
+})
+  .trim()
+  .split('\n')
+  .filter(Boolean)) {
+  delete isolatedGitEnv[name]
+}
 
 function createFixture() {
   const root = mkdtempSync(join(tmpdir(), 'resume-os-hook-'))
   fixtures.push(root)
-  execFileSync('git', ['init', '--quiet'], { cwd: root })
+  execFileSync('git', ['init', '--quiet'], {
+    cwd: root,
+    env: isolatedGitEnv,
+  })
 
   const hooksDirectory = join(root, '.githooks')
   mkdirSync(hooksDirectory)
@@ -30,7 +43,10 @@ function createFixture() {
 function stage(root: string, relativePath: string, content: string) {
   const path = join(root, relativePath)
   writeFileSync(path, content)
-  execFileSync('git', ['add', '--', relativePath], { cwd: root })
+  execFileSync('git', ['add', '--', relativePath], {
+    cwd: root,
+    env: isolatedGitEnv,
+  })
   return path
 }
 
@@ -47,7 +63,11 @@ describe('pre-commit shell validation', () => {
     const path = stage(root, relativePath, '#!/usr/bin/env bash\nif then\n')
     writeFileSync(path, '#!/usr/bin/env bash\nexit 0\n')
 
-    const result = spawnSync(hook, { cwd: root, encoding: 'utf8' })
+    const result = spawnSync(hook, {
+      cwd: root,
+      encoding: 'utf8',
+      env: isolatedGitEnv,
+    })
 
     expect(result.status).toBe(1)
     expect(result.stderr).toContain('staged shell syntax is invalid')
@@ -59,7 +79,11 @@ describe('pre-commit shell validation', () => {
     const path = stage(root, relativePath, '#!/usr/bin/env bash\nexit 0\n')
     writeFileSync(path, '#!/usr/bin/env bash\nif then\n')
 
-    const result = spawnSync(hook, { cwd: root, encoding: 'utf8' })
+    const result = spawnSync(hook, {
+      cwd: root,
+      encoding: 'utf8',
+      env: isolatedGitEnv,
+    })
 
     expect(result.status).toBe(0)
   })

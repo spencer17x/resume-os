@@ -167,10 +167,12 @@ Release. Push the release branch, open a pull request with the same title, and
 merge only after the required `Repository check` succeeds. Then manually run
 the Release workflow from the `main` ref with `vX.Y.Z` and the full merged
 `main` commit SHA. The workflow verifies main ancestry and package version,
-reruns `pnpm check`, resolves the live remote tag and GitHub Release immediately
-before publication, verifies the published non-draft/non-prerelease Release
-again, and only then deploys to Vercel. The deployment job repeats that live
-check before it can read Vercel credentials. Store `VERCEL_TOKEN`,
+runs that revision's `pnpm check` (or its equivalent historical quality gate
+for releases that predate `pnpm check`), resolves the live remote tag and GitHub
+Release immediately before publication, verifies the published
+non-draft/non-prerelease Release again, and only then deploys to Vercel. The
+deployment job repeats that live check before it can read Vercel credentials.
+Store `VERCEL_TOKEN`,
 `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` as secrets on the protected
 `production` GitHub Environment. See
 [Deployment and data boundaries](docs/deployment.md#quality-release-and-deployment)

@@ -96,7 +96,7 @@ explicit verification and release request
   → squash merge into protected main
 manual Release workflow from main with vX.Y.Z + full merged main SHA
   → verify main ancestry and package version
-  → pnpm check against that exact revision
+  → revision-native quality check against that exact revision
   → resolve live remote tag + GitHub Release state
   → create or validate immutable tag + published stable GitHub Release
   → revalidate live publication state without deployment credentials
@@ -195,8 +195,11 @@ After merge, open **Actions → Release → Run workflow** and enter both `vX.Y.
 and the full merge commit SHA now reachable from `main`; leave the workflow ref
 set to `main`. The workflow fails closed for any other dispatch ref, a non-main
 commit, version mismatch, malformed SHA, or inconsistent live publication state.
-It reruns `pnpm check`, then applies this state matrix immediately before
-publication:
+It runs the released revision's `pnpm check`. Tags created before `.nvmrc` and
+`pnpm check` were introduced use their original Node.js 22 runtime, pinned pnpm,
+and historical `typecheck`, `lint`, `test`, and production-extraction gate
+instead. Unknown legacy layouts fail closed. The workflow then applies this
+state matrix immediately before publication:
 
 | Live tag / Release state | Result |
 | --- | --- |
