@@ -87,26 +87,64 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
+    outputs:
+      node_version: ${{ steps.release-profile.outputs.node_version }}
+      pnpm_version: ${{ steps.release-profile.outputs.pnpm_version }}
+      quality_profile: ${{ steps.release-profile.outputs.quality_profile }}
     steps:
+      - name: Check out trusted release controls
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Preserve trusted release profile resolver
+        run: cp scripts/release-profile.mjs "$RUNNER_TEMP/release-profile.mjs"
+
       - name: Check out released commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.release.outputs.sha }}
           persist-credentials: false
 
+      - name: Resolve released toolchain and quality profile
+        id: release-profile
+        run: node "$RUNNER_TEMP/release-profile.mjs"
+
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version-file: .nvmrc
+          node-version: ${{ steps.release-profile.outputs.node_version }}
 
       - name: Enable Corepack
         run: corepack enable
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        env:
+          PNPM_VERSION: ${{ steps.release-profile.outputs.pnpm_version }}
+        run: corepack "pnpm@$PNPM_VERSION" install --frozen-lockfile
 
       - name: Run release quality check
-        run: pnpm check
+        env:
+          PNPM_VERSION: ${{ steps.release-profile.outputs.pnpm_version }}
+          QUALITY_PROFILE: ${{ steps.release-profile.outputs.quality_profile }}
+        run: |
+          case "$QUALITY_PROFILE" in
+            check)
+              corepack "pnpm@$PNPM_VERSION" check
+              ;;
+            legacy)
+              echo "Release predates pnpm check; running its historical quality gate."
+              corepack "pnpm@$PNPM_VERSION" typecheck
+              corepack "pnpm@$PNPM_VERSION" lint
+              corepack "pnpm@$PNPM_VERSION" test
+              corepack "pnpm@$PNPM_VERSION" test:production-extraction
+              ;;
+            *)
+              echo "Unsupported quality profile: $QUALITY_PROFILE"
+              exit 1
+              ;;
+          esac
 
   publish-release:
     name: Publish tag and GitHub Release
@@ -235,7 +273,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version-file: .nvmrc
+          node-version: ${{ needs.quality-release.outputs.node_version }}
 
       - name: Verify tag matches package version
         env:
@@ -247,6 +285,13 @@ jobs:
             console.error('Release tag, action output, and package.json version do not match.');
             process.exit(1);
           }"
+
+      - name: Enable released package manager
+        env:
+          PNPM_VERSION: ${{ needs.quality-release.outputs.pnpm_version }}
+        run: |
+          corepack enable
+          corepack "pnpm@$PNPM_VERSION" --version
 
       - name: Install Vercel CLI
         run: npm install --global vercel@56.3.1
