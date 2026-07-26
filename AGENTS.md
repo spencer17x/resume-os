@@ -201,9 +201,13 @@ Release behavior:
   publish, or push directly to protected `main`.
 - Push the release branch, open a `chore(release): vX.Y.Z` pull request, and
   merge only after the required `Repository check` succeeds.
-- After merge, invoke the manual Release workflow with the tag and full merged
-  `main` commit SHA. The workflow revalidates that revision before it creates or
-  confirms the tag and GitHub Release and deploys production.
+- After merge, invoke the manual Release workflow from the `main` ref with the
+  tag and full merged `main` commit SHA. The workflow resolves remote tag and
+  Release state immediately before publication, verifies the resulting stable
+  Release, and repeats that verification before deployment secrets are exposed.
+- Keep `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` on the protected
+  `production` GitHub Environment. Restrict that Environment to protected
+  branches so non-main refs cannot access production credentials.
 - Do not run `pnpm release`, deploy production, move a tag, or invoke the manual
   Release workflow unless the user explicitly requests that exact release
   operation.

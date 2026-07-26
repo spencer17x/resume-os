@@ -165,11 +165,14 @@ the next version from commits added since the previous release:
 `chore(release): vX.Y.Z` commit. It does not tag, push, or publish a GitHub
 Release. Push the release branch, open a pull request with the same title, and
 merge only after the required `Repository check` succeeds. Then manually run
-the Release workflow with `vX.Y.Z` and the full merged `main` commit SHA. The
-workflow verifies main ancestry and package version, reruns `pnpm check`, creates
-or validates the immutable tag and GitHub Release, and only then deploys to
-Vercel. The only custom Actions secrets are `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and
-`VERCEL_PROJECT_ID`. See
+the Release workflow from the `main` ref with `vX.Y.Z` and the full merged
+`main` commit SHA. The workflow verifies main ancestry and package version,
+reruns `pnpm check`, resolves the live remote tag and GitHub Release immediately
+before publication, verifies the published non-draft/non-prerelease Release
+again, and only then deploys to Vercel. The deployment job repeats that live
+check before it can read Vercel credentials. Store `VERCEL_TOKEN`,
+`VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` as secrets on the protected
+`production` GitHub Environment. See
 [Deployment and data boundaries](docs/deployment.md#quality-release-and-deployment)
 for setup, deployment retry, rollback, and the complete lifecycle.
 
@@ -179,7 +182,7 @@ Vercel can run the complete current Next.js application, including Node.js docum
 
 For the complete raw-resume-to-tailored-variant workflow on Vercel:
 
-1. Link the repository to the Vercel project once, then add the Vercel project IDs and access token to GitHub Actions secrets.
+1. Link the repository to the Vercel project once, then add the Vercel project IDs and access token to the protected `production` GitHub Environment as Actions secrets.
 2. Keep branch Preview deployments enabled. `vercel.json` disables direct `main` deployments so Production can only follow a version tag.
 3. Build from source in GitHub Actions on Linux; do not upload a macOS-built `.next` directory because document extraction includes platform-native code.
 4. Set `RESUME_OS_TRUSTED_PROXY=vercel`; do not set `RESUME_OS_LOCAL_ONLY`.

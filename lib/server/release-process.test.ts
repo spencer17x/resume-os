@@ -36,10 +36,29 @@ describe('release process', () => {
     )
 
     expect(workflow).toContain('description: Full main commit SHA produced by the merged release PR')
+    expect(workflow).toContain('DISPATCH_REF: ${{ github.ref }}')
+    expect(workflow).toContain('[ "$DISPATCH_REF" != "refs/heads/main" ]')
     expect(workflow).toContain('git merge-base --is-ancestor "$release_sha" origin/main')
-    expect(workflow).toContain('New release commit must be titled chore(release): $release_tag.')
+    expect(workflow).toContain('New release commit must be titled chore(release): $RELEASE_TAG.')
     expect(workflow).toContain('run: pnpm check')
     expect(workflow).toContain('name: Publish tag and GitHub Release')
     expect(workflow).toContain('contents: write')
+    expect(workflow).not.toContain('release_exists: ${{ steps.result.outputs.release_exists }}')
+    expect(workflow).not.toContain('tag_exists: ${{ steps.result.outputs.tag_exists }}')
+  })
+
+  it('revalidates the published release before exposing deployment secrets', () => {
+    const workflow = readFileSync(
+      join(process.cwd(), '.github', 'workflows', 'release.yml'),
+      'utf8'
+    )
+    const revalidation = workflow.indexOf(
+      '- name: Revalidate published tag and Release before deployment'
+    )
+    const secretAccess = workflow.indexOf('- name: Verify deployment secrets')
+
+    expect(revalidation).toBeGreaterThan(-1)
+    expect(secretAccess).toBeGreaterThan(revalidation)
+    expect(workflow.slice(revalidation, secretAccess)).toContain('--expect-published')
   })
 })

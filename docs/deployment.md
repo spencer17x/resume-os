@@ -94,10 +94,12 @@ explicit verification and release request
   → push release branch and open chore(release): vX.Y.Z PR
   → required Repository check succeeds
   → squash merge into protected main
-manual Release workflow with vX.Y.Z + full merged main SHA
+manual Release workflow from main with vX.Y.Z + full merged main SHA
   → verify main ancestry and package version
   → pnpm check against that exact revision
-  → create or validate immutable tag + GitHub Release
+  → resolve live remote tag + GitHub Release state
+  → create or validate immutable tag + published stable GitHub Release
+  → revalidate live publication state without deployment credentials
   → Vercel production build and deployment from the released revision
 ```
 
@@ -107,10 +109,13 @@ Dependency installation never enables hooks, and `pnpm check` plus CI remain
 authoritative. There is no whole-tree ESLint or Prettier gate yet because
 introducing one safely would require an application-wide rewrite.
 `.github/workflows/release.yml` never creates a release
-automatically. A manual dispatch names both the intended `vX.Y.Z` tag and the
-full merged `main` SHA. The workflow validates that immutable input, reruns the
-handoff check, creates or confirms the tag and GitHub Release, and only then
-builds and deploys it. Reusing the same tag and SHA safely redeploys an existing
+automatically. A manual dispatch must run from the `main` ref and names both the
+intended `vX.Y.Z` tag and the full merged `main` SHA. The workflow validates that
+immutable input, reruns the handoff check, reads live remote state immediately
+before any publication write, and verifies the resulting non-draft,
+non-prerelease Release against the immutable tag and SHA. The deployment job
+performs the same live verification before any step can read Vercel secrets.
+Reusing the same exact published tag and SHA safely redeploys an existing
 release.
 `vercel.json` disables Vercel's direct deployment for `main`, while unspecified
 feature branches retain Vercel Preview deployments.
@@ -121,7 +126,7 @@ created and avoids relying on an administrator bypass.
 
 ### One-time GitHub configuration
 
-Add these repository Actions secrets:
+Add these secrets to the `production` GitHub Environment:
 
 | Secret | Purpose |
 | --- | --- |
@@ -132,6 +137,13 @@ Add these repository Actions secrets:
 The workflow-level `GITHUB_TOKEN`, revision-resolution job, quality job, and
 deployment job are read-only. Only the narrowly scoped `Publish tag and GitHub
 Release` job receives `contents: write`; it runs after release quality succeeds.
+Configure the `production` Environment deployment branch policy to allow only
+protected branches. All three Vercel values belong to that Environment so they
+are unavailable to other jobs and refs. During the current migration,
+`VERCEL_ORG_ID` and `VERCEL_PROJECT_ID` are Environment secrets;
+`VERCEL_TOKEN` remains a repository secret only until its value can be rotated
+or re-entered, and must be moved into the Environment before the next production
+release.
 The repository Actions policy allows only GitHub-owned actions pinned to a full
 commit SHA. Keep this policy aligned with every `uses:` entry before introducing
 another action.
@@ -144,6 +156,7 @@ Keep the remote repository settings aligned with these boundaries:
 | Allowed Actions | GitHub-owned only; full-length commit SHA required |
 | `main` protection | Enforce for administrators; require pull requests, linear history, and the strict up-to-date `Repository check` from the GitHub Actions App; disallow force pushes and deletion |
 | Pull-request merge methods | Merge commits disabled; squash and rebase enabled |
+| `production` Environment | Deployment branches restricted to protected branches; all Vercel credentials stored as Environment secrets |
 | Secret scanning | Secret scanning and push protection enabled |
 | Code scanning | CodeQL default setup enabled for JavaScript/TypeScript and Actions |
 
@@ -179,12 +192,27 @@ pull request whose title matches the generated commit, and squash merge after
 `Repository check` succeeds.
 
 After merge, open **Actions → Release → Run workflow** and enter both `vX.Y.Z`
-and the full merge commit SHA now reachable from `main`. The workflow rejects a
-non-main commit, version mismatch, malformed SHA, or an existing tag that points
-elsewhere. It reruns `pnpm check`, then creates the tag and GitHub Release if
-needed before deploying the same revision. If Vercel deployment fails, rerun the
-workflow with the same tag and SHA; the existing release is validated rather
-than recalculated or replaced. Never move or overwrite a version tag.
+and the full merge commit SHA now reachable from `main`; leave the workflow ref
+set to `main`. The workflow fails closed for any other dispatch ref, a non-main
+commit, version mismatch, malformed SHA, or inconsistent live publication state.
+It reruns `pnpm check`, then applies this state matrix immediately before
+publication:
+
+| Live tag / Release state | Result |
+| --- | --- |
+| Tag missing; Release missing | Create both after the release-commit check |
+| Tag points to another SHA | Reject |
+| Exact tag exists; Release missing | Publish a Release from the verified tag |
+| Release exists; tag missing | Reject |
+| Release is a draft | Reject |
+| Release is a prerelease | Reject |
+| Exact tag and stable published Release exist | No-op publication; allow an idempotent redeploy |
+
+After a create or no-op, the workflow resolves the remote tag to its commit and
+verifies the published Release again. Deployment repeats that live check before
+accessing Vercel credentials. If Vercel deployment fails, rerun the workflow
+with the same tag and SHA; the existing release is validated rather than
+recalculated or replaced. Never move or overwrite a version tag.
 
 ### Rollback and hotfixes
 
@@ -210,7 +238,7 @@ Vercel is the supported zero-server-management topology because it runs the Next
 ### Deployment steps
 
 1. Keep the GitHub repository connected to the existing Vercel project so feature branches receive Preview deployments.
-2. Store the Vercel token, organization ID, and project ID in GitHub Actions secrets. Do not commit `.vercel/`.
+2. Store the Vercel token, organization ID, and project ID as secrets on the protected `production` GitHub Environment, whose deployment branch policy allows only protected branches. Do not commit `.vercel/`.
 3. Build from source on the GitHub-hosted Linux runner. The release workflow uses `vercel build --prod` and `vercel deploy --prebuilt --prod`; do not upload a `.next` output built on macOS because PDF extraction includes platform-native canvas code.
 4. Set `RESUME_OS_TRUSTED_PROXY=vercel` in Preview and Production. Keep `RESUME_OS_LOCAL_ONLY` unset.
 5. Add only the exact additional BYOK provider hosts users need. Treat this list as an SSRF boundary.

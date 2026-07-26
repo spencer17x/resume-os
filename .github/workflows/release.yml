@@ -25,12 +25,20 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
-      release_exists: ${{ steps.result.outputs.release_exists }}
       sha: ${{ steps.result.outputs.sha }}
-      tag_exists: ${{ steps.result.outputs.tag_exists }}
       tag_name: ${{ steps.result.outputs.tag_name }}
       version: ${{ steps.result.outputs.version }}
     steps:
+      - name: Require a main-branch workflow dispatch
+        env:
+          DISPATCH_REF: ${{ github.ref }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" != "workflow_dispatch" ] \
+            || [ "$DISPATCH_REF" != "refs/heads/main" ]; then
+            echo "Release must be dispatched from refs/heads/main."
+            exit 1
+          fi
+
       - name: Check out main with release history
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -43,7 +51,6 @@ jobs:
         env:
           MANUAL_TAG: ${{ inputs.tag }}
           MANUAL_SHA: ${{ inputs.sha }}
-          GH_TOKEN: ${{ github.token }}
         run: |
           release_tag="$MANUAL_TAG"
           if ! printf '%s\n' "$release_tag" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
@@ -55,7 +62,6 @@ jobs:
             exit 1
           fi
 
-          git fetch --force --tags origin
           release_sha="$(git rev-parse --verify "$MANUAL_SHA^{commit}")"
           if ! git merge-base --is-ancestor "$release_sha" origin/main; then
             echo "Commit $release_sha is not reachable from origin/main."
@@ -69,34 +75,7 @@ jobs:
             exit 1
           fi
 
-          if git rev-parse --verify --quiet "refs/tags/$release_tag" >/dev/null; then
-            tagged_sha="$(git rev-list -n 1 "$release_tag")"
-            if [ "$tagged_sha" != "$release_sha" ]; then
-              echo "Tag $release_tag already points to $tagged_sha, not $release_sha."
-              exit 1
-            fi
-            tag_exists=true
-          else
-            tag_exists=false
-          fi
-
-          if [ "$tag_exists" = "false" ]; then
-            release_subject="$(git show -s --format=%s "$release_sha")"
-            if [ "$release_subject" != "chore(release): $release_tag" ]; then
-              echo "New release commit must be titled chore(release): $release_tag."
-              exit 1
-            fi
-          fi
-
-          if gh release view "$release_tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            release_exists=true
-          else
-            release_exists=false
-          fi
-
-          echo "release_exists=$release_exists" >> "$GITHUB_OUTPUT"
           echo "sha=$release_sha" >> "$GITHUB_OUTPUT"
-          echo "tag_exists=$tag_exists" >> "$GITHUB_OUTPUT"
           echo "tag_name=$release_tag" >> "$GITHUB_OUTPUT"
           echo "version=$release_version" >> "$GITHUB_OUTPUT"
 
@@ -140,33 +119,71 @@ jobs:
       contents: write
     env:
       GH_TOKEN: ${{ github.token }}
-      RELEASE_EXISTS: ${{ needs.release.outputs.release_exists }}
       RELEASE_SHA: ${{ needs.release.outputs.sha }}
       RELEASE_TAG: ${{ needs.release.outputs.tag_name }}
-      TAG_EXISTS: ${{ needs.release.outputs.tag_exists }}
     steps:
-      - name: Create or validate GitHub Release
+      - name: Check out trusted release controls
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Inspect live tag and Release state
+        id: release-state
         run: |
-          if [ "$RELEASE_EXISTS" = "true" ]; then
-            release_url="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json url --jq .url)"
-          elif [ "$TAG_EXISTS" = "true" ]; then
-            release_url="$(gh release create "$RELEASE_TAG" \
-              --repo "$GITHUB_REPOSITORY" \
-              --verify-tag \
-              --title "$RELEASE_TAG" \
-              --generate-notes)"
-          else
-            release_url="$(gh release create "$RELEASE_TAG" \
-              --repo "$GITHUB_REPOSITORY" \
-              --target "$RELEASE_SHA" \
-              --title "$RELEASE_TAG" \
-              --generate-notes)"
+          state_json="$(node scripts/release-state.mjs \
+            --repo "$GITHUB_REPOSITORY" \
+            --tag "$RELEASE_TAG" \
+            --sha "$RELEASE_SHA")"
+          echo "action=$(printf '%s' "$state_json" | jq -r .action)" >> "$GITHUB_OUTPUT"
+          echo "state=$(printf '%s' "$state_json" | jq -r .state)" >> "$GITHUB_OUTPUT"
+
+      - name: Verify a new release commit title
+        if: steps.release-state.outputs.action == 'create'
+        run: |
+          release_subject="$(git show -s --format=%s "$RELEASE_SHA")"
+          if [ "$release_subject" != "chore(release): $RELEASE_TAG" ]; then
+            echo "New release commit must be titled chore(release): $RELEASE_TAG."
+            exit 1
           fi
 
+      - name: Create tag and GitHub Release
+        if: steps.release-state.outputs.action == 'create'
+        run: >-
+          gh release create "$RELEASE_TAG"
+          --repo "$GITHUB_REPOSITORY"
+          --target "$RELEASE_SHA"
+          --title "$RELEASE_TAG"
+          --generate-notes
+
+      - name: Publish GitHub Release from an existing tag
+        if: steps.release-state.outputs.action == 'publish'
+        run: >-
+          gh release create "$RELEASE_TAG"
+          --repo "$GITHUB_REPOSITORY"
+          --verify-tag
+          --title "$RELEASE_TAG"
+          --generate-notes
+
+      - name: Verify published tag and Release state
+        id: published-state
+        run: |
+          state_json="$(node scripts/release-state.mjs \
+            --repo "$GITHUB_REPOSITORY" \
+            --tag "$RELEASE_TAG" \
+            --sha "$RELEASE_SHA" \
+            --expect-published)"
+          echo "release_url=$(printf '%s' "$state_json" | jq -r .releaseUrl)" >> "$GITHUB_OUTPUT"
+
+      - name: Summarize GitHub Release
+        env:
+          RELEASE_URL: ${{ steps.published-state.outputs.release_url }}
+        run: |
           echo "### GitHub Release" >> "$GITHUB_STEP_SUMMARY"
           echo "- Version: $RELEASE_TAG" >> "$GITHUB_STEP_SUMMARY"
           echo "- Commit: $RELEASE_SHA" >> "$GITHUB_STEP_SUMMARY"
-          echo "- URL: $release_url" >> "$GITHUB_STEP_SUMMARY"
+          echo "- URL: $RELEASE_URL" >> "$GITHUB_STEP_SUMMARY"
 
   deploy-production:
     needs:
@@ -180,12 +197,30 @@ jobs:
     environment:
       name: production
       url: https://resume-os-phi.vercel.app
-    env:
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
     steps:
+      - name: Check out trusted release controls
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Revalidate published tag and Release before deployment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_SHA: ${{ needs.release.outputs.sha }}
+          RELEASE_TAG: ${{ needs.release.outputs.tag_name }}
+        run: >-
+          node scripts/release-state.mjs
+          --repo "$GITHUB_REPOSITORY"
+          --tag "$RELEASE_TAG"
+          --sha "$RELEASE_SHA"
+          --expect-published
+
       - name: Verify deployment secrets
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
           test -n "$VERCEL_ORG_ID" || { echo 'Missing VERCEL_ORG_ID'; exit 1; }
           test -n "$VERCEL_PROJECT_ID" || { echo 'Missing VERCEL_PROJECT_ID'; exit 1; }
@@ -217,12 +252,24 @@ jobs:
         run: npm install --global vercel@56.3.1
 
       - name: Pull Vercel production configuration
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
 
       - name: Build Vercel production artifacts
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: vercel build --prod --token="$VERCEL_TOKEN"
 
       - name: Deploy released artifacts
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
           deployment_url="$(vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN")"
           echo "### Production deployment" >> "$GITHUB_STEP_SUMMARY"
