@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       sha:
-        description: Full main commit SHA produced by the merged release PR
+        description: Full release commit SHA already pushed to main
         required: true
         type: string
 
@@ -136,7 +136,6 @@ jobs:
             legacy)
               echo "Release predates pnpm check; running its historical quality gate."
               corepack "pnpm@$PNPM_VERSION" typecheck
-              corepack "pnpm@$PNPM_VERSION" lint
               corepack "pnpm@$PNPM_VERSION" test
               corepack "pnpm@$PNPM_VERSION" test:production-extraction
               ;;

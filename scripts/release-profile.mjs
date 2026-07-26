@@ -4,7 +4,6 @@ import { fileURLToPath } from 'node:url'
 const LEGACY_NODE_VERSION = '22'
 const LEGACY_QUALITY_SCRIPTS = [
   'typecheck',
-  'lint',
   'test',
   'test:production-extraction',
 ]

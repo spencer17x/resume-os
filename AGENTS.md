@@ -123,12 +123,6 @@ corepack pnpm@11.17.0 test:e2e
 corepack pnpm@11.17.0 test:production-extraction
 ```
 
-Optionally enable local Git hooks for early feedback:
-
-```bash
-corepack pnpm@11.17.0 hooks:install
-```
-
 Verification policy:
 
 - Run the narrowest relevant Vitest file while iterating.
@@ -138,7 +132,7 @@ Verification policy:
   (`typecheck` + full unit/integration suite + production build).
 - Run `build` for App Router, server/client boundary, configuration, dependency, or production-bundling changes.
 - Run `test:production-extraction` for document parsing, worker, dependency tracing, Next config, or deployment changes.
-- Run the relevant Playwright project for desktop/mobile routing, window management, responsive UI, or complete user-flow changes. **E2E is not part of pre-push or the default quality CI job.**
+- Run the relevant Playwright project for desktop/mobile routing, window management, responsive UI, or complete user-flow changes. **E2E is not part of `pnpm check`.**
 - Security-boundary changes require both an allowed-path test and a rejected-path test. Cover origins, provider hosts, redirects, limits, credential handling, and cancellation as applicable.
 - Do not run `test:e2e:update` or update snapshots merely to make a failing test pass. Snapshot changes must be intentional, inspected, and explained.
 - For documentation-only changes, at minimum run `git diff --check` and verify every referenced path, command, environment variable, and workflow against the repository.
@@ -148,14 +142,9 @@ Verification policy:
 
 Do not commit, amend, tag, or push unless the user explicitly asks for that action.
 
-Optional hooks (only after explicitly running `pnpm hooks:install`):
-
-- `pre-commit`: staged `git diff --check` + high-risk path deny-globs
-- `commit-msg`: Conventional Commits via `scripts/validate-commit-message.sh` (allows local fixup/squash/amend)
-- `pre-push`: strict commit subjects + `pnpm typecheck && pnpm test` (not e2e)
-- Do not use `--no-verify` for review-bound commits.
-- Hooks are a fast feedback aid, not the quality authority. Dependency
-  installation does not enable them; `pnpm check` and CI remain authoritative.
+The repository does not install or ship Git hooks and does not run a quality
+workflow automatically on commits or pushes. Run the checks required by this
+guide directly before committing or pushing.
 
 When asked to commit or use Commit and Push:
 
@@ -190,29 +179,26 @@ test(desktop): cover restored window focus
 
 Release behavior:
 
-- Releases are not started automatically. Preparing a version pull request and
-  publishing its merged main revision both require an explicit release request.
+- Releases are not started automatically. Preparing a version commit and
+  publishing its main revision both require an explicit release request.
 - `fix`, `perf`, and `revert` create a patch release.
 - `feat` creates a minor release.
 - A breaking-change note creates a major release.
 - `docs`, `refactor`, `test`, `build`, `ci`, and `chore` do not create a release by themselves.
-- When a release is explicitly requested, create a `release/*` branch and let
-  release-it create only the version and changelog commit. It must not tag,
-  publish, or push directly to protected `main`.
-- Push the release branch, open a `chore(release): vX.Y.Z` pull request, and
-  merge only after the required `Repository check` succeeds.
-- After merge, invoke the manual Release workflow from the `main` ref with the
-  tag and full merged `main` commit SHA. The workflow resolves remote tag and
+- When a release is explicitly requested, start from a clean, up-to-date `main`,
+  run `pnpm check`, and let release-it create only the version and changelog
+  commit. It must not tag, publish, or push automatically.
+- Push the generated `chore(release): vX.Y.Z` commit directly to `main`, then
+  invoke the manual Release workflow from the `main` ref with the tag and full
+  release commit SHA. The workflow resolves remote tag and
   Release state immediately before publication, verifies the resulting stable
   Release, and repeats that verification before deployment secrets are exposed.
-- Keep `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` on the protected
-  `production` GitHub Environment. Restrict that Environment to protected
-  branches so non-main refs cannot access production credentials.
+- Keep `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` on the
+  `production` GitHub Environment. Restrict that Environment to the `main`
+  branch so other refs cannot access production credentials.
 - Do not run `pnpm release`, deploy production, move a tag, or invoke the manual
   Release workflow unless the user explicitly requests that exact release
   operation.
-- Prefer a squash merge so the validated release PR title becomes the release
-  commit subject on `main`.
 
 ## Review Guidelines
 

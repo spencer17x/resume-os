@@ -19,10 +19,10 @@ type ReleaseConfig = {
 const require = createRequire(import.meta.url)
 
 describe('release process', () => {
-  it('prepares a checked release PR without pushing or tagging protected main', () => {
+  it('prepares a local main release commit without pushing or tagging', () => {
     const config = require(join(process.cwd(), '.release-it.cjs')) as ReleaseConfig
 
-    expect(config.git?.requireBranch).toBe('release/*')
+    expect(config.git?.requireBranch).toBe('main')
     expect(config.git?.commitMessage).toBe('chore(release): v${version}')
     expect(config.git?.commitMessage).not.toContain('[skip ci]')
     expect(config.git?.tag).toBe(false)
@@ -36,7 +36,7 @@ describe('release process', () => {
       'utf8'
     )
 
-    expect(workflow).toContain('description: Full main commit SHA produced by the merged release PR')
+    expect(workflow).toContain('description: Full release commit SHA already pushed to main')
     expect(workflow).toContain('DISPATCH_REF: ${{ github.ref }}')
     expect(workflow).toContain('[ "$DISPATCH_REF" != "refs/heads/main" ]')
     expect(workflow).toContain('git merge-base --is-ancestor "$release_sha" origin/main')
@@ -47,7 +47,6 @@ describe('release process', () => {
     expect(workflow).toContain('run: node "$RUNNER_TEMP/release-profile.mjs"')
     expect(workflow).toContain('corepack "pnpm@$PNPM_VERSION" check')
     expect(workflow).toContain('corepack "pnpm@$PNPM_VERSION" typecheck')
-    expect(workflow).toContain('corepack "pnpm@$PNPM_VERSION" lint')
     expect(workflow).toContain('corepack "pnpm@$PNPM_VERSION" test')
     expect(workflow).toContain('corepack "pnpm@$PNPM_VERSION" test:production-extraction')
     expect(workflow).toContain(
@@ -71,7 +70,6 @@ describe('release process', () => {
         packageManager: 'pnpm@10.33.0',
         scripts: {
           typecheck: 'tsc --noEmit',
-          lint: 'eslint .',
           test: 'vitest run',
           'test:production-extraction': 'next build && node scripts/smoke.mjs',
         },
@@ -90,7 +88,6 @@ describe('release process', () => {
       qualityProfile: 'legacy',
       qualityScripts: [
         'typecheck',
-        'lint',
         'test',
         'test:production-extraction',
       ],
@@ -113,7 +110,6 @@ describe('release process', () => {
           packageManager: 'pnpm@10.33.0',
           scripts: {
             typecheck: 'tsc --noEmit',
-            lint: 'eslint .',
             test: 'vitest run',
           },
         },

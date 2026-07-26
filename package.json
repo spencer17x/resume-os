@@ -14,7 +14,6 @@
     "test:e2e:update": "playwright test --update-snapshots",
     "typecheck": "tsc --noEmit --incremental false",
     "check": "node scripts/check.mjs",
-    "hooks:install": "node scripts/install-githooks.mjs",
     "release": "release-it --ci --config .release-it.cjs"
   },
   "dependencies": {

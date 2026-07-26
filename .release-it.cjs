@@ -25,7 +25,7 @@ function recommendRelease(commits) {
 
 module.exports = {
   git: {
-    requireBranch: "release/*",
+    requireBranch: "main",
     requireCleanWorkingDir: true,
     requireUpstream: false,
     requireCommits: true,

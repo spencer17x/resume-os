@@ -69,22 +69,18 @@ Supported locales are `en` and `zh`.
 
 ```bash
 corepack pnpm@11.17.0 install
-corepack pnpm@11.17.0 hooks:install # optional local early feedback
 corepack pnpm@11.17.0 dev
 corepack pnpm@11.17.0 check
 ```
 
-`pnpm check` is the authoritative local and CI gate: it runs typecheck, the
-unit/integration suite, and a production build (not Playwright e2e). Versioned
-Git hooks are optional early feedback and are enabled only by explicitly running
-`pnpm hooks:install`; dependency installation never enables them. There is no
-required whole-tree Prettier/ESLint gate yet because introducing one would
-require a high-risk application-wide rewrite; keep formatting consistent with
-nearby files.
+`pnpm check` is the authoritative local verification command: it runs
+typecheck, the unit/integration suite, and a production build (not Playwright
+e2e). The repository does not ship Git hooks or an automatic pull-request/push
+quality workflow, so run the relevant checks directly before committing or
+pushing. There is no required whole-tree Prettier/ESLint gate; keep formatting
+consistent with nearby files.
 
-The supported local and CI runtime is Node.js 24.18.0 (`>=24.18.0 <25`).
-Pull requests and pushes to `main` run the same `pnpm check` in the Quality
-workflow and validate pull request titles as Conventional Commits.
+The supported local runtime is Node.js 24.18.0 (`>=24.18.0 <25`).
 
 `pnpm dev` binds to `127.0.0.1:3001`. When that port is owned by another process, use a separate loopback port without killing an unrelated service:
 
@@ -141,19 +137,16 @@ The in-process route limiter remains defense-in-depth. Set `RESUME_OS_TRUSTED_PR
 Production is released from SemVer tags through an explicit release operation rather than from every `main` push:
 
 ```text
-release branch → calculate SemVer → package version + CHANGELOG commit
-               → pull request → Repository check → protected main
-manual tag + full main SHA → recheck → GitHub Release → Vercel Production
+clean main → local pnpm check → calculate SemVer
+           → package version + CHANGELOG commit → push main
+manual tag + full release SHA → recheck → GitHub Release → Vercel Production
 ```
 
-Release changes use a pull request so protected `main` never needs a direct
-release commit. Optional local hooks provide early feedback only after an
-explicit `pnpm hooks:install`; `pnpm check` and the GitHub Actions Quality
-workflow are authoritative. Run the production extraction smoke test and
-relevant Playwright suite explicitly when a change warrants them because those
-checks are not part of the default Quality job. When a release is explicitly
-requested, create a `release/*` branch and run `pnpm release`; release-it derives
-the next version from commits added since the previous release:
+Release changes are prepared directly on a clean, up-to-date `main`. Run
+`pnpm check` first, plus the production extraction smoke test and relevant
+Playwright suite when a change warrants them. When a release is explicitly
+requested, run `pnpm release`; release-it derives the next version from commits
+added since the previous release:
 
 - `fix:` creates a patch release.
 - `feat:` creates a minor release.
@@ -163,18 +156,17 @@ the next version from commits added since the previous release:
 
 `release-it` updates `package.json` and `CHANGELOG.md` and creates only the
 `chore(release): vX.Y.Z` commit. It does not tag, push, or publish a GitHub
-Release. Push the release branch, open a pull request with the same title, and
-merge only after the required `Repository check` succeeds. Then manually run
-the Release workflow from the `main` ref with `vX.Y.Z` and the full merged
-`main` commit SHA. The workflow verifies main ancestry and package version,
+Release. Push that commit to `main`, then manually run the Release workflow from
+the `main` ref with `vX.Y.Z` and the full release commit SHA. The workflow
+verifies main ancestry and package version,
 runs that revision's `pnpm check` (or its equivalent historical quality gate
 for releases that predate `pnpm check`), resolves the live remote tag and GitHub
 Release immediately before publication, verifies the published
 non-draft/non-prerelease Release again, and only then deploys to Vercel. The
 deployment job repeats that live check before it can read Vercel credentials.
 Store `VERCEL_TOKEN`,
-`VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` as secrets on the protected
-`production` GitHub Environment. See
+`VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` as secrets on the `production` GitHub
+Environment, whose deployment branch policy allows only `main`. See
 [Deployment and data boundaries](docs/deployment.md#quality-release-and-deployment)
 for setup, deployment retry, rollback, and the complete lifecycle.
 
@@ -184,7 +176,7 @@ Vercel can run the complete current Next.js application, including Node.js docum
 
 For the complete raw-resume-to-tailored-variant workflow on Vercel:
 
-1. Link the repository to the Vercel project once, then add the Vercel project IDs and access token to the protected `production` GitHub Environment as Actions secrets.
+1. Link the repository to the Vercel project once, then add the Vercel project IDs and access token to the `production` GitHub Environment as Actions secrets and restrict deployments to `main`.
 2. Keep branch Preview deployments enabled. `vercel.json` disables direct `main` deployments so Production can only follow a version tag.
 3. Build from source in GitHub Actions on Linux; do not upload a macOS-built `.next` directory because document extraction includes platform-native code.
 4. Set `RESUME_OS_TRUSTED_PROXY=vercel`; do not set `RESUME_OS_LOCAL_ONLY`.
