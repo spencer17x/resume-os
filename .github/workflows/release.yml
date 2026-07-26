@@ -26,10 +26,11 @@ jobs:
       version: ${{ steps.result.outputs.version }}
     steps:
       - name: Check out main with release history
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Resolve release for deployment
         id: result
@@ -61,10 +62,40 @@ jobs:
           echo "tag_name=$release_tag" >> "$GITHUB_OUTPUT"
           echo "version=$release_version" >> "$GITHUB_OUTPUT"
 
+  quality-release:
+    name: Validate released revision
+    needs:
+      - release
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Check out released commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.release.outputs.sha }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run release quality check
+        run: pnpm check
+
   deploy-production:
     if: needs.release.outputs.release_created == 'true'
     needs:
       - release
+      - quality-release
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -84,7 +115,7 @@ jobs:
           test -n "$VERCEL_TOKEN" || { echo 'Missing VERCEL_TOKEN'; exit 1; }
 
       - name: Check out released commit
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.release.outputs.sha }}
           persist-credentials: false
@@ -92,7 +123,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 22
+          node-version-file: .nvmrc
 
       - name: Verify tag matches package version
         env:
@@ -106,9 +137,7 @@ jobs:
           }"
 
       - name: Install Vercel CLI
-        run: |
-          corepack enable
-          npm install --global vercel@56.3.1
+        run: npm install --global vercel@56.3.1
 
       - name: Pull Vercel production configuration
         run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"

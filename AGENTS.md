@@ -1,10 +1,20 @@
 # Resume OS Agent Guide
 
-This file applies to the entire repository. It defines the durable project guidance that coding agents must follow when inspecting, changing, testing, reviewing, committing, or pushing Resume OS.
+This file applies to the entire repository. A nested `AGENTS.md` would win for its subtree without weakening root safety, secrets, or verification rules.
 
-## Project Intent
+## Purpose
 
 Resume OS is a local-first, evidence-grounded resume tailoring agent built with Next.js App Router, TypeScript, React, and `next-intl`.
+
+## Start Here
+
+1. Read the user request and the relevant source, tests, or docs in full.
+2. Inspect `git status --short` and preserve unrelated or user-authored changes.
+3. Prefer current implementation + colocated tests as source of truth; use `README.md` and `docs/deployment.md` for product/ops boundaries; treat `docs/superpowers/` as design history.
+4. Choose the smallest change that fully solves the request.
+5. **Do not** commit, amend, tag, push, publish, or deploy unless the user explicitly asks.
+
+## Project Intent
 
 Preserve these product invariants:
 
@@ -79,7 +89,7 @@ Preserve these product invariants:
 
 ## Runtime And Environment
 
-- Use Node.js 22 and `pnpm@10.33.0`. Do not use npm or Yarn to install dependencies or generate another lockfile.
+- Use Node.js 24.18.0 (`>=24.18.0 <25`) and `pnpm@11.17.0`. Do not use npm or Yarn to install dependencies or generate another lockfile.
 - The default development server is local-only at `127.0.0.1:3001`. If that port is occupied, use another loopback port; do not terminate an unrelated process merely to reclaim the default port.
 - Keep secrets in untracked `.env.local` or the deployment secret store. `.env.example` must contain only safe placeholders, and server credentials must never be exposed through a `NEXT_PUBLIC_*` variable or client bundle.
 - Treat `RESUME_OS_ALLOWED_AI_HOSTS`, `RESUME_OS_AI_ACCESS_TOKEN`, `RESUME_OS_LOCAL_ONLY`, and `RESUME_OS_TRUSTED_PROXY` as security-boundary configuration. Do not weaken their semantics to make a request work.
@@ -98,18 +108,25 @@ Preserve these product invariants:
 Use the pinned package manager:
 
 ```bash
-corepack pnpm@10.33.0 install
-corepack pnpm@10.33.0 dev
+corepack pnpm@11.17.0 install
+corepack pnpm@11.17.0 dev
+corepack pnpm@11.17.0 check   # authoritative: typecheck + tests + build
 ```
 
 Primary checks:
 
 ```bash
-corepack pnpm@10.33.0 typecheck
-corepack pnpm@10.33.0 test
-corepack pnpm@10.33.0 build
-corepack pnpm@10.33.0 test:e2e
-corepack pnpm@10.33.0 test:production-extraction
+corepack pnpm@11.17.0 typecheck
+corepack pnpm@11.17.0 test
+corepack pnpm@11.17.0 build
+corepack pnpm@11.17.0 test:e2e
+corepack pnpm@11.17.0 test:production-extraction
+```
+
+Optionally enable local Git hooks for early feedback:
+
+```bash
+corepack pnpm@11.17.0 hooks:install
 ```
 
 Verification policy:
@@ -117,10 +134,11 @@ Verification policy:
 - Run the narrowest relevant Vitest file while iterating.
 - Keep unit and component tests colocated as `*.test.ts` or `*.test.tsx`; keep browser workflows in `tests/e2e/`. Add a regression test for a bug fix when the failure is reproducible.
 - Use synthetic resume and provider data in tests, fixtures, screenshots, and logs. Never copy a real resume, API key, or personal career history into the repository.
-- Before handing off a material code change, run `typecheck` and the full unit/integration suite.
+- Before handing off a material code change, run the authoritative `pnpm check`
+  (`typecheck` + full unit/integration suite + production build).
 - Run `build` for App Router, server/client boundary, configuration, dependency, or production-bundling changes.
 - Run `test:production-extraction` for document parsing, worker, dependency tracing, Next config, or deployment changes.
-- Run the relevant Playwright project for desktop/mobile routing, window management, responsive UI, or complete user-flow changes.
+- Run the relevant Playwright project for desktop/mobile routing, window management, responsive UI, or complete user-flow changes. **E2E is not part of pre-push or the default quality CI job.**
 - Security-boundary changes require both an allowed-path test and a rejected-path test. Cover origins, provider hosts, redirects, limits, credential handling, and cancellation as applicable.
 - Do not run `test:e2e:update` or update snapshots merely to make a failing test pass. Snapshot changes must be intentional, inspected, and explained.
 - For documentation-only changes, at minimum run `git diff --check` and verify every referenced path, command, environment variable, and workflow against the repository.
@@ -129,6 +147,15 @@ Verification policy:
 ## Git And Commit Messages
 
 Do not commit, amend, tag, or push unless the user explicitly asks for that action.
+
+Optional hooks (only after explicitly running `pnpm hooks:install`):
+
+- `pre-commit`: staged `git diff --check` + high-risk path deny-globs
+- `commit-msg`: Conventional Commits via `scripts/validate-commit-message.sh` (allows local fixup/squash/amend)
+- `pre-push`: strict commit subjects + `pnpm typecheck && pnpm test` (not e2e)
+- Do not use `--no-verify` for review-bound commits.
+- Hooks are a fast feedback aid, not the quality authority. Dependency
+  installation does not enable them; `pnpm check` and CI remain authoritative.
 
 When asked to commit or use Commit and Push:
 

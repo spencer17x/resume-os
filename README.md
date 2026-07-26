@@ -68,16 +68,28 @@ Supported locales are `en` and `zh`.
 ## Development
 
 ```bash
-corepack pnpm@10.33.0 install
-corepack pnpm@10.33.0 dev
+corepack pnpm@11.17.0 install
+corepack pnpm@11.17.0 hooks:install # optional local early feedback
+corepack pnpm@11.17.0 dev
+corepack pnpm@11.17.0 check
 ```
 
-The repository does not install Git hooks or provide a lint command. Run the relevant type checks and tests explicitly before sharing a change.
+`pnpm check` is the authoritative local and CI gate: it runs typecheck, the
+unit/integration suite, and a production build (not Playwright e2e). Versioned
+Git hooks are optional early feedback and are enabled only by explicitly running
+`pnpm hooks:install`; dependency installation never enables them. There is no
+required whole-tree Prettier/ESLint gate yet because introducing one would
+require a high-risk application-wide rewrite; keep formatting consistent with
+nearby files.
+
+The supported local and CI runtime is Node.js 24.18.0 (`>=24.18.0 <25`).
+Pull requests and pushes to `main` run the same `pnpm check` in the Quality
+workflow and validate pull request titles as Conventional Commits.
 
 `pnpm dev` binds to `127.0.0.1:3001`. When that port is owned by another process, use a separate loopback port without killing an unrelated service:
 
 ```bash
-RESUME_OS_LOCAL_ONLY=1 corepack pnpm@10.33.0 exec next dev --hostname 127.0.0.1 -p 3114
+RESUME_OS_LOCAL_ONLY=1 corepack pnpm@11.17.0 exec next dev --hostname 127.0.0.1 -p 3114
 ```
 
 For local development, either configure the AI service in Settings or create `.env.local`:
@@ -134,7 +146,13 @@ explicit release → calculate SemVer → package version + CHANGELOG
 manual tag deployment → Vercel Production
 ```
 
-Pull requests are optional. Commit and push operations do not run repository-managed hooks or CI checks. Run the relevant type checks, tests, production extraction smoke test, and Playwright suite explicitly when the change warrants them. When a release is explicitly requested, `release-it` derives the next version from commits added since the previous release:
+Pull requests are optional unless repository protection requires them. Optional
+local hooks provide early feedback only after an explicit `pnpm hooks:install`;
+`pnpm check` and the GitHub Actions Quality workflow are authoritative. Run the
+production extraction smoke test and relevant Playwright suite explicitly when
+a change warrants them because those checks are not part of the default Quality
+job. When a release is explicitly requested, `release-it` derives the next
+version from commits added since the previous release:
 
 - `fix:` creates a patch release.
 - `feat:` creates a minor release.
@@ -142,7 +160,7 @@ Pull requests are optional. Commit and push operations do not run repository-man
 - `perf:` and `revert:` create a patch release.
 - `docs:`, `test:`, `chore:`, and `ci:` do not create a production release by themselves.
 
-`release-it` updates `package.json` and `CHANGELOG.md`, creates the version commit and immutable tag, and publishes the GitHub Release. The manual GitHub workflow accepts an existing release tag and deploys it to Vercel. The only custom Actions secrets are `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID`. See [Deployment and data boundaries](docs/deployment.md#manual-release-and-deployment) for setup, deployment retry, rollback, and the complete lifecycle.
+`release-it` updates `package.json` and `CHANGELOG.md`, creates the version commit and immutable tag, and publishes the GitHub Release. The manual GitHub workflow accepts an existing release tag, reruns `pnpm check` against that exact revision, and only then deploys it to Vercel. The only custom Actions secrets are `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID`. See [Deployment and data boundaries](docs/deployment.md#quality-release-and-deployment) for setup, deployment retry, rollback, and the complete lifecycle.
 
 ## Deploy to Vercel
 

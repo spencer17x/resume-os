@@ -1,5 +1,5 @@
 const PATCH_TYPES = new Set(["fix", "perf", "revert"]);
-const FEATURE_TYPES = new Set(["feat", "feature"]);
+const FEATURE_TYPES = new Set(["feat"]);
 
 function recommendRelease(commits) {
   let level = null;
