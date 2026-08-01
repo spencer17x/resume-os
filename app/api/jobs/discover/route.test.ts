@@ -62,6 +62,22 @@ describe('POST /api/jobs/discover', () => {
     expect(adapter.refresh).not.toHaveBeenCalled()
   })
 
+  it('allows bounded same-origin discovery and rejects requests above the configured limit', async () => {
+    const adapter = createAdapter()
+    const post = createDiscoverJobsRoute({
+      guard: createAiRequestGuard({ localOnly: true, limiter: new FixedWindowRateLimiter() }),
+      adapters: new Map([['greenhouse', adapter]]),
+      now: () => now,
+      rateLimit: { limit: 2, windowMs: 60_000 }
+    })
+
+    expect((await post(request({ source: 'greenhouse', sourceKey: 'one' }))).status).toBe(200)
+    expect((await post(request({ source: 'greenhouse', sourceKey: 'two' }))).status).toBe(200)
+    const rejected = await post(request({ source: 'greenhouse', sourceKey: 'three' }))
+    expect(rejected.status).toBe(429)
+    expect(adapter.refresh).toHaveBeenCalledTimes(2)
+  })
+
   it('maps bounded source failures without exposing upstream details', async () => {
     const failures = [
       ['RESPONSE_TOO_LARGE', 502, 'JOB_SOURCE_RESPONSE_TOO_LARGE'],

@@ -56,6 +56,26 @@ describe('scoreJobRecommendation', () => {
     expect(result.preliminaryScore).toBeTypeOf('number')
   })
 
+  it('treats an optional target company as a soft preference rather than a hard gate', () => {
+    const preferred = scoreJobRecommendation({
+      posting,
+      profile: { ...profile, preferredCompanies: ['Example'] },
+      sourceDraftId: 'draft-1',
+      facts,
+      now
+    })
+    const other = scoreJobRecommendation({
+      posting: { ...posting, company: 'Other' },
+      profile: { ...profile, preferredCompanies: ['Example'] },
+      sourceDraftId: 'draft-1',
+      facts,
+      now
+    })
+    expect(preferred.eligibility).toBe('eligible')
+    expect(other.eligibility).toBe('eligible')
+    expect(preferred.preliminaryScore).toBeGreaterThan(other.preliminaryScore ?? 0)
+  })
+
   it('rejects old and closed postings deterministically', () => {
     expect(scoreJobRecommendation({
       posting: { ...posting, status: 'closed' }, profile, sourceDraftId: 'draft-1', facts, now

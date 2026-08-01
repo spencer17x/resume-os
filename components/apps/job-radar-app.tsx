@@ -1,6 +1,6 @@
 'use client'
 
-import { ExternalLink, LoaderCircle, Radar, RefreshCw, Save, X } from 'lucide-react'
+import { ClipboardPaste, ExternalLink, LoaderCircle, Radar, RefreshCw, Save, Search, X } from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useResumeDraft } from '@/components/resume-draft-provider'
@@ -22,6 +22,17 @@ import {
 import { scoreJobRecommendation } from '@/lib/jobs/job-recommendation'
 import { createJobPromotionIntent, saveJobPromotionIntent } from '@/lib/jobs/job-promotion'
 import { refreshJobSource } from '@/lib/jobs/job-refresh'
+import { refreshSelectedJobMarket } from '@/lib/jobs/job-market-search'
+import { importMarketplaceJob } from '@/lib/jobs/manual-job-import'
+import { parseJobClipboardText } from '@/lib/jobs/job-clipboard-import'
+import {
+  DEFAULT_JOB_MARKETPLACES,
+  JOB_MARKETPLACE_IDS,
+  buildOfficialMarketplaceSearchUrl,
+  deriveJobSearchSeed,
+  jobMarketplaceRegistry,
+  type JobMarketplaceId
+} from '@/lib/jobs/job-marketplace'
 import {
   ApplicationRecordError,
   loadApplicationPacket,
@@ -58,19 +69,31 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
   const [busyApplicationId, setBusyApplicationId] = useState('')
   const [sourceKind, setSourceKind] = useState<SourceKind>('greenhouse')
   const [sourceKey, setSourceKey] = useState('')
+  const [selectedPlatforms, setSelectedPlatforms] = useState<JobMarketplaceId[]>([...DEFAULT_JOB_MARKETPLACES])
   const [profileName, setProfileName] = useState('')
   const [titles, setTitles] = useState('')
   const [locations, setLocations] = useState('')
+  const [preferredCompanies, setPreferredCompanies] = useState('')
   const [requiredTerms, setRequiredTerms] = useState('')
   const [preferredTerms, setPreferredTerms] = useState('')
   const [excludedTerms, setExcludedTerms] = useState('')
+  const [importPlatform, setImportPlatform] = useState<JobMarketplaceId>('boss')
+  const [clipboardJobText, setClipboardJobText] = useState('')
+  const [importUrl, setImportUrl] = useState('')
+  const [importTitle, setImportTitle] = useState('')
+  const [importCompany, setImportCompany] = useState('')
+  const [importLocation, setImportLocation] = useState('')
+  const [importDescription, setImportDescription] = useState('')
   const [filter, setFilter] = useState<Filter>('all')
   const [busySourceId, setBusySourceId] = useState('')
+  const [marketProgress, setMarketProgress] = useState('')
+  const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const controllerRef = useRef<AbortController | null>(null)
   const refreshGenerationRef = useRef(0)
   const hydratedProfileIdRef = useRef('')
+  const seededDraftIdRef = useRef('')
 
   const load = useCallback(async () => {
     const [nextSources, nextProfiles, nextPostings, nextRecommendations, nextApplications] = await Promise.all([
@@ -85,6 +108,7 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
     setPostings(nextPostings.sort((left, right) => right.lastCheckedAt.localeCompare(left.lastCheckedAt)))
     setRecommendations(nextRecommendations)
     setApplications(nextApplications)
+    setLoaded(true)
     if (activeDraft && ['paste', 'upload'].includes(activeDraft.source)) {
       const results = await Promise.allSettled(nextApplications
         .filter((application) => application.sourceDraftId === activeDraft.id)
@@ -118,12 +142,25 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
     if (!profile || hydratedProfileIdRef.current === profile.id) return
     hydratedProfileIdRef.current = profile.id
     setProfileName(profile.name)
+    setSelectedPlatforms(profile.platforms?.length ? profile.platforms : [...DEFAULT_JOB_MARKETPLACES])
     setTitles(profile.titles.join(', '))
     setLocations(profile.locations.join(', '))
+    setPreferredCompanies(profile.preferredCompanies?.join(', ') ?? '')
     setRequiredTerms(profile.requiredTerms.join(', '))
     setPreferredTerms(profile.preferredTerms.join(', '))
     setExcludedTerms(profile.excludedTerms.join(', '))
   }, [profiles])
+
+  useEffect(() => {
+    if (!loaded || profiles.length > 0 || !activeDraft || !trustedDraft) return
+    if (seededDraftIdRef.current === activeDraft.id) return
+    seededDraftIdRef.current = activeDraft.id
+    const seed = deriveJobSearchSeed(activeDraft.data)
+    setProfileName(seed.name)
+    setTitles(seed.titles.join(', '))
+    setLocations(seed.locations.join(', '))
+    setPreferredTerms(seed.preferredTerms.join(', '))
+  }, [activeDraft, loaded, profiles.length, trustedDraft])
 
   async function addSource() {
     setError('')
@@ -148,7 +185,7 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
     }
   }
 
-  async function saveProfile() {
+  async function saveProfile(announce = true): Promise<JobSearchProfile | null> {
     setError('')
     try {
       const now = new Date().toISOString()
@@ -156,6 +193,7 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
       const profile = jobSearchProfileSchema.parse({
         id: existing?.id ?? createStableJobDomainId('search-profile', [profileName, titles]),
         name: profileName.trim(),
+        platforms: selectedPlatforms,
         titles: splitTerms(titles),
         adjacentTitles: [],
         locations: splitTerms(locations),
@@ -165,16 +203,85 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
         requiredTerms: splitTerms(requiredTerms),
         preferredTerms: splitTerms(preferredTerms),
         excludedTerms: splitTerms(excludedTerms),
+        preferredCompanies: splitTerms(preferredCompanies),
         maximumAgeDays: 30,
         createdAt: existing?.createdAt ?? now,
         updatedAt: now
       })
       await store.put('jobSearchProfiles', profile)
       if (activeDraft) await scoreCurrentPostings(profile, activeDraft.id)
-      setNotice(t('profileSaved'))
+      if (announce) setNotice(t('profileSaved'))
       await load()
+      return profile
     } catch {
       setError(t('errors.invalidProfile'))
+      return null
+    }
+  }
+
+  async function searchMarket() {
+    if (!activeDraft || !trustedDraft) {
+      setError(t('errors.resumeRequired'))
+      return
+    }
+    if (selectedPlatforms.length === 0) {
+      setError(t('errors.platformRequired'))
+      return
+    }
+    controllerRef.current?.abort()
+    const controller = new AbortController()
+    const generation = refreshGenerationRef.current + 1
+    refreshGenerationRef.current = generation
+    controllerRef.current = controller
+    setBusySourceId('market')
+    setMarketProgress(t('marketStarting'))
+    setError('')
+    setNotice('')
+    try {
+      const profile = await saveProfile(false)
+      if (!profile || controller.signal.aborted || refreshGenerationRef.current !== generation) return
+      const result = await refreshSelectedJobMarket({
+        platforms: selectedPlatforms,
+        existingSources: sources,
+        store,
+        createAdapter,
+        signal: controller.signal,
+        onProgress(completed, total, source) {
+          if (refreshGenerationRef.current !== generation) return
+          setMarketProgress(t('marketProgress', { completed, total, source: source.label }))
+        }
+      })
+      if (refreshGenerationRef.current !== generation) return
+      await scoreCurrentPostings(profile, activeDraft.id)
+      const totals = result.summaries.reduce((summary, source) => ({
+        added: summary.added + source.newCount,
+        updated: summary.updated + source.updatedCount,
+        closed: summary.closed + source.closedCount,
+        warnings: summary.warnings + source.warningCount
+      }), { added: 0, updated: 0, closed: 0, warnings: 0 })
+      setNotice(result.sourceCount === 0
+        ? t('marketManualOnly')
+        : t('marketComplete', {
+          sources: result.sourceCount,
+          added: totals.added,
+          updated: totals.updated,
+          failures: result.failures.length,
+          skipped: result.skippedCount
+        }))
+      await load()
+    } catch (caught) {
+      if (refreshGenerationRef.current !== generation) return
+      if (controller.signal.aborted || (caught instanceof DOMException && caught.name === 'AbortError')) {
+        setNotice(t('refreshCancelled'))
+      } else {
+        setError(t('errors.refresh'))
+      }
+    } finally {
+      if (controllerRef.current === controller) {
+        controllerRef.current = null
+        setBusySourceId('')
+        setMarketProgress('')
+      }
     }
   }
 
@@ -289,6 +396,66 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
     }
   }
 
+  async function importAndAnalyze() {
+    if (!activeDraft || !trustedDraft) {
+      setError(t('errors.resumeRequired'))
+      return
+    }
+    setError('')
+    setNotice('')
+    try {
+      const profile = await saveProfile(false)
+      if (!profile) return
+      const facts = (await store.list('careerFacts')).filter((fact) => (
+        fact.evidenceRefs.includes(careerEvidenceSourceId(activeDraft.id))
+      ))
+      const imported = await importMarketplaceJob({
+        store,
+        platform: importPlatform,
+        url: importUrl,
+        title: importTitle,
+        company: importCompany,
+        description: importDescription,
+        location: importLocation,
+        locale: locale === 'zh' ? 'zh' : 'en',
+        profile,
+        sourceDraftId: activeDraft.id,
+        facts
+      })
+      saveJobPromotionIntent(createJobPromotionIntent({
+        posting: imported.posting,
+        recommendation: imported.recommendation,
+        sourceDraftId: activeDraft.id
+      }))
+      setImportUrl('')
+      setImportTitle('')
+      setImportCompany('')
+      setImportLocation('')
+      setImportDescription('')
+      if (desktop) desktop.openApp('jd-match')
+      else window.location.assign(`/${locale}/jd-match`)
+    } catch {
+      setError(t('errors.importJob'))
+    }
+  }
+
+  function prefillFromClipboard() {
+    setError('')
+    setNotice('')
+    try {
+      const parsed = parseJobClipboardText(clipboardJobText)
+      if (parsed.platform) setImportPlatform(parsed.platform)
+      if (parsed.url) setImportUrl(parsed.url)
+      if (parsed.title) setImportTitle(parsed.title)
+      if (parsed.company) setImportCompany(parsed.company)
+      if (parsed.location) setImportLocation(parsed.location)
+      if (parsed.description) setImportDescription(parsed.description)
+      setNotice(t('clipboardParsed'))
+    } catch {
+      setError(t('errors.clipboardJob'))
+    }
+  }
+
   async function prepareApplication(recordId: string) {
     if (!activeDraft || !trustedDraft) return
     setBusyApplicationId(recordId)
@@ -342,7 +509,16 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
     if (filter === 'ready') return application?.status === 'ready-to-apply'
     if (filter === 'applied') return Boolean(application && ['applied', 'interviewing', 'offered', 'rejected', 'withdrawn', 'archived'].includes(application.status))
     return filter === 'all' || decision === filter
+  }).sort((left, right) => {
+    const leftScore = recommendationByPosting.get(left.id)?.preliminaryScore ?? -1
+    const rightScore = recommendationByPosting.get(right.id)?.preliminaryScore ?? -1
+    return rightScore - leftScore || right.lastCheckedAt.localeCompare(left.lastCheckedAt)
   })
+  const officialSearchPlatforms = selectedPlatforms.filter((platform): platform is Extract<JobMarketplaceId, 'boss' | '51job' | '58'> => (
+    platform === 'boss' || platform === '51job' || platform === '58'
+  ))
+  const primaryTitle = splitTerms(titles)[0]
+  const primaryLocation = splitTerms(locations)[0]
 
   return <main className="job-radar-app" aria-label={t('title')}>
     <header className="job-radar-app__header">
@@ -353,20 +529,47 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
     {notice ? <p className="job-radar-app__notice" role="status">{notice}</p> : null}
     <div className="job-radar-app__layout">
       <aside>
-        <section><h2>{t('sources')}</h2>
-          <label>{t('sourceKind')}<select value={sourceKind} onChange={(event) => setSourceKind(event.target.value as SourceKind)}><option value="greenhouse">Greenhouse</option><option value="lever">Lever</option></select></label>
-          <label>{t('sourceKey')}<input value={sourceKey} onChange={(event) => setSourceKey(event.target.value)} placeholder="company-slug" /></label>
-          <button type="button" onClick={() => void addSource()} disabled={!sourceKey.trim()}>{t('addSource')}</button>
-          <ul>{sources.map((source) => <li key={source.id}><span>{source.label}<small>{source.kind}</small></span><button type="button" disabled={Boolean(busySourceId)} onClick={() => void refresh(source)} aria-label={t('refreshSource', { source: source.label })}>{busySourceId === source.id ? <LoaderCircle className="spin" size={14} /> : <RefreshCw size={14} />}</button></li>)}</ul>
+        <section><h2>{t('platforms')}</h2>
+          <p className="job-radar-app__section-help">{t('platformHelp')}</p>
+          <fieldset className="job-radar-app__platforms"><legend>{t('platformLegend')}</legend>{JOB_MARKETPLACE_IDS.map((platform) => {
+            const definition = jobMarketplaceRegistry[platform]
+            return <label key={platform} data-capability={definition.capability}>
+              <input type="checkbox" checked={selectedPlatforms.includes(platform)} onChange={() => setSelectedPlatforms((current) => current.includes(platform) ? current.filter((item) => item !== platform) : [...current, platform])} />
+              <span><strong>{t(`marketplace.${platform}.name`)}</strong><small>{t(`capability.${definition.capability}`)}</small></span>
+            </label>
+          })}</fieldset>
+          <button className="job-radar-app__market-search" type="button" onClick={() => void searchMarket()} disabled={Boolean(busySourceId) || !trustedDraft || selectedPlatforms.length === 0 || !titles.trim()}><Search size={14} />{t('searchMarket')}</button>
+          {marketProgress ? <p className="job-radar-app__progress" role="status">{marketProgress}</p> : null}
+          {officialSearchPlatforms.length > 0 ? <div className="job-radar-app__official-searches"><h3>{t('officialSearches')}</h3><p>{t('officialSearchHelp')}</p><ul>{officialSearchPlatforms.map((platform) => <li key={platform}><a href={buildOfficialMarketplaceSearchUrl({ platform, title: primaryTitle, location: primaryLocation })} target="_blank" rel="noopener noreferrer"><ExternalLink size={12} />{t('openMarketplace', { platform: t(`marketplace.${platform}.name`) })}</a><small>{t(`marketplace.${platform}.note`)}</small></li>)}</ul></div> : null}
+          <details className="job-radar-app__advanced"><summary>{t('advancedSources')}</summary>
+            <p>{t('advancedSourcesHelp')}</p>
+            <label>{t('sourceKind')}<select value={sourceKind} onChange={(event) => setSourceKind(event.target.value as SourceKind)}><option value="greenhouse">Greenhouse</option><option value="lever">Lever</option></select></label>
+            <label>{t('sourceKey')}<input value={sourceKey} onChange={(event) => setSourceKey(event.target.value)} placeholder="company-slug" /></label>
+            <button type="button" onClick={() => void addSource()} disabled={!sourceKey.trim()}>{t('addSource')}</button>
+            <ul>{sources.map((source) => <li key={source.id}><span>{source.label}<small>{source.kind}</small></span><button type="button" disabled={Boolean(busySourceId)} onClick={() => void refresh(source)} aria-label={t('refreshSource', { source: source.label })}>{busySourceId === source.id ? <LoaderCircle className="spin" size={14} /> : <RefreshCw size={14} />}</button></li>)}</ul>
+          </details>
         </section>
         <section><h2>{t('profile')}</h2>
           <label>{t('profileName')}<input value={profileName} onChange={(event) => setProfileName(event.target.value)} /></label>
           <label>{t('titles')}<input value={titles} onChange={(event) => setTitles(event.target.value)} /></label>
           <label>{t('locations')}<input value={locations} onChange={(event) => setLocations(event.target.value)} /></label>
+          <label>{t('preferredCompanies')}<input value={preferredCompanies} onChange={(event) => setPreferredCompanies(event.target.value)} placeholder={t('preferredCompaniesPlaceholder')} /></label>
           <label>{t('requiredTerms')}<input value={requiredTerms} onChange={(event) => setRequiredTerms(event.target.value)} /></label>
           <label>{t('preferredTerms')}<input value={preferredTerms} onChange={(event) => setPreferredTerms(event.target.value)} /></label>
           <label>{t('excludedTerms')}<input value={excludedTerms} onChange={(event) => setExcludedTerms(event.target.value)} /></label>
-          <button type="button" onClick={() => void saveProfile()} disabled={!profileName.trim() || !titles.trim()}><Save size={14} />{t('saveProfile')}</button>
+          <button type="button" onClick={() => void saveProfile()} disabled={!profileName.trim() || !titles.trim() || selectedPlatforms.length === 0}><Save size={14} />{t('saveProfile')}</button>
+        </section>
+        <section><h2>{t('importJob')}</h2>
+          <p className="job-radar-app__section-help">{t('importJobHelp')}</p>
+          <label>{t('clipboardJob')}<textarea value={clipboardJobText} onChange={(event) => setClipboardJobText(event.target.value)} rows={6} placeholder={t('clipboardJobPlaceholder')} /></label>
+          <button type="button" onClick={prefillFromClipboard} disabled={!clipboardJobText.trim()}><ClipboardPaste size={14} />{t('parseClipboardJob')}</button>
+          <label>{t('importPlatform')}<select value={importPlatform} onChange={(event) => setImportPlatform(event.target.value as JobMarketplaceId)}>{JOB_MARKETPLACE_IDS.map((platform) => <option key={platform} value={platform}>{t(`marketplace.${platform}.name`)}</option>)}</select></label>
+          <label>{t('importUrl')}<input type="url" value={importUrl} onChange={(event) => setImportUrl(event.target.value)} placeholder="https://…" /></label>
+          <label>{t('importTitle')}<input value={importTitle} onChange={(event) => setImportTitle(event.target.value)} /></label>
+          <label>{t('importCompany')}<input value={importCompany} onChange={(event) => setImportCompany(event.target.value)} /></label>
+          <label>{t('importLocation')}<input value={importLocation} onChange={(event) => setImportLocation(event.target.value)} /></label>
+          <label>{t('importDescription')}<textarea value={importDescription} onChange={(event) => setImportDescription(event.target.value)} rows={7} /></label>
+          <button type="button" onClick={() => void importAndAnalyze()} disabled={!trustedDraft || !importUrl.trim() || !importTitle.trim() || !importCompany.trim() || !importDescription.trim() || !profileName.trim() || !titles.trim()}><ClipboardPaste size={14} />{t('importAndAnalyze')}</button>
         </section>
       </aside>
       <section className="job-radar-app__inbox">

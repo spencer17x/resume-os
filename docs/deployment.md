@@ -48,7 +48,22 @@ The adapters construct only these upstream requests:
 - `GET https://boards-api.greenhouse.io/v1/boards/{sourceKey}/jobs?content=true`
 - `GET https://api.lever.co/v0/postings/{sourceKey}?mode=json`
 
-Upstream requests use manual redirect handling and no credentials. Exact HTTPS hosts are fixed in code; response bodies are streamed with a 2 MiB limit, the source collection is limited to 500 postings, and the default timeout is 15 seconds. The same-origin request body is limited to 1 KiB and the route uses a 10-request-per-minute in-process bucket. A public deployment must include `/api/jobs/discover` in its platform/distributed rate-limit policy because serverless instances do not share process memory.
+The browser materializes a versioned, reviewed Greenhouse/Lever source catalog and
+refreshes at most ten selected automatic sources per market-search action. Target
+company is optional, and additional public boards remain an explicit advanced input.
+BOSS Zhipin and 51job are fixed-host official-search links only. 58.com is labeled as
+requiring an approved Open Platform partnership; none of these three platforms are
+fetched by `/api/jobs/discover`.
+
+The Copilot import path is browser-local. A user may paste a selected platform job's
+official HTTPS URL and description. The hostname must match the selected marketplace;
+the application stores the supplied fields in IndexedDB and does not request the URL,
+send it through a server route, or access marketplace cookies.
+Labeled quick-paste parsing is deterministic browser code with a 100,000-character
+limit. It only prefills editable fields and does not trigger persistence or navigation
+until the user confirms “Import and analyze.”
+
+Upstream requests use manual redirect handling and no credentials. Exact HTTPS hosts are fixed in code; response bodies are streamed with a 2 MiB limit, the source collection is limited to 500 postings, and the default timeout is 15 seconds. The same-origin request body is limited to 1 KiB and the route uses a 30-request-per-minute in-process bucket, enough for three maximum-size market refreshes. A public deployment must include `/api/jobs/discover` in its platform/distributed rate-limit policy because serverless instances do not share process memory.
 
 The server returns normalized public posting data and does not persist it. The browser commits a refresh to IndexedDB only after the adapter completes and cancellation/stale checks pass. A complete response may close a disappeared posting; a partial response may not. Do not add another provider through a generic fetcher: review its official documentation and terms, add a dedicated exact-host adapter, and cover both allowed and rejected paths first.
 

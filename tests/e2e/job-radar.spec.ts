@@ -62,7 +62,7 @@ test('refreshes Lever, rejects arbitrary source URLs, and cancels a late source 
     discoveryBodies.push(body)
     expect(Object.keys(body).sort()).toEqual(['source', 'sourceKey'])
     if (body.sourceKey === 'slow-board') {
-      await new Promise((resolve) => setTimeout(resolve, 500))
+      await new Promise((resolve) => setTimeout(resolve, 2_000))
       try { await json(route, sourceResult(body.source, body.sourceKey, 'Slow Role')) } catch { /* request was canceled */ }
       return
     }
@@ -75,6 +75,7 @@ test('refreshes Lever, rejects arbitrary source URLs, and cancels a late source 
   await radar.getByRole('textbox', { name: 'Target titles' }).fill('Platform Engineer')
   await radar.getByRole('button', { name: 'Save profile' }).click()
 
+  await radar.getByText('Advanced: add a company board').click()
   await radar.getByRole('textbox', { name: 'Public board identifier' }).fill('https://evil.example/jobs')
   await radar.getByRole('button', { name: 'Add source' }).click()
   await expect(radar.getByRole('alert')).toContainText('valid public board identifier')
@@ -93,8 +94,72 @@ test('refreshes Lever, rejects arbitrary source URLs, and cancels a late source 
   await radar.getByRole('button', { name: 'Refresh slow-board' }).click()
   await radar.getByRole('button', { name: 'Cancel refresh' }).click()
   await expect(radar.getByRole('status')).toContainText('Refresh canceled')
-  await page.waitForTimeout(600)
+  await page.waitForTimeout(2_100)
   await expect(radar.getByRole('heading', { name: 'Slow Role' })).toHaveCount(0)
+})
+
+test('derives a resume search and scans selected public marketplaces without a company input', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'Desktop market-search workflow')
+  await createTrustedDraft(page)
+  const discoveryBodies: Array<{ source: 'greenhouse' | 'lever'; sourceKey: string }> = []
+  await page.route('**/api/jobs/discover', async (route) => {
+    const body = route.request().postDataJSON() as { source: 'greenhouse' | 'lever'; sourceKey: string }
+    discoveryBodies.push(body)
+    await json(route, sourceResult(body.source, body.sourceKey, `${body.sourceKey} Platform Engineer`))
+  })
+
+  await page.goto('/en/jobs')
+  const radar = page.getByRole('application', { name: 'Job Radar' })
+  await expect(radar.getByRole('textbox', { name: 'Target titles' })).toHaveValue('Platform Engineer')
+  await expect(radar.getByRole('checkbox', { name: /Greenhouse/ })).toBeChecked()
+  await expect(radar.getByRole('checkbox', { name: /Lever/ })).toBeChecked()
+  await expect(radar.getByRole('link', { name: 'Search BOSS Zhipin' })).toHaveAttribute('href', /query=Platform\+Engineer/)
+
+  await radar.getByRole('checkbox', { name: /Lever/ }).uncheck()
+  await radar.getByRole('button', { name: 'Search selected platforms' }).click()
+  await expect(radar.getByRole('status')).toContainText('3 automatic sources')
+  await expect(radar.getByRole('heading', { name: /Platform Engineer/ })).toHaveCount(3)
+  expect(discoveryBodies).toEqual([
+    { source: 'greenhouse', sourceKey: 'discord' },
+    { source: 'greenhouse', sourceKey: 'webflow' },
+    { source: 'greenhouse', sourceKey: 'cockroachlabs' }
+  ])
+})
+
+test('brings a user-selected platform job into Target Job without fetching the page', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'Desktop Copilot handoff workflow')
+  await createTrustedDraft(page)
+  let discoveryRequests = 0
+  await page.route('**/api/jobs/discover', async (route) => {
+    discoveryRequests += 1
+    await route.abort()
+  })
+
+  await page.goto('/en/jobs')
+  const radar = page.getByRole('application', { name: 'Job Radar' })
+  await expect(radar.getByRole('textbox', { name: 'Target titles' })).toHaveValue('Platform Engineer')
+  await radar.getByRole('textbox', { name: 'Quick paste' }).fill(`
+Job title: Senior Platform Engineer
+Company: Example China
+Location: Shanghai
+URL: https://www.zhipin.com/job_detail/example.html
+Job description: Build TypeScript developer platforms and improve delivery reliability.
+  `)
+  await radar.getByRole('button', { name: 'Parse and prefill' }).click()
+  await expect(radar.getByRole('combobox', { name: 'Source platform' })).toHaveValue('boss')
+  await expect(radar.getByRole('textbox', { name: 'Official job URL' })).toHaveValue(
+    'https://www.zhipin.com/job_detail/example.html'
+  )
+  await expect(radar.getByRole('textbox', { name: 'Job title' })).toHaveValue('Senior Platform Engineer')
+  await expect(radar.getByRole('textbox', { name: 'Company' })).toHaveValue('Example China')
+  await radar.getByRole('button', { name: 'Import and analyze' }).click()
+
+  const targetJob = page.getByRole('application', { name: 'Target Job' })
+  await expect(targetJob.getByRole('textbox', { name: 'Job description' })).toHaveValue(
+    'Build TypeScript developer platforms and improve delivery reliability.'
+  )
+  await expect(targetJob.getByText(/Example China · Senior Platform Engineer was loaded/)).toBeVisible()
+  expect(discoveryRequests).toBe(0)
 })
 
 test('keeps the bilingual Job Radar route usable without horizontal overflow on mobile', async ({ page }, testInfo) => {

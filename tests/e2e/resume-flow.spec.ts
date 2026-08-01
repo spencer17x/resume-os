@@ -377,6 +377,7 @@ test('builds a reviewable Evidence Agent run and saves a variant without mutatin
   await radar.getByRole('textbox', { name: 'Profile name' }).fill('AI platform roles')
   await radar.getByRole('textbox', { name: 'Target titles' }).fill('Staff AI Platform Engineer')
   await radar.getByRole('button', { name: 'Save profile' }).click()
+  await radar.getByText('Advanced: add a company board').click()
   await radar.getByRole('textbox', { name: 'Public board identifier' }).fill('evidence-labs')
   await radar.getByRole('button', { name: 'Add source' }).click()
   await radar.getByRole('button', { name: 'Refresh evidence-labs' }).click()

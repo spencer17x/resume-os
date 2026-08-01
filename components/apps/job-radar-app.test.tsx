@@ -73,7 +73,7 @@ function trustedStorage() {
 function renderRadar(options: {
   store: IndexedDbDomainStore
   storage?: MemoryStorage | null
-  createAdapter?: () => JobSourceAdapter
+  createAdapter?: (kind: 'greenhouse' | 'lever') => JobSourceAdapter
 }) {
   return render(
     <NextIntlClientProvider locale="en" messages={en}>
@@ -96,12 +96,60 @@ describe('JobRadarApp', () => {
     renderRadar({ store })
 
     expect(await screen.findByText('Import or paste a trusted resume before matching jobs.')).toBeVisible()
+    expect(screen.getByRole('group', { name: 'Platforms to search' })).toBeVisible()
+    await user.click(screen.getByText('Advanced: add a company board'))
     await user.type(screen.getByLabelText('Public board identifier'), 'example')
     await user.click(screen.getByRole('button', { name: 'Add source' }))
 
     expect(await screen.findByText('Source added. Refresh it when you are ready.')).toBeVisible()
     expect(await store.list('jobPostings')).toEqual([])
     expect(screen.getByRole('button', { name: 'Refresh example' })).toBeVisible()
+  })
+
+  it('derives the initial search from the resume and searches selected automatic marketplaces', async () => {
+    const user = userEvent.setup()
+    const store = createStore()
+    const createAdapter = (kind: 'greenhouse' | 'lever'): JobSourceAdapter => ({
+      kind,
+      validateSourceKey: (value) => value,
+      recognizeUrl: () => null,
+      async refresh({ source }) {
+        return {
+          sourceId: source.id,
+          completeness: 'complete',
+          checkedAt: now,
+          postings: [{
+            ...posting,
+            id: `posting-${source.id}`,
+            sourceId: source.id,
+            externalId: `external-${source.sourceKey}`,
+            title: `${source.label} Platform Engineer`,
+            company: source.label,
+            contentHash: `hash:${source.id}`
+          }],
+          warnings: []
+        }
+      }
+    })
+    renderRadar({ store, storage: trustedStorage(), createAdapter })
+
+    expect(await screen.findByDisplayValue('Platform Engineer')).toBeVisible()
+    expect(screen.getByRole('checkbox', { name: /BOSS Zhipin/ })).toBeChecked()
+    expect(screen.getByRole('link', { name: 'Search BOSS Zhipin' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('query=Platform+Engineer')
+    )
+    await user.click(screen.getByRole('button', { name: 'Search selected platforms' }))
+
+    expect(await screen.findByText(/Market search complete: 8 automatic sources/)).toHaveTextContent(
+      '0 source failures'
+    )
+    expect(await store.list('jobSources')).toHaveLength(8)
+    expect(await store.list('jobPostings')).toHaveLength(8)
+    expect((await store.list('jobSearchProfiles'))[0]).toMatchObject({
+      platforms: ['greenhouse', 'lever', 'boss', '51job', '58'],
+      titles: ['Platform Engineer']
+    })
   })
 
   it('surfaces partial refreshes, scores jobs, and preserves a saved application when ignored later', async () => {

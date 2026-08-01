@@ -3207,7 +3207,7 @@ a {
 .job-radar-app__layout > aside section { display: grid; gap: 9px; padding: 16px; border-bottom: 1px solid var(--theme-line); }
 .job-radar-app h2 { font-size: 12px; letter-spacing: -.01em; }
 .job-radar-app aside label { display: grid; gap: 4px; color: var(--theme-muted); font-size: 10px; font-weight: 650; }
-.job-radar-app aside :is(input, select) {
+.job-radar-app aside :is(input, select, textarea) {
   width: 100%;
   min-height: 32px;
   border: 1px solid var(--theme-line);
@@ -3215,7 +3215,39 @@ a {
   background: var(--theme-panel-strong);
   padding: 6px 8px;
 }
+.job-radar-app aside textarea { min-height: 118px; resize: vertical; line-height: 1.5; }
 .job-radar-app aside > section > button { justify-self: start; border-color: color-mix(in srgb, var(--theme-accent) 58%, var(--theme-line)); }
+.job-radar-app__section-help,
+.job-radar-app__advanced > p,
+.job-radar-app__official-searches > p,
+.job-radar-app__progress { color: var(--theme-muted); font-size: 9px; line-height: 1.45; }
+.job-radar-app__platforms { display: grid; gap: 6px; margin: 0; border: 0; padding: 0; }
+.job-radar-app__platforms legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+.job-radar-app__platforms label {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  border: 1px solid var(--theme-line);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--theme-panel-strong) 72%, transparent);
+  padding: 8px;
+  cursor: pointer;
+}
+.job-radar-app__platforms label:has(input:checked) { border-color: color-mix(in srgb, var(--theme-accent) 58%, var(--theme-line)); background: color-mix(in srgb, var(--theme-accent) 7%, var(--theme-panel-strong)); }
+.job-radar-app aside .job-radar-app__platforms input { width: 15px; min-height: 15px; margin: 1px 0 0; accent-color: var(--theme-accent); }
+.job-radar-app__platforms span { min-width: 0; }
+.job-radar-app__platforms strong { display: block; color: var(--theme-fog); font-size: 10px; }
+.job-radar-app__platforms small { display: block; margin-top: 2px; color: var(--theme-muted); font-size: 8px; font-weight: 500; }
+.job-radar-app aside .job-radar-app__market-search { width: 100%; justify-self: stretch; border-color: color-mix(in srgb, var(--theme-accent) 64%, var(--theme-line)); background: color-mix(in srgb, var(--theme-accent) 10%, var(--theme-panel-strong)); }
+.job-radar-app__official-searches { display: grid; gap: 6px; border-top: 1px solid var(--theme-line); padding-top: 9px; }
+.job-radar-app__official-searches h3 { font-size: 10px; }
+.job-radar-app aside .job-radar-app__official-searches li { display: grid; justify-items: start; gap: 3px; }
+.job-radar-app__official-searches a { display: inline-flex; align-items: center; gap: 4px; color: var(--theme-accent-soft); font-size: 9px; text-decoration: none; }
+.job-radar-app__advanced { border-top: 1px solid var(--theme-line); padding-top: 9px; }
+.job-radar-app__advanced summary { color: var(--theme-fog); font-size: 10px; font-weight: 700; cursor: pointer; }
+.job-radar-app__advanced[open] { display: grid; gap: 8px; }
 .job-radar-app aside ul { display: grid; gap: 6px; }
 .job-radar-app aside li { display: flex; align-items: center; justify-content: space-between; gap: 8px; border-top: 1px solid var(--theme-line); padding-top: 7px; }
 .job-radar-app aside li span { min-width: 0; overflow-wrap: anywhere; font-size: 11px; }

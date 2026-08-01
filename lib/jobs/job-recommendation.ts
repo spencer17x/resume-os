@@ -136,6 +136,9 @@ function softPreferenceFit(posting: JobPosting, profile: JobSearchProfile, text:
     const matches = profile.preferredTerms.filter((term) => includesTerm(text, term)).length
     signals.push((matches / profile.preferredTerms.length) * 100)
   }
+  if ((profile.preferredCompanies?.length ?? 0) > 0) {
+    signals.push(profile.preferredCompanies!.some((company) => sameText(company, posting.company)) ? 100 : 0)
+  }
   return signals.length === 0 ? 0 : signals.reduce((total, value) => total + value, 0) / signals.length
 }
 

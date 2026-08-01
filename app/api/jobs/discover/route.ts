@@ -6,6 +6,7 @@ import { apiErrorResponse, guardAiRequest, type AiRequestGuard } from '@/lib/ser
 import { readLimitedJson, requestJsonErrorResponse } from '@/lib/server/request-json'
 
 const MAX_DISCOVER_BODY_BYTES = 1_024
+export const DEFAULT_DISCOVER_RATE_LIMIT = { limit: 30, windowMs: 60_000 } as const
 const discoverRequestSchema = z.object({
   source: z.enum(['greenhouse', 'lever']),
   sourceKey: z.string().trim().min(1).max(128)
@@ -20,7 +21,7 @@ export function createDiscoverJobsRoute(dependencies: {
   const guardRequest = dependencies.guard ?? guardAiRequest
   const adapters = dependencies.adapters ?? createJobSourceRegistry()
   const now = dependencies.now ?? (() => new Date().toISOString())
-  const rateLimit = dependencies.rateLimit ?? { limit: 10, windowMs: 60_000 }
+  const rateLimit = dependencies.rateLimit ?? DEFAULT_DISCOVER_RATE_LIMIT
 
   return async function discoverJobsRoute(request: Request) {
     const guarded = guardRequest(request, {

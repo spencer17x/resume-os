@@ -50,7 +50,7 @@ export async function refreshJobSource(input: {
       }
       await transaction.put('jobSources', {
         ...source,
-        createdAt: existingSource?.createdAt ?? source.createdAt,
+        createdAt: existingSource?.createdAt ?? result.checkedAt,
         updatedAt: result.checkedAt
       })
 

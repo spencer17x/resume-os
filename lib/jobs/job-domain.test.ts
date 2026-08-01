@@ -115,6 +115,19 @@ describe('job domain schemas', () => {
       ...profile,
       updatedAt: '2026-07-31T08:00:00.000Z'
     }).success).toBe(false)
+    expect(jobSearchProfileSchema.safeParse({
+      ...profile,
+      platforms: ['greenhouse', 'greenhouse']
+    }).success).toBe(false)
+  })
+
+  it('keeps older stored search profiles valid while accepting platform scope', () => {
+    expect(jobSearchProfileSchema.parse(profile)).toEqual(profile)
+    expect(jobSearchProfileSchema.parse({
+      ...profile,
+      platforms: ['greenhouse', 'lever', 'boss'],
+      preferredCompanies: ['Example']
+    })).toMatchObject({ platforms: ['greenhouse', 'lever', 'boss'], preferredCompanies: ['Example'] })
   })
 
   it('requires HTTPS job URLs without embedded credentials', () => {

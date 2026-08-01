@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { jobMarketplaceIdSchema } from './job-marketplace'
 
 export const JOB_SOURCE_KINDS = ['greenhouse', 'lever', 'manual'] as const
 export const JOB_WORKPLACE_TYPES = ['remote', 'hybrid', 'onsite'] as const
@@ -99,6 +100,9 @@ export const jobSourceSchema = z.object({
 export const jobSearchProfileSchema = z.object({
   id: stableIdSchema,
   name: boundedLabelSchema,
+  platforms: z.array(jobMarketplaceIdSchema).min(1).max(5)
+    .superRefine((values, context) => addDuplicateIssues(values, context, 'Platforms must be unique'))
+    .optional(),
   titles: uniqueTermsSchema(30).min(1),
   adjacentTitles: uniqueTermsSchema(30),
   locations: uniqueTermsSchema(50),
@@ -110,6 +114,7 @@ export const jobSearchProfileSchema = z.object({
   requiredTerms: uniqueTermsSchema(100),
   preferredTerms: uniqueTermsSchema(100),
   excludedTerms: uniqueTermsSchema(100),
+  preferredCompanies: uniqueTermsSchema(50).optional(),
   maximumAgeDays: z.number().int().min(1).max(365),
   createdAt: timestampSchema,
   updatedAt: timestampSchema

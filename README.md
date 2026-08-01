@@ -2,7 +2,7 @@
 
 [Live Demo](https://resume-os-phi.vercel.app/en) · [中文体验](https://resume-os-phi.vercel.app/zh) · [Deployment and data boundaries](docs/deployment.md)
 
-Resume OS is a local-first, evidence-grounded job-search and resume-tailoring agent. Job Radar can refresh configured Greenhouse and Lever public boards, rank roles locally against a saved career profile, and hand a selected role into the existing reviewable resume workflow. The master resume is not silently rewritten, and Resume OS never submits an application on the user's behalf.
+Resume OS is a local-first, evidence-grounded job-search Copilot. It turns a trusted resume into cross-platform search entry points, refreshes reviewed public sources where automatic access is available, lets the user bring a promising marketplace job back into one local inbox, and carries that job through reviewable resume tailoring and application tracking. The master resume is not silently rewritten, and Resume OS never submits an application on the user's behalf.
 
 The product is built around four principles:
 
@@ -14,8 +14,8 @@ The product is built around four principles:
 The primary workflow is:
 
 1. Import or paste an existing resume in Resume Studio.
-2. Add authorized public Greenhouse or Lever boards in Job Radar and explicitly refresh them.
-3. Review deterministic preliminary relevance, save a role, and promote it to Target Job.
+2. Choose job platforms in Job Radar; Resume OS derives an initial search, refreshes reviewed public sources, and opens fixed-host searches for restricted platforms.
+3. Select a promising role on a platform and paste its official URL and job description back into Job Radar, or choose an automatically discovered role. Resume OS ranks it locally and promotes it to Target Job.
 4. Confirm every extracted requirement and inspect the evidence and gaps.
 5. Ask the Resume Agent for job-specific, reviewable changes.
 6. Verify each claim and apply selected changes to a separate resume variant.
@@ -118,12 +118,31 @@ Uploaded PDF/DOCX/TXT bytes are processed transiently by the same-origin extract
 
 ## Job Radar source and submission boundary
 
-Job Radar supports user-triggered reads from two documented public source classes:
+Job Radar starts from the resume rather than a required target company. Users can select Greenhouse, Lever, BOSS Zhipin, 51job, and 58.com. Platform selection is capability-aware:
+
+- Greenhouse and Lever are automatic sources backed by a bundled, reviewed company-board catalog; users may optionally add another public company board in Advanced settings.
+- BOSS Zhipin and 51job open fixed-host official searches carrying the primary target title where supported. Resume OS does not scrape or automate their signed-in products.
+- 58.com opens the official jobs product and is labeled as requiring an approved Open Platform partnership before automatic access can be enabled.
+
+For a role selected on one of these platforms, the user may paste its official HTTPS
+URL, title, company, location, and description into Job Radar. The URL is accepted only
+when its hostname matches the selected platform. Resume OS never fetches that URL,
+reads the platform session, or infers data the user did not provide. The imported role
+is stored locally, scored against the active search profile, and handed directly to
+Target Job for evidence review.
+
+The quick-paste helper can parse a labeled job share (`Job title`, `Company`,
+`Location`, `URL`, and `Job description`, with Chinese equivalents) entirely in the
+browser and prefill the reviewable import form. Unlabeled plain text is treated only
+as a description proposal; Resume OS does not guess missing identity fields or import
+until the user reviews the form and presses the explicit action.
+
+The automatic source classes remain:
 
 - Greenhouse Job Board API at the fixed `boards-api.greenhouse.io` host;
 - Lever Postings API at the fixed `api.lever.co` host.
 
-The browser calls only the same-origin `/api/jobs/discover` route with a strict provider enum and a bounded public board identifier. The route constructs the upstream URL itself, uses HTTPS GET without cookies or credentials, rejects redirects, limits the request to 1 KiB, limits an upstream response to 2 MiB and 500 postings, applies a 15-second timeout and per-process rate limit, and returns normalized records. It does not accept arbitrary URLs, headers, authorization data, or resume/career content.
+The bundled catalog is a versioned source seed, not a server-side job database. A market search refreshes at most ten selected automatic sources. The browser calls only the same-origin `/api/jobs/discover` route with a strict provider enum and a bounded public board identifier. The route constructs the upstream URL itself, uses HTTPS GET without cookies or credentials, rejects redirects, limits the request to 1 KiB, limits an upstream response to 2 MiB and 500 postings, applies a 15-second timeout and per-process rate limit, and returns normalized records. It does not accept arbitrary URLs, headers, authorization data, or resume/career content.
 
 Refresh is manual and runs only while the browser request is active; Resume OS does not promise background discovery after the browser closes. Partial source responses are shown as warnings and do not close missing postings. Matching and application state stay in IndexedDB. Demo/Sandbox resumes cannot enter the real application flow.
 

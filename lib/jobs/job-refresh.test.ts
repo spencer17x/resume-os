@@ -47,6 +47,26 @@ describe('refreshJobSource', () => {
     expect(await store.get('jobPostings', 'posting-1')).toMatchObject({ firstSeenAt: first, lastCheckedAt: second })
   })
 
+  it('anchors a newly persisted source to its first check when the client clock is ahead', async () => {
+    const store = createStore()
+    const clientAheadSource = { ...source, createdAt: second, updatedAt: second }
+    await refreshJobSource({
+      source: clientAheadSource,
+      adapter: adapter({
+        sourceId: source.id,
+        completeness: 'complete',
+        checkedAt: first,
+        postings: [posting('1')],
+        warnings: []
+      }),
+      store
+    })
+    expect(await store.get('jobSources', source.id)).toMatchObject({
+      createdAt: first,
+      updatedAt: first
+    })
+  })
+
   it('closes missing jobs only after a complete refresh', async () => {
     const store = createStore()
     await refreshJobSource({
