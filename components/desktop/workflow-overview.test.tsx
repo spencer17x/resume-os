@@ -61,8 +61,8 @@ describe('WorkflowOverview', () => {
     expect(screen.getByText('62.5%')).toBeVisible()
     expect(screen.getByText('75%')).toBeVisible()
     expect(screen.getByText('resume-os-alignment-v1')).toBeVisible()
-    expect(screen.getByRole('heading', { name: 'Stage 04: Review & Export' })).toBeVisible()
-    expect(screen.getByRole('heading', { name: 'Stage 05: Settings' })).toBeVisible()
+    expect(screen.getByRole('heading', { name: 'Stage 05: Review & Export' })).toBeVisible()
+    expect(screen.getByRole('heading', { name: 'Stage 06: Settings' })).toBeVisible()
     fireEvent.click(screen.getByRole('button', { name: 'Continue Agent run' }))
     expect(mocks.openApp).toHaveBeenCalledWith('agent')
   })
@@ -97,8 +97,8 @@ describe('WorkflowOverview', () => {
     )
 
     expect(await screen.findByText('Add a job description to focus the analysis')).toBeVisible()
-    fireEvent.click(screen.getByRole('button', { name: 'Open Target Job' }))
-    expect(mocks.openApp).toHaveBeenCalledWith('jd-match')
+    fireEvent.click(screen.getByRole('button', { name: 'Explore Job Radar' }))
+    expect(mocks.openApp).toHaveBeenCalledWith('jobs')
   })
 
   it('keeps Demo and AI-created drafts outside the verified Career Profile workflow', async () => {

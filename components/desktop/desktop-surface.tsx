@@ -12,6 +12,7 @@ import { WorkflowOverview } from './workflow-overview'
 const desktopApps = Object.values(appRegistry).filter((app) => app.desktop)
 const launcherOrder = [
   'studio',
+  'jobs',
   'agent',
   'jd-match',
   'resume-3d',

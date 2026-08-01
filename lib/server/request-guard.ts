@@ -26,6 +26,10 @@ export type ApiErrorCode =
   | 'AI_OUTPUT_INVALID'
   | 'AI_OUTPUT_TOO_LARGE'
   | 'REQUEST_ABORTED'
+  | 'JOB_SOURCE_INVALID'
+  | 'JOB_SOURCE_UNAVAILABLE'
+  | 'JOB_SOURCE_RESPONSE_TOO_LARGE'
+  | 'JOB_SOURCE_TIMEOUT'
 
 const apiErrorMessages: Record<ApiErrorCode, string> = {
   AI_PUBLIC_ACCESS_DISABLED: 'Public AI access is disabled.',
@@ -46,7 +50,11 @@ const apiErrorMessages: Record<ApiErrorCode, string> = {
   AI_UNAVAILABLE: 'AI service is temporarily unavailable.',
   AI_OUTPUT_INVALID: 'AI service returned an invalid response.',
   AI_OUTPUT_TOO_LARGE: 'AI service response exceeded the allowed size.',
-  REQUEST_ABORTED: 'Request was cancelled.'
+  REQUEST_ABORTED: 'Request was cancelled.',
+  JOB_SOURCE_INVALID: 'Job source configuration is invalid.',
+  JOB_SOURCE_UNAVAILABLE: 'Job source is temporarily unavailable.',
+  JOB_SOURCE_RESPONSE_TOO_LARGE: 'Job source response exceeded the allowed size.',
+  JOB_SOURCE_TIMEOUT: 'Job source request timed out.'
 }
 
 export function apiErrorResponse(

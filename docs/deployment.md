@@ -8,7 +8,7 @@ Resume OS is a local-first Evidence Agent with a stateless Next.js service bound
 | --- | --- | --- |
 | Browser | Desktop/mobile UI, drafts, Career Evidence, requirement matrix, deterministic scoring, agent-run state, approvals, variants, provider selection | `localStorage` and IndexedDB for this origin |
 | Chrome Built-in AI (Beta) | Supported structured tasks through the browser `LanguageModel` API | Model lifecycle is managed by Chrome; Resume OS does not copy the model into its database |
-| Next.js route handlers | Same-origin request validation, PDF/DOCX/TXT extraction, OpenAI-compatible request execution, schema/error normalization | None; request-scoped processing only |
+| Next.js route handlers | Same-origin request validation, bounded Greenhouse/Lever public-job discovery, PDF/DOCX/TXT extraction, OpenAI-compatible request execution, schema/error normalization | None; request-scoped processing only |
 | User-configured OpenAI-compatible provider | Cloud inference for explicitly selected cloud tasks | Governed by that provider's policy, not by Resume OS |
 
 The application has no server-side user database, ORM, account system, authentication session, vector database, or cloud-sync layer. Serverless Function instances may be created or discarded without losing the user's saved workspace because that workspace remains in the browser. Changing domains, subdomains, browser profiles, or site-storage partitions creates a different local workspace.
@@ -32,11 +32,27 @@ This is structured evidence retrieval for a resume-tailoring domain. It is inten
 | Evidence sources and career facts | IndexedDB | Imported facts remain visually unconfirmed until reviewed; original file bytes are rejected by the schema |
 | Target jobs, requirements, mappings | IndexedDB | Powers reviewable requirement matrices and deterministic alignment |
 | Resume variants and optimization runs | IndexedDB | Enables job-specific versions and resumable state transitions |
+| Job sources, search profiles, public postings, recommendations, application records | IndexedDB | Public job content plus local decisions and packet references; no platform sessions or credentials |
 | Active workflow pointer and UI preferences | `localStorage` | Theme, motion, desktop layout, locale/provider preference |
 | Provider Base URL/model | `localStorage` | Per browser origin |
 | BYOK API key | `sessionStorage` by default | Moves to `localStorage` only after explicit device-persistence consent |
 
 If IndexedDB is unavailable, Resume OS reports that Career Evidence or agent state was not saved; it must not display an in-memory result as durable. Deletion checks are restrictive: a draft, fact, requirement, job, or variant referenced by saved agent data is not silently cascaded away.
+
+## Public job discovery boundary
+
+`POST /api/jobs/discover` is a stateless same-origin proxy for dedicated Greenhouse and Lever adapters. Its request schema contains only `source: "greenhouse" | "lever"` and a public `sourceKey` of at most 128 restricted characters. It never accepts a URL, custom host, request headers, cookies, credentials, resume data, or career facts.
+
+The adapters construct only these upstream requests:
+
+- `GET https://boards-api.greenhouse.io/v1/boards/{sourceKey}/jobs?content=true`
+- `GET https://api.lever.co/v0/postings/{sourceKey}?mode=json`
+
+Upstream requests use manual redirect handling and no credentials. Exact HTTPS hosts are fixed in code; response bodies are streamed with a 2 MiB limit, the source collection is limited to 500 postings, and the default timeout is 15 seconds. The same-origin request body is limited to 1 KiB and the route uses a 10-request-per-minute in-process bucket. A public deployment must include `/api/jobs/discover` in its platform/distributed rate-limit policy because serverless instances do not share process memory.
+
+The server returns normalized public posting data and does not persist it. The browser commits a refresh to IndexedDB only after the adapter completes and cancellation/stale checks pass. A complete response may close a disappeared posting; a partial response may not. Do not add another provider through a generic fetcher: review its official documentation and terms, add a dedicated exact-host adapter, and cover both allowed and rejected paths first.
+
+No authenticated job marketplace is supported. The application does not store or replay session cookies, solve CAPTCHAs, automate final forms, infer submission from a page visit, or submit in the background. Final submission remains a user action on the employer site followed by a separate explicit local confirmation.
 
 ## AI provider policy
 
@@ -70,6 +86,7 @@ Chrome does not currently guarantee Chinese as a Prompt API input or output lang
 
 ## Data that crosses the device boundary
 
+- A Job Radar refresh sends the configured public provider enum and board identifier to the same-origin discovery route. That route fetches public posting data from the fixed official host. Resume drafts, career facts, recommendation scores, application notes, and application status are not included in source requests.
 - A PDF/DOCX/TXT upload is sent to the same-origin extraction route. Bytes are processed transiently and are not stored by Resume OS. The route returns extracted text.
 - Pasted or extracted raw resume text is processed in the browser when Chrome Built-in AI is selected. It is sent through the same-origin parse route to the configured OpenAI-compatible provider only when that provider is explicitly selected or Automatic mode has saved fallback consent and the local model is unavailable or over its context budget.
 - Demo / Sandbox generation follows the same saved provider preference. Locally generated and cloud-generated demo resumes are both classified as `ai-generated` and never become verified Career Evidence.
@@ -238,10 +255,10 @@ Vercel is the supported zero-server-management topology because it runs the Next
 3. Build from source on the GitHub-hosted Linux runner. The release workflow uses `vercel build --prod` and `vercel deploy --prebuilt --prod`; do not upload a `.next` output built on macOS because PDF extraction includes platform-native canvas code.
 4. Set `RESUME_OS_TRUSTED_PROXY=vercel` in Preview and Production. Keep `RESUME_OS_LOCAL_ONLY` unset.
 5. Add only the exact additional BYOK provider hosts users need. Treat this list as an SSRF boundary.
-6. Add a Vercel Firewall or another distributed rate limit for `/api/`. The built-in process-memory limiter is defense-in-depth and is not shared by serverless instances.
+6. Add a Vercel Firewall or another distributed rate limit for `/api/`, including `/api/jobs/discover`. The built-in process-memory limiter is defense-in-depth and is not shared by serverless instances.
 7. After explicit release creation, dispatch the Release workflow with the existing `vX.Y.Z` tag and confirm that tagged quality validation and the Production deployment both succeed.
 8. Open Settings on Production, select the intended provider mode, and run the corresponding AI check.
-9. Import both a TXT and a representative PDF/DOCX; complete a JD analysis, save an agent run, reload, and verify IndexedDB recovery on the deployed origin.
+9. Import both a TXT and a representative PDF/DOCX; add synthetic Greenhouse and Lever test boards, verify manual refresh/cancellation, complete a JD analysis and application packet, reload, and verify IndexedDB recovery on the deployed origin. Do not use a real resume in test artifacts.
 
 ### Complete-function conditions
 
@@ -266,6 +283,8 @@ corepack pnpm@11.17.0 test:production-extraction
 ```
 
 For a public deployment, also verify the browser network panel: Chrome-local tasks must not call cloud routes, Automatic mode with fallback disabled must stop locally, and cloud tasks must call only the same-origin API before the configured provider.
+
+For Job Radar, verify that refresh calls only `/api/jobs/discover`, the server calls only the fixed Greenhouse/Lever hosts, cancellation leaves no partial browser commit, career data is absent from the request, opening an application URL does not mark it submitted, and an explicit submitted confirmation is required.
 
 ## GitHub Pages boundary
 

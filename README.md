@@ -2,7 +2,7 @@
 
 [Live Demo](https://resume-os-phi.vercel.app/en) · [中文体验](https://resume-os-phi.vercel.app/zh) · [Deployment and data boundaries](docs/deployment.md)
 
-Resume OS is a local-first, evidence-grounded agent for tailoring a resume to a target job. It compares a saved structured resume with a job description, proposes focused changes, and keeps every AI suggestion reviewable before it can create a separate job-specific version. The master resume is not silently rewritten.
+Resume OS is a local-first, evidence-grounded job-search and resume-tailoring agent. Job Radar can refresh configured Greenhouse and Lever public boards, rank roles locally against a saved career profile, and hand a selected role into the existing reviewable resume workflow. The master resume is not silently rewritten, and Resume OS never submits an application on the user's behalf.
 
 The product is built around four principles:
 
@@ -14,9 +14,12 @@ The product is built around four principles:
 The primary workflow is:
 
 1. Import or paste an existing resume in Resume Studio.
-2. Add a target job description and inspect the evidence and gaps.
-3. Ask the Resume Agent for job-specific, reviewable changes.
-4. Verify each claim, apply selected changes, and export the resulting resume.
+2. Add authorized public Greenhouse or Lever boards in Job Radar and explicitly refresh them.
+3. Review deterministic preliminary relevance, save a role, and promote it to Target Job.
+4. Confirm every extracted requirement and inspect the evidence and gaps.
+5. Ask the Resume Agent for job-specific, reviewable changes.
+6. Verify each claim and apply selected changes to a separate resume variant.
+7. Check the local application packet, open the employer site yourself, and explicitly mark it submitted only after completing the application.
 
 Simulated resume generation is a **Demo / Sandbox** for exploring the interface. It does not represent verified user history and should not be used as the evidence source for a real application.
 
@@ -44,13 +47,14 @@ There is currently no embedding pipeline, vector database, document chunk index,
 - Vercel AI SDK / OpenAI-compatible BYOK
 - Chrome Built-in AI `LanguageModel` adapter (Beta)
 - `localStorage` for drafts and preferences
-- IndexedDB for evidence, requirements, mappings, variants, and resumable agent runs
+- IndexedDB for evidence, jobs, recommendations, application records, requirements, mappings, variants, and resumable agent runs
 
 ## Routes
 
 ```text
 /{locale}                 Desktop or mobile workflow home
 /{locale}/studio          Resume import, drafts, and Demo / Sandbox generation
+/{locale}/jobs            Job Radar sources, recommendations, and applications
 /{locale}/agent           Evidence-grounded Resume Agent
 /{locale}/jd-match        Target-job evidence and gap analysis
 /{locale}/3d              Three.js resume scene
@@ -80,7 +84,7 @@ quality workflow, so run the relevant checks directly before committing or
 pushing. There is no required whole-tree Prettier/ESLint gate; keep formatting
 consistent with nearby files.
 
-The supported local runtime is Node.js 24.18.0 (`>=24.18.0 <25`).
+The supported local runtime is Node.js 24.16.0 (`>=24.16.0 <25`).
 
 `pnpm dev` binds to `127.0.0.1:3001`. When that port is owned by another process, use a separate loopback port without killing an unrelated service:
 
@@ -105,12 +109,25 @@ Resume OS does not require a server-side database, account system, or cloud-sync
 | Data | Storage | Sent off-device? |
 | --- | --- | --- |
 | Structured resume drafts and snapshots | `localStorage` | Only when required by an explicitly selected cloud AI task |
-| Career evidence, target jobs, requirements, mappings, variants, agent runs | IndexedDB | Only the context required by an explicitly selected cloud AI task |
+| Career evidence, public postings, recommendations, application records, target jobs, requirements, mappings, variants, agent runs | IndexedDB | Job-source refresh sends only the configured public board identifier; career context leaves the device only for an explicitly selected cloud AI task |
 | Provider choice, theme, motion, desktop layout | `localStorage` | No |
 | OpenAI-compatible Base URL and model | `localStorage` | Included with same-origin AI requests |
 | BYOK API key | `sessionStorage` by default; `localStorage` only after explicit “remember” consent | Relayed through the same-origin route to the configured provider; never persisted by Resume OS server code |
 
 Uploaded PDF/DOCX/TXT bytes are processed transiently by the same-origin extraction route and are not written to the domain store. The original document bytes are not stored in IndexedDB. Clearing site data, using a different browser profile, or moving to a different deployment origin produces a separate local workspace unless the user exports or migrates it separately.
+
+## Job Radar source and submission boundary
+
+Job Radar supports user-triggered reads from two documented public source classes:
+
+- Greenhouse Job Board API at the fixed `boards-api.greenhouse.io` host;
+- Lever Postings API at the fixed `api.lever.co` host.
+
+The browser calls only the same-origin `/api/jobs/discover` route with a strict provider enum and a bounded public board identifier. The route constructs the upstream URL itself, uses HTTPS GET without cookies or credentials, rejects redirects, limits the request to 1 KiB, limits an upstream response to 2 MiB and 500 postings, applies a 15-second timeout and per-process rate limit, and returns normalized records. It does not accept arbitrary URLs, headers, authorization data, or resume/career content.
+
+Refresh is manual and runs only while the browser request is active; Resume OS does not promise background discovery after the browser closes. Partial source responses are shown as warnings and do not close missing postings. Matching and application state stay in IndexedDB. Demo/Sandbox resumes cannot enter the real application flow.
+
+Resume OS prepares a checked local packet and opens the original employer application URL in a new tab. Opening that page never changes the application status. Only the separate user action “I submitted this application” records `applied` and `submittedAt`. Authenticated marketplace scraping, cookie reuse, CAPTCHA bypass, screening-answer invention, browser form submission, and unattended or bulk applications are outside the product boundary.
 
 ## AI providers and no-silent-fallback policy
 

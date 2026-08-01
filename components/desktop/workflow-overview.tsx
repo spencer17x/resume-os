@@ -4,6 +4,7 @@ import {
   ArrowRight,
   BriefcaseBusiness,
   FileCheck2,
+  Radar,
   ScanSearch,
   Settings2,
   UserRoundCheck
@@ -32,19 +33,20 @@ export function WorkflowOverview({ compact = false, hud = false }: { compact?: b
     && workflow.run.sourceDraftId === activeDraft.id
   )
   const hasVariant = Boolean(hasTarget && workflow?.run.stage === 'applied')
-  const nextApp = !hasProfile ? 'studio' : !hasTarget ? 'jd-match' : !hasVariant ? 'agent' : 'classic'
-  const actionLabel = !hasProfile ? t('openProfile') : !hasTarget ? t('openTarget') : !hasVariant ? t('openAgent') : t('openReview')
+  const nextApp = !hasProfile ? 'studio' : !hasTarget ? 'jobs' : !hasVariant ? 'agent' : 'classic'
+  const actionLabel = !hasProfile ? t('openProfile') : !hasTarget ? t('openJobs') : !hasVariant ? t('openAgent') : t('openReview')
   const nextLabel = !hasProfile
     ? hasUnverifiedDraft ? t('nextVerifiedProfile') : t('nextProfile')
-    : !hasTarget ? t('nextTarget') : !hasVariant ? t('nextAgent') : t('nextReview')
+    : !hasTarget ? t('nextJobs') : !hasVariant ? t('nextAgent') : t('nextReview')
 
   if (hud) {
     const hudStages = [
       { number: '01', title: t('profileTitle'), state: hasProfile ? 'ready' : 'next' },
-      { number: '02', title: t('targetTitle'), state: hasTarget ? 'ready' : hasProfile ? 'next' : 'locked' },
-      { number: '03', title: t('agentTitle'), state: hasVariant ? 'ready' : hasTarget ? 'next' : 'locked' },
-      { number: '04', title: t('reviewTitle'), state: hasVariant ? 'next' : 'locked' },
-      { number: '05', title: t('settingsTitle'), state: 'ready' }
+      { number: '02', title: t('jobsTitle'), state: hasTarget ? 'ready' : hasProfile ? 'next' : 'locked' },
+      { number: '03', title: t('targetTitle'), state: hasTarget ? 'ready' : 'locked' },
+      { number: '04', title: t('agentTitle'), state: hasVariant ? 'ready' : hasTarget ? 'next' : 'locked' },
+      { number: '05', title: t('reviewTitle'), state: hasVariant ? 'next' : 'locked' },
+      { number: '06', title: t('settingsTitle'), state: 'ready' }
     ] as const
     const stageStateLabels = {
       ready: t('stageStateReady'),
@@ -116,18 +118,26 @@ export function WorkflowOverview({ compact = false, hud = false }: { compact?: b
           </div>
         </article>
         <article data-state={hasTarget ? 'ready' : hasProfile ? 'next' : 'locked'}>
-          <BriefcaseBusiness size={17} aria-hidden="true" />
+          <Radar size={17} aria-hidden="true" />
           <span>02</span>
           <div>
-            <h2 aria-label={t('stageLabel', { number: '02', title: t('targetTitle') })}>{t('targetTitle')}</h2>
+            <h2 aria-label={t('stageLabel', { number: '02', title: t('jobsTitle') })}>{t('jobsTitle')}</h2>
+            <p>{hasTarget ? t('jobsReady') : t('jobsMissing')}</p>
+          </div>
+        </article>
+        <article data-state={hasTarget ? 'ready' : 'locked'}>
+          <BriefcaseBusiness size={17} aria-hidden="true" />
+          <span>03</span>
+          <div>
+            <h2 aria-label={t('stageLabel', { number: '03', title: t('targetTitle') })}>{t('targetTitle')}</h2>
             <p>{hasTarget ? t('targetReady', { title: workflow?.targetJob.title ?? '' }) : t('targetMissing')}</p>
           </div>
         </article>
         <article data-state={hasVariant ? 'ready' : hasTarget ? 'next' : 'locked'}>
           <FileCheck2 size={17} aria-hidden="true" />
-          <span>03</span>
+          <span>04</span>
           <div>
-            <h2 aria-label={t('stageLabel', { number: '03', title: t('agentTitle') })}>{t('agentTitle')}</h2>
+            <h2 aria-label={t('stageLabel', { number: '04', title: t('agentTitle') })}>{t('agentTitle')}</h2>
             <p>{hasTarget && workflow
               ? t(`agentStages.${workflow.run.stage}`)
               : t('agentWaiting')}</p>
@@ -135,17 +145,17 @@ export function WorkflowOverview({ compact = false, hud = false }: { compact?: b
         </article>
         <article data-state={hasVariant ? 'next' : 'locked'}>
           <ScanSearch size={17} aria-hidden="true" />
-          <span>04</span>
+          <span>05</span>
           <div>
-            <h2 aria-label={t('stageLabel', { number: '04', title: t('reviewTitle') })}>{t('reviewTitle')}</h2>
+            <h2 aria-label={t('stageLabel', { number: '05', title: t('reviewTitle') })}>{t('reviewTitle')}</h2>
             <p>{hasVariant ? t('reviewReady') : t('reviewWaiting')}</p>
           </div>
         </article>
         <article data-state="ready">
           <Settings2 size={17} aria-hidden="true" />
-          <span>05</span>
+          <span>06</span>
           <div>
-            <h2 aria-label={t('stageLabel', { number: '05', title: t('settingsTitle') })}>{t('settingsTitle')}</h2>
+            <h2 aria-label={t('stageLabel', { number: '06', title: t('settingsTitle') })}>{t('settingsTitle')}</h2>
             <p>{t('settingsReady')}</p>
           </div>
         </article>

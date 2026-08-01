@@ -159,7 +159,7 @@ test('mobile Home exits a nested app and restores only the iOS app grid', async 
 
   await expect(page).toHaveURL(/\/en$/)
   await expect(page.getByRole('main', { name: 'Resume OS' })).toBeVisible()
-  await expect(page.locator('.mobile-home__app')).toHaveCount(10)
+  await expect(page.locator('.mobile-home__app')).toHaveCount(11)
   await expect(page.locator('.mobile-app-frame')).toHaveCount(0)
   await expect(page.locator('.mobile-app-frame__bar')).toHaveCount(0)
   await expect(page.locator('.desktop-app-content')).toHaveCount(0)

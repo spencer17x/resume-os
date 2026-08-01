@@ -42,6 +42,13 @@ import type {
   ActiveWorkflowSummary
 } from '@/lib/agent/workflow-persistence'
 import type { AppId } from '@/lib/desktop/types'
+import {
+  clearJobPromotionIntent,
+  completeJobPromotion,
+  loadBrowserJobPromotion,
+  type JobPromotionIntent
+} from '@/lib/jobs/job-promotion'
+import type { JobPosting } from '@/lib/jobs/job-domain'
 import { createResumeId } from '@/lib/resume-model'
 import {
   ChromeBuiltInAiError,
@@ -87,18 +94,32 @@ export type JDMatchStalePersistence = (input: {
 }) => Promise<void>
 
 export type JDMatchWorkflowSummaryLoader = () => Promise<ActiveWorkflowSummary | null>
+export type JDMatchPromotionLoader = (activeDraft: { id: string; source: string }) => Promise<{
+  intent: JobPromotionIntent
+  posting: JobPosting
+  closed: boolean
+} | null>
+export type JDMatchPromotionCompletion = (input: {
+  intent: JobPromotionIntent
+  targetJobId: string
+  now: string
+}) => Promise<void>
 
 export function JDMatchApp({
   workflowPersistence = persistWorkflow,
   requirementPersistence = persistRequirementCorrection,
   stalePersistence = persistStaleWorkflow,
-  workflowSummaryLoader = loadActiveWorkflowSummary
+  workflowSummaryLoader = loadActiveWorkflowSummary,
+  promotionLoader = loadPromotion,
+  promotionCompletion = persistPromotionCompletion
 }: {
   appId?: AppId
   workflowPersistence?: JDMatchWorkflowPersistence
   requirementPersistence?: JDMatchRequirementPersistence
   stalePersistence?: JDMatchStalePersistence
   workflowSummaryLoader?: JDMatchWorkflowSummaryLoader
+  promotionLoader?: JDMatchPromotionLoader
+  promotionCompletion?: JDMatchPromotionCompletion
 } = {}) {
   const locale = useLocale() as 'zh' | 'en'
   const t = useTranslations('jdMatch')
@@ -112,7 +133,9 @@ export function JDMatchApp({
   const [persistenceMessage, setPersistenceMessage] = useState('')
   const [correctingRequirementId, setCorrectingRequirementId] = useState('')
   const [workflowSaving, setWorkflowSaving] = useState(false)
+  const [promotion, setPromotion] = useState<{ intent: JobPromotionIntent; posting: JobPosting; closed: boolean } | null>(null)
   const stalePersistenceRef = useRef('')
+  const promotionLoadRef = useRef(0)
   const workflowRefreshSequenceRef = useRef(0)
   const requestRef = useRef<{ id: number; controller: AbortController; context: string } | null>(null)
   const activeRef = useRef(activeDraft)
@@ -198,6 +221,23 @@ export function JDMatchApp({
     reportState?.workflowPreference,
     workflowSummaryLoader
   ])
+  useEffect(() => {
+    if (!activeDraft) return
+    const sequence = ++promotionLoadRef.current
+    let active = true
+    void promotionLoader(activeDraft).then((value) => {
+      if (!active || sequence !== promotionLoadRef.current || !value) return
+      setPromotion(value)
+      setJd(value.posting.description)
+      setPersistenceMessage(value.closed ? t('promotionClosed') : t('promotionLoaded', {
+        title: value.posting.title,
+        company: value.posting.company
+      }))
+    }).catch(() => {
+      if (active && sequence === promotionLoadRef.current) setError(t('promotionInvalid'))
+    })
+    return () => { active = false }
+  }, [activeDraft, promotionLoader, t])
 
   if (!activeDraft) {
     return (
@@ -360,7 +400,22 @@ export function JDMatchApp({
       }
       saveActiveWorkflowPreference(preference)
       setReportState({ ...current, analysis, workflowPreference: preference })
-      setPersistenceMessage(t('savedWorkflow'))
+      if (promotion) {
+        try {
+          await promotionCompletion({
+            intent: promotion.intent,
+            targetJobId: preference.targetJobId,
+            now: new Date().toISOString()
+          })
+          clearJobPromotionIntent()
+          setPromotion(null)
+          setPersistenceMessage(t('savedPromotedWorkflow'))
+        } catch {
+          setPersistenceMessage(t('promotionLinkFailed'))
+        }
+      } else {
+        setPersistenceMessage(t('savedWorkflow'))
+      }
     } catch {
       setPersistenceMessage(t('localSaveFailed'))
     } finally {
@@ -393,6 +448,15 @@ export function JDMatchApp({
             </div>
           </aside>
         ) : null}
+        {promotion ? <aside className="resume-app-sandbox-warning" role="note">
+          <BriefcaseBusiness size={15} aria-hidden="true" />
+          <div>
+            <strong>{t('promotionTitle')}</strong>
+            <p>{promotion.closed
+              ? t('promotionClosed')
+              : t('promotionLoaded', { title: promotion.posting.title, company: promotion.posting.company })}</p>
+          </div>
+        </aside> : null}
         <label htmlFor="jd-match-input">{t('jobDescription')}</label>
         <textarea
           id="jd-match-input"
@@ -471,6 +535,19 @@ async function persistWorkflow(input: Parameters<JDMatchWorkflowPersistence>[0])
       targetJobId: result.run.targetJobId,
       optimizationRunId: result.run.id
     }
+  } finally {
+    await store.close()
+  }
+}
+
+async function loadPromotion(activeDraft: { id: string; source: string }) {
+  return loadBrowserJobPromotion({ activeDraft })
+}
+
+async function persistPromotionCompletion(input: Parameters<JDMatchPromotionCompletion>[0]) {
+  const store = createDomainStore()
+  try {
+    await completeJobPromotion({ store, ...input })
   } finally {
     await store.close()
   }

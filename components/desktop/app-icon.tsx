@@ -8,6 +8,7 @@ import {
   LayoutTemplate,
   Milestone,
   Orbit,
+  Radar,
   Settings2,
   Sparkles,
   Terminal,
@@ -17,6 +18,7 @@ import type { DesktopAppDefinition } from '@/lib/desktop/types'
 
 const icons: Record<DesktopAppDefinition['icon'], LucideIcon> = {
   sparkles: Sparkles,
+  radar: Radar,
   bot: Bot,
   'file-search': FileSearch,
   orbit: Orbit,

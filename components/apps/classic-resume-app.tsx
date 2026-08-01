@@ -10,12 +10,14 @@ import {
   type OptimizationRun,
   type ResumeVariant
 } from '@/lib/agent/domain-store'
+import type { ApplicationRecord } from '@/lib/jobs/job-domain'
 import { scoreResumeStructure } from '@/lib/agent/resume-structure-score'
 import { createProjectPresentations } from '@/lib/presentation-projects'
 
 type ReviewVariants = {
   variants: ResumeVariant[]
   runs: OptimizationRun[]
+  applications?: ApplicationRecord[]
 }
 
 export type ReviewVariantLoader = (sourceDraftId: string) => Promise<ReviewVariants>
@@ -34,7 +36,7 @@ export function ClassicResumeApp({
   const [selection, setSelection] = useState({ sourceDraftId: '', variantId: 'master' })
   const review = loadedReview.sourceDraftId === sourceDraftId
     ? loadedReview
-    : { variants: [], runs: [] }
+    : { variants: [], runs: [], applications: [] }
   const selectedVariantId = selection.sourceDraftId === sourceDraftId
     ? selection.variantId
     : 'master'
@@ -53,6 +55,9 @@ export function ClassicResumeApp({
   const selectedVariant = review.variants.find((item) => item.id === selectedVariantId)
   const selectedRun = selectedVariant
     ? review.runs.find((run) => run.appliedVariantId === selectedVariant.id)
+    : undefined
+  const selectedApplication = selectedVariant
+    ? review.applications?.find((application) => application.resumeVariantId === selectedVariant.id)
     : undefined
   const displayedResume = selectedVariant?.data ?? activeResume
   const masterStructure = useMemo(() => scoreResumeStructure(activeResume), [activeResume])
@@ -93,6 +98,7 @@ export function ClassicResumeApp({
           <span>{t('print')}</span>
         </button>
       </div>
+      {selectedApplication ? <p className="classic-resume-app__application-context">{t('applicationLinked', { status: selectedApplication.status })}</p> : null}
       {selectedRun?.scoreBefore && selectedRun.scoreAfter ? <dl className="classic-resume-app__quality" role="group" aria-label={t('qualityReport')}>
         <div>
           <dt>{t('requirementCoverage')}</dt>
@@ -191,15 +197,17 @@ export function ClassicResumeApp({
 async function loadReviewVariants(sourceDraftId: string): Promise<ReviewVariants> {
   const store = createDomainStore()
   try {
-    const [variants, runs] = await Promise.all([
+    const [variants, runs, applications] = await Promise.all([
       store.list('resumeVariants'),
-      store.list('optimizationRuns')
+      store.list('optimizationRuns'),
+      store.list('applicationRecords')
     ])
     return {
       variants: variants
         .filter((variant) => variant.sourceDraftId === sourceDraftId)
         .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)),
-      runs: runs.filter((run) => run.sourceDraftId === sourceDraftId)
+      runs: runs.filter((run) => run.sourceDraftId === sourceDraftId),
+      applications: applications.filter((application) => application.sourceDraftId === sourceDraftId)
     }
   } finally {
     await store.close()

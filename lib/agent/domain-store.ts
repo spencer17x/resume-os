@@ -11,9 +11,21 @@ import {
   optimizationRunSchema,
   type OptimizationRun
 } from './optimization-run'
+import {
+  applicationRecordSchema,
+  jobPostingSchema,
+  jobRecommendationSchema,
+  jobSearchProfileSchema,
+  jobSourceSchema,
+  type ApplicationRecord,
+  type JobPosting,
+  type JobRecommendation,
+  type JobSearchProfile,
+  type JobSource
+} from '@/lib/jobs/job-domain'
 import { resumeDataSchema, type ResumeData } from '@/lib/resume-model'
 
-export const DOMAIN_STORE_SCHEMA_VERSION = 1 as const
+export const DOMAIN_STORE_SCHEMA_VERSION = 2 as const
 export const DEFAULT_DOMAIN_DATABASE_NAME = 'resume-os-domain'
 
 export const DOMAIN_STORE_NAMES = [
@@ -23,7 +35,12 @@ export const DOMAIN_STORE_NAMES = [
   'jobRequirements',
   'requirementMatches',
   'resumeVariants',
-  'optimizationRuns'
+  'optimizationRuns',
+  'jobSources',
+  'jobSearchProfiles',
+  'jobPostings',
+  'jobRecommendations',
+  'applicationRecords'
 ] as const
 
 const stableIdSchema = z.string()
@@ -115,6 +132,11 @@ export type DomainEntityMap = {
   requirementMatches: RequirementMatch
   resumeVariants: ResumeVariant
   optimizationRuns: OptimizationRun
+  jobSources: JobSource
+  jobSearchProfiles: JobSearchProfile
+  jobPostings: JobPosting
+  jobRecommendations: JobRecommendation
+  applicationRecords: ApplicationRecord
 }
 
 export type DomainStoreName = keyof DomainEntityMap
@@ -144,6 +166,8 @@ export class DomainStoreError extends Error {
 export type SourceDraftReferences = {
   resumeVariantIds: string[]
   optimizationRunIds: string[]
+  jobRecommendationIds: string[]
+  applicationRecordIds: string[]
 }
 
 export interface DomainStoreTransaction<AllowedStore extends DomainStoreName> {
@@ -199,12 +223,14 @@ export class IndexedDbDomainStore {
   async sourceDraftReferences(sourceDraftId: string): Promise<SourceDraftReferences> {
     parseStableId(sourceDraftId)
     return this.transaction(
-      ['resumeVariants', 'optimizationRuns'],
+      ['resumeVariants', 'optimizationRuns', 'jobRecommendations', 'applicationRecords'],
       'readonly',
       async (transaction) => {
-        const [variants, runs] = await Promise.all([
+        const [variants, runs, recommendations, applications] = await Promise.all([
           transaction.list('resumeVariants'),
-          transaction.list('optimizationRuns')
+          transaction.list('optimizationRuns'),
+          transaction.list('jobRecommendations'),
+          transaction.list('applicationRecords')
         ])
         return {
           resumeVariantIds: variants
@@ -214,6 +240,14 @@ export class IndexedDbDomainStore {
           optimizationRunIds: runs
             .filter((run) => run.sourceDraftId === sourceDraftId)
             .map((run) => run.id)
+            .sort(compareStrings),
+          jobRecommendationIds: recommendations
+            .filter((recommendation) => recommendation.sourceDraftId === sourceDraftId)
+            .map((recommendation) => recommendation.id)
+            .sort(compareStrings),
+          applicationRecordIds: applications
+            .filter((application) => application.sourceDraftId === sourceDraftId)
+            .map((application) => application.id)
             .sort(compareStrings)
         }
       }
@@ -222,7 +256,12 @@ export class IndexedDbDomainStore {
 
   async assertSourceDraftCanBeDeleted(sourceDraftId: string): Promise<void> {
     const references = await this.sourceDraftReferences(sourceDraftId)
-    if (references.resumeVariantIds.length > 0 || references.optimizationRunIds.length > 0) {
+    if (
+      references.resumeVariantIds.length > 0
+      || references.optimizationRunIds.length > 0
+      || references.jobRecommendationIds.length > 0
+      || references.applicationRecordIds.length > 0
+    ) {
       throw new DomainStoreError(
         'DELETE_RESTRICTED',
         `Source draft ${sourceDraftId} is referenced by saved agent data`
@@ -383,6 +422,15 @@ class IndexedDbTransaction implements DomainStoreTransaction<DomainStoreName> {
       case 'optimizationRuns':
         await this.assertOptimizationRunRelationships(value as OptimizationRun)
         return
+      case 'jobPostings':
+        await this.requireReferences('jobSources', [(value as JobPosting).sourceId])
+        return
+      case 'jobRecommendations':
+        await this.assertJobRecommendationRelationships(value as JobRecommendation)
+        return
+      case 'applicationRecords':
+        await this.assertApplicationRecordRelationships(value as ApplicationRecord)
+        return
       default:
         return
     }
@@ -428,6 +476,37 @@ class IndexedDbTransaction implements DomainStoreTransaction<DomainStoreName> {
     }
   }
 
+  private async assertJobRecommendationRelationships(recommendation: JobRecommendation) {
+    await this.requireReferences('jobPostings', [recommendation.postingId])
+    await this.requireReferences('jobSearchProfiles', [recommendation.searchProfileId])
+    await this.requireReferences(
+      'careerFacts',
+      recommendation.reasons.flatMap((reason) => reason.evidenceRefs)
+    )
+    if (recommendation.analyzedTargetJobId) {
+      await this.requireReferences('targetJobs', [recommendation.analyzedTargetJobId])
+    }
+  }
+
+  private async assertApplicationRecordRelationships(application: ApplicationRecord) {
+    await this.requireReferences('jobPostings', [application.postingId])
+    if (application.targetJobId) {
+      await this.requireReferences('targetJobs', [application.targetJobId])
+    }
+    if (application.resumeVariantId) {
+      const [variant] = await this.requireReferences('resumeVariants', [application.resumeVariantId])
+      if (
+        variant.targetJobId !== application.targetJobId
+        || variant.sourceDraftId !== application.sourceDraftId
+      ) {
+        throw new DomainStoreError(
+          'REFERENTIAL_INTEGRITY',
+          `Application record ${application.id} references an unrelated resume variant`
+        )
+      }
+    }
+  }
+
   private async requireReferences<Store extends DomainStoreName>(
     store: Store,
     ids: readonly string[]
@@ -455,11 +534,20 @@ class IndexedDbTransaction implements DomainStoreTransaction<DomainStoreName> {
       case 'careerFacts':
         referenced = (await this.list('requirementMatches')).some((match) => match.factIds.includes(id))
           || (await this.list('optimizationRuns')).some((run) => optimizationRunFactIds(run).has(id))
+          || (await this.list('jobRecommendations')).some((recommendation) => (
+            recommendation.reasons.some((reason) => reason.evidenceRefs.includes(id))
+          ))
         break
       case 'targetJobs':
         referenced = (await this.list('jobRequirements')).some((requirement) => requirement.jobId === id)
           || (await this.list('resumeVariants')).some((variant) => variant.targetJobId === id)
           || (await this.list('optimizationRuns')).some((run) => run.targetJobId === id)
+          || (await this.list('jobRecommendations')).some(
+            (recommendation) => recommendation.analyzedTargetJobId === id
+          )
+          || (await this.list('applicationRecords')).some(
+            (application) => application.targetJobId === id
+          )
         break
       case 'jobRequirements':
         referenced = Boolean(await this.get('requirementMatches', id))
@@ -467,6 +555,24 @@ class IndexedDbTransaction implements DomainStoreTransaction<DomainStoreName> {
         break
       case 'resumeVariants':
         referenced = (await this.list('optimizationRuns')).some((run) => run.appliedVariantId === id)
+          || (await this.list('applicationRecords')).some(
+            (application) => application.resumeVariantId === id
+          )
+        break
+      case 'jobSources':
+        referenced = (await this.list('jobPostings')).some((posting) => posting.sourceId === id)
+        break
+      case 'jobSearchProfiles':
+        referenced = (await this.list('jobRecommendations')).some(
+          (recommendation) => recommendation.searchProfileId === id
+        )
+        break
+      case 'jobPostings':
+        referenced = (await this.list('jobRecommendations')).some(
+          (recommendation) => recommendation.postingId === id
+        ) || (await this.list('applicationRecords')).some(
+          (application) => application.postingId === id
+        )
         break
       default:
         break
@@ -537,13 +643,21 @@ function migrateDomainSchema(
   oldVersion: number,
   newVersion: number | null
 ) {
-  if (newVersion !== DOMAIN_STORE_SCHEMA_VERSION || oldVersion !== 0) {
+  if (
+    newVersion !== DOMAIN_STORE_SCHEMA_VERSION
+    || (oldVersion !== 0 && oldVersion !== 1)
+  ) {
     throw new DomainStoreError(
       'SCHEMA_MIGRATION_FAILED',
       `Unsupported domain schema migration: ${oldVersion} -> ${newVersion ?? 'unknown'}`
     )
   }
 
+  if (oldVersion === 0) createCoreDomainStores(database)
+  createJobDomainStores(database)
+}
+
+function createCoreDomainStores(database: IDBDatabase) {
   const evidenceSources = database.createObjectStore('evidenceSources', { keyPath: 'id' })
   evidenceSources.createIndex('byCreatedAt', 'createdAt')
 
@@ -573,6 +687,36 @@ function migrateDomainSchema(
   optimizationRuns.createIndex('byUpdatedAt', 'updatedAt')
 }
 
+function createJobDomainStores(database: IDBDatabase) {
+  const jobSources = database.createObjectStore('jobSources', { keyPath: 'id' })
+  jobSources.createIndex('byKind', 'kind')
+  jobSources.createIndex('byUpdatedAt', 'updatedAt')
+
+  const jobSearchProfiles = database.createObjectStore('jobSearchProfiles', { keyPath: 'id' })
+  jobSearchProfiles.createIndex('byUpdatedAt', 'updatedAt')
+
+  const jobPostings = database.createObjectStore('jobPostings', { keyPath: 'id' })
+  jobPostings.createIndex('bySourceId', 'sourceId')
+  jobPostings.createIndex('bySourceIdentity', ['sourceId', 'externalId'], { unique: true })
+  jobPostings.createIndex('byStatus', 'status')
+  jobPostings.createIndex('byLastCheckedAt', 'lastCheckedAt')
+  jobPostings.createIndex('byContentHash', 'contentHash')
+
+  const jobRecommendations = database.createObjectStore('jobRecommendations', { keyPath: 'id' })
+  jobRecommendations.createIndex('byPostingId', 'postingId')
+  jobRecommendations.createIndex('bySearchProfileId', 'searchProfileId')
+  jobRecommendations.createIndex('bySourceDraftId', 'sourceDraftId')
+  jobRecommendations.createIndex('byUpdatedAt', 'updatedAt')
+
+  const applicationRecords = database.createObjectStore('applicationRecords', { keyPath: 'id' })
+  applicationRecords.createIndex('byPostingId', 'postingId')
+  applicationRecords.createIndex('bySourceDraftId', 'sourceDraftId')
+  applicationRecords.createIndex('byTargetJobId', 'targetJobId')
+  applicationRecords.createIndex('byResumeVariantId', 'resumeVariantId')
+  applicationRecords.createIndex('byStatus', 'status')
+  applicationRecords.createIndex('byUpdatedAt', 'updatedAt')
+}
+
 const entitySchemas: {
   [Store in DomainStoreName]: z.ZodType<DomainEntityMap[Store]>
 } = {
@@ -582,7 +726,12 @@ const entitySchemas: {
   jobRequirements: jobRequirementSchema,
   requirementMatches: requirementMatchSchema,
   resumeVariants: resumeVariantSchema,
-  optimizationRuns: optimizationRunSchema
+  optimizationRuns: optimizationRunSchema,
+  jobSources: jobSourceSchema,
+  jobSearchProfiles: jobSearchProfileSchema,
+  jobPostings: jobPostingSchema,
+  jobRecommendations: jobRecommendationSchema,
+  applicationRecords: applicationRecordSchema
 }
 
 function parseEntity<Store extends DomainStoreName>(
@@ -678,7 +827,12 @@ function compareStrings(left: string, right: string) {
 }
 
 export type {
+  ApplicationRecord,
   JobRequirement,
+  JobPosting,
+  JobRecommendation,
+  JobSearchProfile,
+  JobSource,
   OptimizationRun,
   RequirementMatch,
   ResumeData,

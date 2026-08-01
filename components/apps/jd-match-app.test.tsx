@@ -14,6 +14,8 @@ import { writeDraftState } from '@/lib/resume-store'
 import {
   JDMatchApp,
   type JDMatchRequirementPersistence,
+  type JDMatchPromotionCompletion,
+  type JDMatchPromotionLoader,
   type JDMatchStalePersistence,
   type JDMatchWorkflowSummaryLoader,
   type JDMatchWorkflowPersistence
@@ -46,7 +48,9 @@ function renderMatch(
   requirementPersistence?: JDMatchRequirementPersistence,
   stalePersistence?: JDMatchStalePersistence,
   workflowSummaryLoader?: JDMatchWorkflowSummaryLoader,
-  source: 'paste' | 'sample' = 'paste'
+  source: 'paste' | 'sample' = 'paste',
+  promotionLoader?: JDMatchPromotionLoader,
+  promotionCompletion?: JDMatchPromotionCompletion
 ) {
   return render(
     <NextIntlClientProvider locale="en" messages={en}>
@@ -57,6 +61,8 @@ function renderMatch(
           requirementPersistence={requirementPersistence}
           stalePersistence={stalePersistence}
           workflowSummaryLoader={workflowSummaryLoader}
+          promotionLoader={promotionLoader}
+          promotionCompletion={promotionCompletion}
         />
       </ResumeDraftProviderCore>
     </NextIntlClientProvider>
@@ -134,6 +140,45 @@ afterEach(() => {
 })
 
 describe('JDMatchApp', () => {
+  it('loads a fingerprinted Job Radar handoff and links it only after requirement confirmation', async () => {
+    const user = userEvent.setup()
+    const intent = {
+      postingId: 'posting-1', recommendationId: 'recommendation-1', sourceDraftId: 'ada',
+      postingContentHash: 'hash:one', recommendationFingerprint: 'fingerprint:one',
+      createdAt: '2026-08-01T08:00:00.000Z'
+    }
+    const promotionLoader = vi.fn<JDMatchPromotionLoader>().mockResolvedValue({
+      intent,
+      posting: {
+        id: 'posting-1', sourceId: 'source-1', externalId: '1',
+        canonicalUrl: 'https://boards.greenhouse.io/example/jobs/1',
+        applyUrl: 'https://boards.greenhouse.io/example/jobs/1',
+        title: 'Platform Engineer', company: 'Example Co', description: 'Seeking a platform engineer',
+        locale: 'en', firstSeenAt: '2026-08-01T08:00:00.000Z', lastCheckedAt: '2026-08-01T08:00:00.000Z',
+        status: 'open', contentHash: 'hash:one'
+      },
+      closed: false
+    })
+    const workflowPersistence = vi.fn<JDMatchWorkflowPersistence>().mockResolvedValue({
+      targetJobId: 'target-1', optimizationRunId: 'run-1'
+    })
+    const promotionCompletion = vi.fn<JDMatchPromotionCompletion>().mockResolvedValue()
+
+    renderMatch(true, workflowPersistence, undefined, undefined, undefined, 'paste', promotionLoader, promotionCompletion)
+    expect(await screen.findByDisplayValue('Seeking a platform engineer')).toBeVisible()
+    expect(screen.getByText(/Example Co · Platform Engineer was loaded/)).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Extract requirements' }))
+    await screen.findByRole('heading', { name: 'TypeScript ownership' })
+    await reviewAllRequirements(user)
+
+    await waitFor(() => expect(promotionCompletion).toHaveBeenCalledWith({
+      intent,
+      targetJobId: 'target-1',
+      now: expect.any(String)
+    }))
+    expect(screen.getByText(/Job Radar application is linked locally/)).toBeVisible()
+  })
+
   it('warns that sandbox resumes cannot become verified career evidence', async () => {
     renderMatch(true, undefined, undefined, undefined, undefined, 'sample')
 

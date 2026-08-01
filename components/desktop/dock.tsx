@@ -8,6 +8,7 @@ import { useDesktop } from './desktop-provider'
 
 const desktopDockFavoriteIds: readonly AppId[] = [
   'studio',
+  'jobs',
   'agent',
   'resume-3d',
   'book',

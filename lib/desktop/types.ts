@@ -1,7 +1,7 @@
 import type { Locale } from '@/i18n/routing'
 
 export type AppId =
-  | 'studio' | 'agent' | 'jd-match' | 'resume-3d' | 'book'
+  | 'studio' | 'jobs' | 'agent' | 'jd-match' | 'resume-3d' | 'book'
   | 'classic' | 'projects' | 'timeline' | 'terminal' | 'settings'
 
 export type DesktopAppMessageKey = `apps.${AppId}`

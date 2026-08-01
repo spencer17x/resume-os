@@ -174,13 +174,14 @@ test('renders the AI agent constellation across desktop motion states and viewpo
   await expect(ambient.locator('video, canvas, img')).toHaveCount(0)
   await expect(page.locator('video, canvas, img')).toHaveCount(0)
   await expect(workflowHud).toBeVisible()
-  await expect(launcher.getByRole('button')).toHaveCount(9)
-  await expect(dock.locator('.desktop-dock-item:not([data-dock-supplemental])')).toHaveCount(6)
+  await expect(launcher.getByRole('button')).toHaveCount(10)
+  await expect(dock.locator('.desktop-dock-item:not([data-dock-supplemental])')).toHaveCount(7)
 
   expect(await launcher.getByRole('button').evaluateAll((elements) =>
     elements.map((element) => element.getAttribute('aria-label'))
   )).toEqual([
     'Resume Studio',
+    'Job Radar',
     'Resume Agent',
     'Target Job',
     'Resume 3D',
@@ -194,6 +195,7 @@ test('renders the AI agent constellation across desktop motion states and viewpo
     elements.map((element) => element.getAttribute('aria-label'))
   )).toEqual([
     'Resume Studio',
+    'Job Radar',
     'Resume Agent',
     'Resume 3D',
     'Resume Book',
@@ -295,8 +297,8 @@ test('renders the AI agent constellation across desktop motion states and viewpo
   ]) {
     await page.setViewportSize(viewport)
     await expect(launcher).toBeVisible()
-    await expect(launcher.getByRole('button')).toHaveCount(9)
-    await expect(dock.getByRole('button')).toHaveCount(6)
+    await expect(launcher.getByRole('button')).toHaveCount(10)
+    await expect(dock.getByRole('button')).toHaveCount(7)
     await expect.poll(() => ambient.evaluate((root) => {
       const desktop = root.parentElement
       if (!desktop) throw new Error('Ambient scene is missing its desktop surface')
@@ -358,12 +360,12 @@ test('renders the AI agent constellation across desktop motion states and viewpo
 
   await page.setViewportSize({ width: 899, height: 768 })
   await expect(launcher).toBeHidden()
-  await expect(dock.getByRole('button')).toHaveCount(10)
+  await expect(dock.getByRole('button')).toHaveCount(11)
 
   await page.setViewportSize({ width: 900, height: 768 })
   await expect(launcher).toBeVisible()
-  await expect(launcher.getByRole('button')).toHaveCount(9)
-  await expect(dock.getByRole('button')).toHaveCount(6)
+  await expect(launcher.getByRole('button')).toHaveCount(10)
+  await expect(dock.getByRole('button')).toHaveCount(7)
 })
 
 test('keeps deep links, history, locale, theme, and reduced motion coherent', async ({ page }) => {

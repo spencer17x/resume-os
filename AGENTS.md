@@ -25,6 +25,8 @@ Preserve these product invariants:
 - Durable user data belongs to the browser origin. Do not add server-side persistence, accounts, analytics, cloud sync, or uploaded-file retention without an explicit product decision.
 - Cloud use must remain explicit. Automatic mode may fall back to a cloud provider only when the saved preference allows it; do not introduce silent fallback.
 - API keys and career data must not be logged, echoed, or persisted by server routes.
+- Job discovery uses dedicated adapters for reviewed public sources. Never turn it into an arbitrary-URL fetcher, authenticated marketplace scraper, cookie/session replay mechanism, CAPTCHA bypass, or unattended application submitter.
+- Opening an employer application page is not proof of submission. Only an explicit user confirmation may move a local application record to `applied` and set `submittedAt`.
 
 ## Repository Map
 
@@ -36,6 +38,7 @@ Preserve these product invariants:
 - `lib/resume-model.ts`: canonical `ResumeData`, drafts, snapshots, IDs, and normalization.
 - `lib/resume-store.ts`: localStorage draft persistence and multi-tab merge behavior.
 - `lib/agent/`: evidence domain, IndexedDB store, provider routing, deterministic scoring, optimization state machine, plans, change sets, and variants.
+- `lib/jobs/`: authorized public-source adapters, local posting/recommendation/application contracts, refresh, scoring, promotion, and packet state transitions.
 - `lib/server/`: request guards, bounded JSON parsing, document parser isolation, and DOCX preflight checks.
 - `i18n/` and `messages/`: locale routing and Chinese/English messages.
 - `tests/e2e/`: Playwright desktop, mobile, safety, and workflow coverage.
@@ -54,7 +57,7 @@ Preserve these product invariants:
 - Keep desktop layout state independent from resume and Agent domain state. Closing or resetting a window must not delete career data.
 - Use the existing persistence boundaries:
   - localStorage for drafts, snapshots, desktop state, provider preferences, theme, motion, and the active workflow pointer.
-  - IndexedDB through `lib/agent/domain-store.ts` for evidence sources, career facts, target jobs, requirements, matches, variants, and optimization runs.
+  - IndexedDB through `lib/agent/domain-store.ts` for evidence sources, career facts, public job data, recommendations, application records, target jobs, requirements, matches, variants, and optimization runs.
   - sessionStorage for a BYOK key by default; localStorage only after explicit remember consent.
 - Treat data from requests, storage, uploaded documents, and models as untrusted. Parse it through the relevant Zod schema and retain existing byte/count limits.
 - Preserve IndexedDB referential integrity. Writes involving related Agent entities must use the domain-store transaction API.
@@ -64,7 +67,7 @@ Preserve these product invariants:
 - Treat persisted schemas as public local data contracts. Schema changes require backward-compatible parsing or an explicit migration plus tests using older stored data; never solve a migration by silently clearing browser storage.
 - Uploaded PDF, DOCX, and TXT bytes are transient extraction inputs. Do not persist the original files or add them to the evidence store without an explicit product and privacy decision.
 - Propagate cancellation through browser requests, provider calls, document parsing, and long-running work. Ignore late responses after cancellation or input changes, and retain fingerprint-based stale-result protection.
-- Browser cloud requests must use `aiFetch` and its approved same-origin paths. Document extraction is the deliberate same-origin non-AI exception.
+- Browser cloud requests must use `aiFetch` and its approved same-origin paths. Document extraction and the bounded `/api/jobs/discover` public-source route are the deliberate same-origin non-AI exceptions.
 - Preserve request-guard, provider-host allowlist, no-redirect, timeout, rate-limit, payload-limit, and worker-resource boundaries when changing API routes.
 - Avoid adding a vector database or embedding pipeline unless the product scope explicitly changes. Retrieval currently means typed, explicit evidence references.
 
@@ -89,7 +92,7 @@ Preserve these product invariants:
 
 ## Runtime And Environment
 
-- Use Node.js 24.18.0 (`>=24.18.0 <25`) and `pnpm@11.17.0`. Do not use npm or Yarn to install dependencies or generate another lockfile.
+- Use Node.js 24.16.0 (`>=24.16.0 <25`) and `pnpm@11.17.0`. Do not use npm or Yarn to install dependencies or generate another lockfile.
 - The default development server is local-only at `127.0.0.1:3001`. If that port is occupied, use another loopback port; do not terminate an unrelated process merely to reclaim the default port.
 - Keep secrets in untracked `.env.local` or the deployment secret store. `.env.example` must contain only safe placeholders, and server credentials must never be exposed through a `NEXT_PUBLIC_*` variable or client bundle.
 - Treat `RESUME_OS_ALLOWED_AI_HOSTS`, `RESUME_OS_AI_ACCESS_TOKEN`, `RESUME_OS_LOCAL_ONLY`, and `RESUME_OS_TRUSTED_PROXY` as security-boundary configuration. Do not weaken their semantics to make a request work.

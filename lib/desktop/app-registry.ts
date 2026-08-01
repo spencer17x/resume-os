@@ -15,6 +15,19 @@ export const appRegistry = {
     pinned: true,
     desktop: true
   },
+  jobs: {
+    id: 'jobs',
+    route: '/jobs',
+    messageKey: 'apps.jobs',
+    icon: 'radar',
+    iconTone: 'blue',
+    defaultSize: { width: 1080, height: 700 },
+    minSize: { width: 720, height: 520 },
+    defaultPosition: { x: 110, y: 55 },
+    group: 'workflow',
+    pinned: true,
+    desktop: true
+  },
   'jd-match': {
     id: 'jd-match',
     route: '/jd-match',

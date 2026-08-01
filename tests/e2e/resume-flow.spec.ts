@@ -1,8 +1,10 @@
 import { expect, test, type Page, type Route } from '@playwright/test'
 import { buildJDRequirementAnalysis, type JDMatchReport } from '../../lib/agent/jd-report'
 import type { ResumeData } from '../../lib/resume-model'
+import { createStableJobDomainId } from '../../lib/jobs/job-domain'
 
 const now = '2026-07-13T00:00:00.000Z'
+const jobCheckedAt = '2026-08-01T08:00:00.000Z'
 const jobDescription = [
   'Staff AI Platform Engineer',
   'Lead reliable AI platform delivery across product teams.',
@@ -103,6 +105,37 @@ async function installAiMocks(page: Page) {
       source: 'paste'
     })
     await json(route, { data: resume(), model: 'deterministic-e2e' })
+  })
+
+  await page.route('**/api/jobs/discover', async (route) => {
+    const body = requestJson<{ source: string; sourceKey: string }>(route)
+    expectExactKeys(body, ['source', 'sourceKey'])
+    expect(body).toEqual({ source: 'greenhouse', sourceKey: 'evidence-labs' })
+    const sourceId = createStableJobDomainId('job-source', [body.source, body.sourceKey])
+    await json(route, {
+      sourceId,
+      completeness: 'complete',
+      checkedAt: jobCheckedAt,
+      warnings: [],
+      postings: [{
+        id: createStableJobDomainId('job-posting', [body.source, body.sourceKey, 'staff-ai-1']),
+        sourceId,
+        externalId: 'staff-ai-1',
+        canonicalUrl: 'https://boards.greenhouse.io/evidence-labs/jobs/staff-ai-1',
+        applyUrl: 'https://boards.greenhouse.io/evidence-labs/jobs/staff-ai-1',
+        title: 'Staff AI Platform Engineer',
+        company: 'Evidence Labs',
+        description: jobDescription,
+        locale: 'en',
+        location: 'Remote',
+        workplaceType: 'remote',
+        employmentType: 'full-time',
+        firstSeenAt: jobCheckedAt,
+        lastCheckedAt: jobCheckedAt,
+        status: 'open',
+        contentHash: 'e2e:staff-ai-1'
+      }]
+    })
   })
 
   await page.route('**/api/jd-match', async (route) => {
@@ -339,9 +372,19 @@ test('builds a reviewable Evidence Agent run and saves a variant without mutatin
   await expect.poll(() => readActiveMaster(page)).not.toBeNull()
   const masterBefore = await readActiveMaster(page)
 
-  await page.goto('/en/jd-match')
+  await page.goto('/en/jobs')
+  const radar = page.getByRole('application', { name: 'Job Radar' })
+  await radar.getByRole('textbox', { name: 'Profile name' }).fill('AI platform roles')
+  await radar.getByRole('textbox', { name: 'Target titles' }).fill('Staff AI Platform Engineer')
+  await radar.getByRole('button', { name: 'Save profile' }).click()
+  await radar.getByRole('textbox', { name: 'Public board identifier' }).fill('evidence-labs')
+  await radar.getByRole('button', { name: 'Add source' }).click()
+  await radar.getByRole('button', { name: 'Refresh evidence-labs' }).click()
+  await expect(radar.getByRole('heading', { name: 'Staff AI Platform Engineer' })).toBeVisible()
+  await radar.getByRole('button', { name: 'Analyze' }).click()
+
   const jdMatch = page.getByRole('application', { name: 'Target Job' })
-  await jdMatch.getByRole('textbox', { name: 'Job description' }).fill(jobDescription)
+  await expect(jdMatch.getByRole('textbox', { name: 'Job description' })).toHaveValue(jobDescription)
   await jdMatch.getByRole('button', { name: 'Extract requirements' }).click()
   await expect(jdMatch.getByRole('heading', { name: 'Extracted requirement matrix' })).toBeVisible()
   await expect(jdMatch.getByRole('heading', {
@@ -350,7 +393,7 @@ test('builds a reviewable Evidence Agent run and saves a variant without mutatin
   await expect(jdMatch.getByText('Not yet mapped', { exact: true })).toBeVisible()
   await jdMatch.getByRole('button', { name: 'Confirm requirement' }).click()
   await jdMatch.getByRole('button', { name: 'Create Agent run' }).click()
-  await expect(jdMatch.getByText('Target job and resumable Agent run saved in this browser.')).toBeVisible()
+  await expect(jdMatch.getByText('Target job and Agent run saved; the Job Radar application is linked locally.')).toBeVisible()
 
   const dock = page.getByRole('navigation', { name: 'Dock' })
   await dock.getByRole('button', { name: 'Resume Agent' }).click()
@@ -408,7 +451,23 @@ test('builds a reviewable Evidence Agent run and saves a variant without mutatin
       stage: 'applied',
       acceptedChangeIds: ['impact-bullet', 'profile-summary'],
       appliedVariantId: expect.any(String)
-    }]
+    }],
+    applications: [{ status: 'analyzing', targetJobId: expect.any(String) }]
+  })
+
+  await page.goto('/en/jobs')
+  const applicationRadar = page.getByRole('application', { name: 'Job Radar' })
+  await expect(applicationRadar.getByRole('heading', { name: 'Application packets' })).toBeVisible()
+  await applicationRadar.getByRole('button', { name: 'Check application packet' }).click()
+  await expect(applicationRadar.getByRole('link', { name: 'Open application site' })).toHaveAttribute(
+    'href',
+    'https://boards.greenhouse.io/evidence-labs/jobs/staff-ai-1'
+  )
+  expect((await readDomainOutcome(page)).applications[0]?.status).toBe('ready-to-apply')
+  await applicationRadar.getByRole('button', { name: 'I submitted this application' }).click()
+  await expect.poll(async () => (await readDomainOutcome(page)).applications[0]).toMatchObject({
+    status: 'applied',
+    submittedAt: expect.any(String)
   })
 
   expect(await readActiveMaster(page)).toEqual(masterBefore)
@@ -464,15 +523,15 @@ async function readDomainOutcome(page: Page) {
       request.onerror = () => reject(request.error)
     })
     try {
-      const transaction = database.transaction(['resumeVariants', 'optimizationRuns'], 'readonly')
-      const getAll = <T>(storeName: 'resumeVariants' | 'optimizationRuns') => (
+      const transaction = database.transaction(['resumeVariants', 'optimizationRuns', 'applicationRecords'], 'readonly')
+      const getAll = <T>(storeName: 'resumeVariants' | 'optimizationRuns' | 'applicationRecords') => (
         new Promise<T[]>((resolve, reject) => {
           const request = transaction.objectStore(storeName).getAll()
           request.onsuccess = () => resolve(request.result as T[])
           request.onerror = () => reject(request.error)
         })
       )
-      const [variants, runs] = await Promise.all([
+      const [variants, runs, applications] = await Promise.all([
         getAll<{
           sourceDraftId: string
           data: ResumeData
@@ -481,9 +540,14 @@ async function readDomainOutcome(page: Page) {
           stage: string
           acceptedChangeIds?: string[]
           appliedVariantId?: string
-        }>('optimizationRuns')
+        }>('optimizationRuns'),
+        getAll<{
+          status: string
+          targetJobId?: string
+          submittedAt?: string
+        }>('applicationRecords')
       ])
-      return { variants, runs }
+      return { variants, runs, applications }
     } finally {
       database.close()
     }

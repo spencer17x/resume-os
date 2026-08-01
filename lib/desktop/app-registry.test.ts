@@ -54,7 +54,7 @@ describe('app registry', () => {
     const workflowIds = apps.filter((app) => app.group === 'workflow').map((app) => app.id)
     const showcaseIds = apps.filter((app) => app.group === 'showcase').map((app) => app.id)
 
-    expect(workflowIds).toEqual(['studio', 'jd-match', 'agent', 'classic', 'settings'])
+    expect(workflowIds).toEqual(['studio', 'jobs', 'jd-match', 'agent', 'classic', 'settings'])
     expect(showcaseIds).toEqual(['resume-3d', 'book', 'projects', 'timeline', 'terminal'])
     expect(apps.filter((app) => app.pinned).map((app) => app.id)).toEqual(workflowIds)
   })

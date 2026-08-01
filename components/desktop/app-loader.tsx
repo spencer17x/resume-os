@@ -11,6 +11,7 @@ import { TerminalApp } from '@/components/apps/terminal-app'
 import { TimelineApp } from '@/components/apps/timeline-app'
 import { ResumeBookApp } from '@/components/apps/resume-book-app'
 import { SettingsApp } from '@/components/apps/settings-app'
+import { JobRadarApp } from '@/components/apps/job-radar-app'
 import type { ComponentType } from 'react'
 import type { AppId } from '@/lib/desktop/types'
 
@@ -31,6 +32,7 @@ function Resume3DLoading() {
 
 const appComponents: Record<AppId, AppComponent> = {
   studio: ResumeStudioApp,
+  jobs: JobRadarApp,
   agent: ResumeAgentApp,
   'jd-match': JDMatchApp,
   'resume-3d': LazyResume3DApp,

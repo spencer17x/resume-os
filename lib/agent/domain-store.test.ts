@@ -6,9 +6,14 @@ import {
   DOMAIN_STORE_SCHEMA_VERSION,
   DomainStoreError,
   createDomainStore,
+  type ApplicationRecord,
   type CareerFact,
   type EvidenceSource,
+  type JobPosting,
+  type JobRecommendation,
   type JobRequirement,
+  type JobSearchProfile,
+  type JobSource,
   type RequirementMatch,
   type ResumeVariant,
   type TargetJob
@@ -79,6 +84,79 @@ const variant: ResumeVariant = {
   updatedAt: now
 }
 
+const jobSource: JobSource = {
+  id: 'job-source-1',
+  kind: 'greenhouse',
+  label: 'Target Co careers',
+  sourceKey: 'target-co',
+  enabled: true,
+  createdAt: now,
+  updatedAt: now
+}
+
+const searchProfile: JobSearchProfile = {
+  id: 'job-search-profile-1',
+  name: 'Staff frontend roles',
+  titles: ['Staff Frontend Engineer'],
+  adjacentTitles: [],
+  locations: ['Remote'],
+  excludedLocations: [],
+  workplaceTypes: ['remote'],
+  employmentTypes: ['full-time'],
+  requiredTerms: ['TypeScript'],
+  preferredTerms: ['design systems'],
+  excludedTerms: [],
+  maximumAgeDays: 30,
+  createdAt: now,
+  updatedAt: now
+}
+
+const jobPosting: JobPosting = {
+  id: 'job-posting-1',
+  sourceId: jobSource.id,
+  externalId: 'posting-123',
+  canonicalUrl: 'https://boards.greenhouse.io/target-co/jobs/posting-123',
+  applyUrl: 'https://boards.greenhouse.io/target-co/jobs/posting-123',
+  title: targetJob.title,
+  company: targetJob.company ?? 'Target Co',
+  description: targetJob.description,
+  locale: 'en',
+  location: 'Remote',
+  workplaceType: 'remote',
+  employmentType: 'full-time',
+  firstSeenAt: now,
+  lastCheckedAt: now,
+  status: 'open',
+  contentHash: 'fnv1a64:job-posting-1'
+}
+
+const jobRecommendation: JobRecommendation = {
+  id: 'job-recommendation-1',
+  postingId: jobPosting.id,
+  searchProfileId: searchProfile.id,
+  sourceDraftId: variant.sourceDraftId,
+  rubricVersion: 'resume-os-job-relevance-v1',
+  inputFingerprint: 'fnv1a64:job-recommendation-1',
+  eligibility: 'eligible',
+  preliminaryScore: 90,
+  reasons: [{ code: 'evidence-overlap', contribution: 30, evidenceRefs: [fact.id] }],
+  analyzedTargetJobId: targetJob.id,
+  createdAt: now,
+  updatedAt: now
+}
+
+const applicationRecord: ApplicationRecord = {
+  id: 'application-record-1',
+  postingId: jobPosting.id,
+  sourceDraftId: variant.sourceDraftId,
+  targetJobId: targetJob.id,
+  resumeVariantId: variant.id,
+  status: 'ready-to-apply',
+  notes: '',
+  createdAt: now,
+  updatedAt: now
+}
+
 function createTestStore() {
   const factory = new IDBFactory()
   const databaseName = `resume-os-domain-test-${crypto.randomUUID()}`
@@ -111,7 +189,7 @@ async function seedRelations(
 }
 
 describe('IndexedDbDomainStore', () => {
-  it('creates schema v1 with every required object store and relation index', async () => {
+  it('creates schema v2 with every required object store and relation index', async () => {
     const { factory, databaseName, store } = createTestStore()
     await store.list('evidenceSources')
 
@@ -124,6 +202,12 @@ describe('IndexedDbDomainStore', () => {
     expect([...transaction.objectStore('jobRequirements').indexNames]).toContain('byJobId')
     expect([...transaction.objectStore('resumeVariants').indexNames]).toEqual(
       expect.arrayContaining(['bySourceDraftId', 'byTargetJobId'])
+    )
+    expect([...transaction.objectStore('jobPostings').indexNames]).toEqual(
+      expect.arrayContaining(['bySourceId', 'bySourceIdentity', 'byStatus'])
+    )
+    expect([...transaction.objectStore('applicationRecords').indexNames]).toEqual(
+      expect.arrayContaining(['byPostingId', 'bySourceDraftId', 'byStatus'])
     )
     database.close()
     await store.close()
@@ -146,6 +230,11 @@ describe('IndexedDbDomainStore', () => {
     await store.put('requirementMatches', match)
     await store.put('resumeVariants', variant)
     await store.put('optimizationRuns', run)
+    await store.put('jobSources', jobSource)
+    await store.put('jobSearchProfiles', searchProfile)
+    await store.put('jobPostings', jobPosting)
+    await store.put('jobRecommendations', jobRecommendation)
+    await store.put('applicationRecords', applicationRecord)
 
     expect(await store.get('evidenceSources', source.id)).toEqual(source)
     expect(await store.get('careerFacts', fact.id)).toEqual(fact)
@@ -154,8 +243,18 @@ describe('IndexedDbDomainStore', () => {
     expect(await store.get('requirementMatches', requirement.id)).toEqual(match)
     expect(await store.get('resumeVariants', variant.id)).toEqual(variant)
     expect(await store.get('optimizationRuns', run.id)).toEqual(run)
+    expect(await store.get('jobSources', jobSource.id)).toEqual(jobSource)
+    expect(await store.get('jobSearchProfiles', searchProfile.id)).toEqual(searchProfile)
+    expect(await store.get('jobPostings', jobPosting.id)).toEqual(jobPosting)
+    expect(await store.get('jobRecommendations', jobRecommendation.id)).toEqual(jobRecommendation)
+    expect(await store.get('applicationRecords', applicationRecord.id)).toEqual(applicationRecord)
     expect(await store.list('careerFacts')).toEqual([fact])
 
+    await store.delete('applicationRecords', applicationRecord.id)
+    await store.delete('jobRecommendations', jobRecommendation.id)
+    await store.delete('jobPostings', jobPosting.id)
+    await store.delete('jobSearchProfiles', searchProfile.id)
+    await store.delete('jobSources', jobSource.id)
     await store.delete('requirementMatches', requirement.id)
     await store.delete('optimizationRuns', run.id)
     await store.delete('resumeVariants', variant.id)
@@ -198,6 +297,35 @@ describe('IndexedDbDomainStore', () => {
     await store.close()
   })
 
+  it('rejects missing job-domain references and unrelated resume variants', async () => {
+    const { store } = createTestStore()
+
+    await expectErrorCode(store.put('jobPostings', jobPosting), 'REFERENTIAL_INTEGRITY')
+    await store.put('jobSources', jobSource)
+    await store.put('jobPostings', jobPosting)
+    await expectErrorCode(
+      store.put('jobRecommendations', jobRecommendation),
+      'REFERENTIAL_INTEGRITY'
+    )
+
+    await store.put('targetJobs', targetJob)
+    await store.put('jobSearchProfiles', searchProfile)
+    await store.put('evidenceSources', source)
+    await store.put('careerFacts', fact)
+    await store.put('resumeVariants', variant)
+    await store.put('jobRecommendations', jobRecommendation)
+
+    await expectErrorCode(
+      store.put('applicationRecords', {
+        ...applicationRecord,
+        sourceDraftId: 'different-draft'
+      }),
+      'REFERENTIAL_INTEGRITY'
+    )
+    expect(await store.get('applicationRecords', applicationRecord.id)).toBeUndefined()
+    await store.close()
+  })
+
   it('atomically rolls back a multi-store transaction when relation validation fails', async () => {
     const { store } = createTestStore()
     const invalidMatch = { ...match, factIds: ['missing-fact'] }
@@ -231,13 +359,32 @@ describe('IndexedDbDomainStore', () => {
     await store.close()
   })
 
+  it('restricts deletes that would orphan job postings and application history', async () => {
+    const { store } = createTestStore()
+    await seedRelations(store, { includeVariant: true })
+    await store.put('jobSources', jobSource)
+    await store.put('jobSearchProfiles', searchProfile)
+    await store.put('jobPostings', jobPosting)
+    await store.put('jobRecommendations', jobRecommendation)
+    await store.put('applicationRecords', applicationRecord)
+
+    await expectErrorCode(store.delete('jobSources', jobSource.id), 'DELETE_RESTRICTED')
+    await expectErrorCode(store.delete('jobSearchProfiles', searchProfile.id), 'DELETE_RESTRICTED')
+    await expectErrorCode(store.delete('jobPostings', jobPosting.id), 'DELETE_RESTRICTED')
+    await expectErrorCode(store.delete('careerFacts', fact.id), 'DELETE_RESTRICTED')
+    await expectErrorCode(store.delete('resumeVariants', variant.id), 'DELETE_RESTRICTED')
+    await store.close()
+  })
+
   it('reports source-draft dependents instead of silently cascading their deletion', async () => {
     const { store } = createTestStore()
     await seedRelations(store, { includeVariant: true, includeRun: true })
 
     await expect(store.sourceDraftReferences(variant.sourceDraftId)).resolves.toEqual({
       resumeVariantIds: [variant.id],
-      optimizationRunIds: ['run-1']
+      optimizationRunIds: ['run-1'],
+      jobRecommendationIds: [],
+      applicationRecordIds: []
     })
     await expectErrorCode(
       store.assertSourceDraftCanBeDeleted(variant.sourceDraftId),
@@ -272,6 +419,28 @@ describe('IndexedDbDomainStore', () => {
     const store = createDomainStore({ databaseName, indexedDB: factory })
     await expectErrorCode(store.list('targetJobs'), 'OPEN_FAILED')
   })
+
+  it('migrates schema v1 records to v2 without clearing existing data', async () => {
+    const factory = new IDBFactory()
+    const databaseName = `resume-os-domain-v1-${crypto.randomUUID()}`
+    const legacy = await createVersionOneDatabase(factory, databaseName)
+    const transaction = legacy.transaction(['evidenceSources', 'targetJobs'], 'readwrite')
+    transaction.objectStore('evidenceSources').put(source)
+    transaction.objectStore('targetJobs').put(targetJob)
+    await waitForNativeTransaction(transaction)
+    legacy.close()
+
+    const store = createDomainStore({ databaseName, indexedDB: factory })
+    await expect(store.list('evidenceSources')).resolves.toEqual([source])
+    await expect(store.list('targetJobs')).resolves.toEqual([targetJob])
+    await expect(store.list('jobSources')).resolves.toEqual([])
+
+    const migrated = await openDatabase(factory, databaseName)
+    expect(migrated.version).toBe(DOMAIN_STORE_SCHEMA_VERSION)
+    expect([...migrated.objectStoreNames]).toEqual([...DOMAIN_STORE_NAMES].sort())
+    migrated.close()
+    await store.close()
+  })
 })
 
 async function expectErrorCode(
@@ -292,5 +461,43 @@ function openDatabase(factory: IDBFactory, name: string, version?: number) {
     const request = version === undefined ? factory.open(name) : factory.open(name, version)
     request.onsuccess = () => resolve(request.result)
     request.onerror = () => reject(request.error)
+  })
+}
+
+function createVersionOneDatabase(factory: IDBFactory, name: string) {
+  return new Promise<IDBDatabase>((resolve, reject) => {
+    const request = factory.open(name, 1)
+    request.onupgradeneeded = () => {
+      const database = request.result
+      database.createObjectStore('evidenceSources', { keyPath: 'id' })
+        .createIndex('byCreatedAt', 'createdAt')
+      const facts = database.createObjectStore('careerFacts', { keyPath: 'id' })
+      facts.createIndex('byEvidenceRef', 'evidenceRefs', { multiEntry: true })
+      facts.createIndex('byUpdatedAt', 'updatedAt')
+      database.createObjectStore('targetJobs', { keyPath: 'id' })
+        .createIndex('byUpdatedAt', 'updatedAt')
+      database.createObjectStore('jobRequirements', { keyPath: 'id' })
+        .createIndex('byJobId', 'jobId')
+      database.createObjectStore('requirementMatches', { keyPath: 'requirementId' })
+        .createIndex('byFactId', 'factIds', { multiEntry: true })
+      const variants = database.createObjectStore('resumeVariants', { keyPath: 'id' })
+      variants.createIndex('bySourceDraftId', 'sourceDraftId')
+      variants.createIndex('byTargetJobId', 'targetJobId')
+      variants.createIndex('byUpdatedAt', 'updatedAt')
+      const runs = database.createObjectStore('optimizationRuns', { keyPath: 'id' })
+      runs.createIndex('bySourceDraftId', 'sourceDraftId')
+      runs.createIndex('byTargetJobId', 'targetJobId')
+      runs.createIndex('byUpdatedAt', 'updatedAt')
+    }
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error)
+  })
+}
+
+function waitForNativeTransaction(transaction: IDBTransaction) {
+  return new Promise<void>((resolve, reject) => {
+    transaction.oncomplete = () => resolve()
+    transaction.onabort = () => reject(transaction.error)
+    transaction.onerror = () => reject(transaction.error)
   })
 }
