@@ -92,7 +92,7 @@ Preserve these product invariants:
 
 ## Runtime And Environment
 
-- Use Node.js 24.16.0 (`>=24.16.0 <25`) and `pnpm@11.17.0`. Do not use npm or Yarn to install dependencies or generate another lockfile.
+- Use Node.js 24.18.0 (`>=24.18.0 <25`) and `pnpm@11.17.0`. Do not use npm or Yarn to install dependencies or generate another lockfile.
 - The default development server is local-only at `127.0.0.1:3001`. If that port is occupied, use another loopback port; do not terminate an unrelated process merely to reclaim the default port.
 - Keep secrets in untracked `.env.local` or the deployment secret store. `.env.example` must contain only safe placeholders, and server credentials must never be exposed through a `NEXT_PUBLIC_*` variable or client bundle.
 - Treat `RESUME_OS_ALLOWED_AI_HOSTS`, `RESUME_OS_AI_ACCESS_TOKEN`, `RESUME_OS_LOCAL_ONLY`, and `RESUME_OS_TRUSTED_PROXY` as security-boundary configuration. Do not weaken their semantics to make a request work.

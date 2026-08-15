@@ -77,7 +77,7 @@ describe('release process', () => {
     })
 
     expect(current).toEqual({
-      nodeVersion: '24.16.0',
+      nodeVersion: '24.18.0',
       pnpmVersion: '11.17.0',
       qualityProfile: 'check',
       qualityScripts: ['check'],

@@ -84,7 +84,7 @@ quality workflow, so run the relevant checks directly before committing or
 pushing. There is no required whole-tree Prettier/ESLint gate; keep formatting
 consistent with nearby files.
 
-The supported local runtime is Node.js 24.16.0 (`>=24.16.0 <25`).
+The supported local runtime is Node.js 24.18.0 (`>=24.18.0 <25`).
 
 `pnpm dev` binds to `127.0.0.1:3001`. When that port is owned by another process, use a separate loopback port without killing an unrelated service:
 
