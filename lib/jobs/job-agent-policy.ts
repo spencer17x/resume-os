@@ -1,16 +1,12 @@
 import { z } from 'zod'
 
 export const JOB_AGENT_PLATFORM_IDS = [
-  'greenhouse',
-  'lever',
-  'boss',
-  '51job',
-  'lagou',
-  'liepin',
-  'linkedin',
-  'indeed',
-  '58'
+  'boss'
 ] as const
+
+const legacyJobAgentPlatformIdSchema = z.enum([
+  'greenhouse', 'lever', 'boss', '51job', 'lagou', 'liepin', 'linkedin', 'indeed', '58'
+])
 
 export const jobAgentPlatformIdSchema = z.enum(JOB_AGENT_PLATFORM_IDS)
 export type JobAgentPlatformId = z.infer<typeof jobAgentPlatformIdSchema>
@@ -25,15 +21,7 @@ export type JobAgentPlatformDefinition = {
 }
 
 export const jobAgentPlatformRegistry = {
-  greenhouse: { id: 'greenhouse', discovery: 'built-in', communication: 'connector-required' },
-  lever: { id: 'lever', discovery: 'built-in', communication: 'connector-required' },
-  boss: { id: 'boss', discovery: 'official-search', communication: 'partner-required' },
-  '51job': { id: '51job', discovery: 'official-search', communication: 'partner-required' },
-  lagou: { id: 'lagou', discovery: 'connector-required', communication: 'partner-required' },
-  liepin: { id: 'liepin', discovery: 'connector-required', communication: 'partner-required' },
-  linkedin: { id: 'linkedin', discovery: 'connector-required', communication: 'partner-required' },
-  indeed: { id: 'indeed', discovery: 'connector-required', communication: 'partner-required' },
-  '58': { id: '58', discovery: 'connector-required', communication: 'partner-required' }
+  boss: { id: 'boss', discovery: 'official-search', communication: 'partner-required' }
 } as const satisfies Record<JobAgentPlatformId, JobAgentPlatformDefinition>
 
 export const jobAgentPreferencesSchema = z.object({
@@ -43,6 +31,10 @@ export const jobAgentPreferencesSchema = z.object({
   platforms: z.array(jobAgentPlatformIdSchema).max(JOB_AGENT_PLATFORM_IDS.length),
   learnFromReplies: z.boolean(),
   learnFromOutcomes: z.boolean()
+})
+
+const persistedJobAgentPreferencesSchema = jobAgentPreferencesSchema.extend({
+  platforms: z.array(legacyJobAgentPlatformIdSchema).max(9)
 })
 
 export type JobAgentPreferences = z.infer<typeof jobAgentPreferencesSchema>
@@ -61,11 +53,15 @@ export const JOB_AGENT_PREFERENCES_KEY = 'resume-os:job-agent-preferences:v1'
 export function parseJobAgentPreferences(value: string | null): JobAgentPreferences {
   if (!value) return DEFAULT_JOB_AGENT_PREFERENCES
   try {
-    const parsed = jobAgentPreferencesSchema.safeParse(JSON.parse(value))
+    const parsed = persistedJobAgentPreferencesSchema.safeParse(JSON.parse(value))
     if (!parsed.success) return DEFAULT_JOB_AGENT_PREFERENCES
+    const platforms = [...new Set(parsed.data.platforms)]
+      .filter((platform): platform is JobAgentPlatformId => (
+        JOB_AGENT_PLATFORM_IDS.includes(platform as JobAgentPlatformId)
+      ))
     return {
       ...parsed.data,
-      platforms: [...new Set(parsed.data.platforms)]
+      platforms: platforms.length ? platforms : [...JOB_AGENT_PLATFORM_IDS]
     }
   } catch {
     return DEFAULT_JOB_AGENT_PREFERENCES

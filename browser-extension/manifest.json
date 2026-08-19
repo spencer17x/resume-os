@@ -5,15 +5,7 @@
   "description": "Local browser bridge for Resume OS job-platform sessions.",
   "permissions": ["tabs"],
   "host_permissions": [
-    "https://www.zhipin.com/*",
-    "https://we.51job.com/*",
-    "https://www.lagou.com/*",
-    "https://www.liepin.com/*",
-    "https://www.linkedin.com/*",
-    "https://www.indeed.com/*",
-    "https://www.58.com/*",
-    "https://boards.greenhouse.io/*",
-    "https://jobs.lever.co/*"
+    "https://www.zhipin.com/*"
   ],
   "background": { "service_worker": "background.js" },
   "content_scripts": [
@@ -28,15 +20,7 @@
     },
     {
       "matches": [
-        "https://www.zhipin.com/*",
-        "https://we.51job.com/*",
-        "https://www.lagou.com/*",
-        "https://www.liepin.com/*",
-        "https://www.linkedin.com/*",
-        "https://www.indeed.com/*",
-        "https://www.58.com/*",
-        "https://boards.greenhouse.io/*",
-        "https://jobs.lever.co/*"
+        "https://www.zhipin.com/*"
       ],
       "js": ["platform-probe.js"],
       "run_at": "document_idle"

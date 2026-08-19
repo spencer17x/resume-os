@@ -56,6 +56,14 @@ describe('job marketplace capabilities', () => {
 
     expect(new URL(buildOfficialMarketplaceSearchUrl({ platform: '58', title: '客服' })).origin)
       .toBe('https://www.58.com')
+
+    const lagou = new URL(buildOfficialMarketplaceSearchUrl({ platform: 'lagou', title: '前端工程师' }))
+    expect(lagou.origin).toBe('https://www.lagou.com')
+    expect(lagou.searchParams.get('kd')).toBe('前端工程师')
+
+    const liepin = new URL(buildOfficialMarketplaceSearchUrl({ platform: 'liepin', title: '产品经理' }))
+    expect(liepin.origin).toBe('https://www.liepin.com')
+    expect(liepin.searchParams.get('key')).toBe('产品经理')
   })
 
   it('accepts only HTTPS job URLs on the selected marketplace host', () => {
@@ -69,6 +77,8 @@ describe('job marketplace capabilities', () => {
     expect(() => assertMarketplaceJobUrl('boss', 'https://zhipin.com.evil.example/job')).toThrow()
     expect(() => assertMarketplaceJobUrl('58', 'http://www.58.com/job/1')).toThrow()
     expect(detectMarketplaceFromJobUrl('https://jobs.51job.com/example.html')).toBe('51job')
+    expect(detectMarketplaceFromJobUrl('https://www.lagou.com/jobs/1.html')).toBe('lagou')
+    expect(detectMarketplaceFromJobUrl('https://www.liepin.com/job/1.shtml')).toBe('liepin')
     expect(detectMarketplaceFromJobUrl('https://example.com/job')).toBeUndefined()
   })
 })

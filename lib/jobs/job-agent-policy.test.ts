@@ -12,21 +12,28 @@ describe('job agent policy', () => {
     expect(parseJobAgentPreferences('{"enabled":"yes"}')).toEqual(DEFAULT_JOB_AGENT_PREFERENCES)
   })
 
-  it('round-trips bounded preferences and removes duplicate platforms', () => {
+  it('round-trips bounded BOSS preferences', () => {
     const value = serializeJobAgentPreferences({
       ...DEFAULT_JOB_AGENT_PREFERENCES,
       enabled: true,
-      platforms: ['boss', 'boss', 'lever']
+      platforms: ['boss']
     })
     expect(parseJobAgentPreferences(value)).toMatchObject({
       enabled: true,
-      platforms: ['boss', 'lever']
+      platforms: ['boss']
     })
   })
 
-  it('starts with every platform enabled and no platform-specific setup', () => {
+  it('starts with only BOSS Zhipin enabled and no platform-specific setup', () => {
     expect(DEFAULT_JOB_AGENT_PREFERENCES).toMatchObject({ enabled: true, autonomy: 'autopilot' })
-    expect(DEFAULT_JOB_AGENT_PREFERENCES.platforms).toHaveLength(9)
+    expect(DEFAULT_JOB_AGENT_PREFERENCES.platforms).toEqual(['boss'])
+  })
+
+  it('migrates older platform preferences into the initial domestic catalog', () => {
+    expect(parseJobAgentPreferences(JSON.stringify({
+      ...DEFAULT_JOB_AGENT_PREFERENCES,
+      platforms: ['greenhouse', 'boss', 'linkedin', 'liepin']
+    })).platforms).toEqual(['boss'])
   })
 
   it('never sends or submits without both autopilot mode and an authorized connector', () => {

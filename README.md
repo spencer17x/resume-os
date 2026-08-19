@@ -4,7 +4,7 @@
 
 Resume OS is a local-first, evidence-grounded job-search agent. It turns a trusted resume and explicit job preferences into cross-platform discovery, qualification, job-specific materials, and recruiter-conversation drafts. Users choose the platforms and automation level. The agent improves search and communication strategy from user corrections, replies, interviews, and outcomes without changing the user's career facts.
 
-The current MVP runs while the browser is open. Reviewed Greenhouse and Lever public sources can be searched directly. The bundled Manifest V3 Browser Agent detects supported platform tabs and local login state without reading cookies; platform-specific send adapters remain disabled until their recipient, final-content, and receipt checks are implemented. The target product requirements are documented in [docs/product-requirements.md](docs/product-requirements.md).
+The current MVP runs while the browser is open and is scoped only to BOSS Zhipin. The bundled Manifest V3 Browser Agent detects the BOSS tab and local login state without reading cookies; its send adapter remains disabled until recipient, final-content, and receipt checks are implemented. The target product requirements are documented in [docs/product-requirements.md](docs/product-requirements.md).
 
 The product is built around four principles:
 
@@ -120,13 +120,13 @@ Uploaded PDF/DOCX/TXT bytes are processed transiently by the same-origin extract
 
 ## Job Agent platform and action boundary
 
-Job Agent starts from the resume rather than a required target company. Its platform catalog includes Greenhouse, Lever, BOSS Zhipin, 51job, Lagou, Liepin, LinkedIn, Indeed, and 58.com. Platform selection is capability-aware and never implies that a connector is installed:
+Job Agent starts from the resume rather than a required target company. Its first release supports only BOSS Zhipin. Platform availability never implies that the browser send adapter is enabled:
 
-- Greenhouse and Lever are automatic sources backed by a bundled, reviewed company-board catalog; users may optionally add another public company board in Advanced settings.
-- BOSS Zhipin and 51job open fixed-host official searches carrying the primary target title where supported. Resume OS does not scrape or automate their signed-in products.
-- 58.com opens the official jobs product and is labeled as requiring an approved Open Platform partnership before automatic access can be enabled.
+- BOSS Zhipin opens a fixed-host official search carrying the primary target title.
+- BOSS Zhipin session detection has been verified; its send adapter remains disabled until recipient, content, and receipt checks are stable.
+- Other marketplace and public-board parsers remain internal for backward compatibility with existing local data, but are not shown in the first-release Job Agent catalog.
 
-For a role selected on one of these platforms, the user may paste its official HTTPS
+For a role selected on BOSS Zhipin, the user may paste its official HTTPS
 URL, title, company, location, and description into Job Agent. The URL is accepted only
 when its hostname matches the selected platform. Resume OS never fetches that URL,
 reads the platform session, or infers data the user did not provide. The imported role

@@ -1,13 +1,5 @@
 const PLATFORM_HOSTS = {
-  greenhouse: ['boards.greenhouse.io'],
-  lever: ['jobs.lever.co'],
-  boss: ['zhipin.com'],
-  '51job': ['51job.com'],
-  lagou: ['lagou.com'],
-  liepin: ['liepin.com'],
-  linkedin: ['linkedin.com'],
-  indeed: ['indeed.com'],
-  '58': ['58.com']
+  boss: ['zhipin.com']
 }
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {

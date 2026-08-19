@@ -11,16 +11,6 @@ function detectSessionState() {
     if (visibleTextIncludes(['登录', '扫码登录'])) return 'login-required'
     return 'unknown'
   }
-  if (host === 'www.linkedin.com' || host.endsWith('.linkedin.com')) {
-    if (document.querySelector('a[href*="/in/"], a[href*="/mynetwork/"]')) return 'available'
-    if (visibleTextIncludes(['sign in', 'join now'])) return 'login-required'
-    return 'unknown'
-  }
-  if (host.endsWith('.51job.com') || host === '51job.com') {
-    if (document.querySelector('a[href*="resume"], a[href*="usercenter"]')) return 'available'
-    if (visibleTextIncludes(['登录', '扫码登录'])) return 'login-required'
-    return 'unknown'
-  }
   return 'unknown'
 }
 

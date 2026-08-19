@@ -61,7 +61,7 @@
       "profileMissing": "请先导入简历，建立事实依据",
       "profileUnverified": "演示及 AI 生成草稿不能作为已验证的职业证据",
       "jobsTitle": "求职 Agent",
-      "jobsMissing": "选择平台与自动化策略，开始持续发现岗位",
+      "jobsMissing": "启动 Agent，自动检查 BOSS 直聘",
       "jobsReady": "已发现岗位进入目标岗位工作流",
       "targetTitle": "目标岗位",
       "targetMissing": "添加岗位描述，聚焦本次分析",
@@ -659,8 +659,8 @@
     "jobAgent": {
       "title": "自动求职控制台",
       "description": "配置模型后自动检测浏览器中的招聘平台登录状态，并立即开始找岗。",
-      "zeroConfig": "全平台自动运行",
-      "zeroConfigHelp": "默认启用全部支持平台，无需逐个平台配置 API。",
+      "zeroConfig": "BOSS 直聘自动运行",
+      "zeroConfigHelp": "第一版只接入 BOSS 直聘，无需配置平台 API。",
       "browserReady": "浏览器 Agent 已连接；检测到可信简历后会自动运行。",
       "browserMissing": "未检测到本地浏览器 Agent；当前仍可使用公开岗位发现。",
       "enabled": "启用求职 Agent",
@@ -678,15 +678,7 @@
       },
       "platformLegend": "Agent 工作平台",
       "platform": {
-        "greenhouse": "Greenhouse",
-        "lever": "Lever",
-        "boss": "BOSS 直聘",
-        "51job": "前程无忧",
-        "lagou": "拉勾",
-        "liepin": "猎聘",
-        "linkedin": "LinkedIn",
-        "indeed": "Indeed",
-        "58": "58 同城"
+        "boss": "BOSS 直聘"
       },
       "access": {
         "built-in": "内置公开发现",
@@ -719,11 +711,7 @@
     "platformHelp": "目标公司不是必填项。公开来源在 Resume OS 内自动搜索；受限平台只打开官方搜索，不使用爬虫。",
     "platformLegend": "选择要搜索的平台",
     "marketplace": {
-      "greenhouse": { "name": "Greenhouse", "note": "已审核的公开 Job Board API。" },
-      "lever": { "name": "Lever", "note": "已审核的公开 Postings API。" },
-      "boss": { "name": "BOSS 直聘", "note": "获得授权接入前仅提供官方搜索入口。" },
-      "51job": { "name": "前程无忧", "note": "仅提供官方搜索入口，不自动操作或抓取登录态平台。" },
-      "58": { "name": "58 同城", "note": "自动接入需要通过 58 开放平台合作审核。" }
+      "boss": { "name": "BOSS 直聘", "note": "已支持官方搜索和登录状态检测；自动发送适配器正在验证。" }
     },
     "capability": {
       "automatic": "自动公开来源",

@@ -1,6 +1,6 @@
 'use client'
 
-import { Bot, BrainCircuit, ClipboardPaste, ExternalLink, LoaderCircle, MessageSquareText, Radar, RefreshCw, Save, Search, ShieldCheck, X } from 'lucide-react'
+import { Bot, BrainCircuit, ClipboardPaste, ExternalLink, MessageSquareText, Radar, Save, ShieldCheck, X } from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useResumeDraft } from '@/components/resume-draft-provider'
@@ -39,10 +39,9 @@ import {
 } from '@/lib/jobs/job-agent-policy'
 import {
   DEFAULT_JOB_MARKETPLACES,
-  JOB_MARKETPLACE_IDS,
+  PRIMARY_JOB_MARKETPLACE_IDS,
   buildOfficialMarketplaceSearchUrl,
   deriveJobSearchSeed,
-  jobMarketplaceRegistry,
   type JobMarketplaceId
 } from '@/lib/jobs/job-marketplace'
 import {
@@ -176,7 +175,10 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
     if (!profile || hydratedProfileIdRef.current === profile.id) return
     hydratedProfileIdRef.current = profile.id
     setProfileName(profile.name)
-    setSelectedPlatforms(profile.platforms?.length ? profile.platforms : [...DEFAULT_JOB_MARKETPLACES])
+    const primaryPlatforms = profile.platforms?.filter((platform) => (
+      PRIMARY_JOB_MARKETPLACE_IDS.includes(platform as typeof PRIMARY_JOB_MARKETPLACE_IDS[number])
+    )) ?? []
+    setSelectedPlatforms(primaryPlatforms.length ? primaryPlatforms : [...DEFAULT_JOB_MARKETPLACES])
     setTitles(profile.titles.join(', '))
     setLocations(profile.locations.join(', '))
     setPreferredCompanies(profile.preferredCompanies?.join(', ') ?? '')
@@ -490,7 +492,9 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
     setNotice('')
     try {
       const parsed = parseJobClipboardText(clipboardJobText)
-      if (parsed.platform) setImportPlatform(parsed.platform)
+      if (parsed.platform && PRIMARY_JOB_MARKETPLACE_IDS.includes(parsed.platform as typeof PRIMARY_JOB_MARKETPLACE_IDS[number])) {
+        setImportPlatform(parsed.platform)
+      }
       if (parsed.url) setImportUrl(parsed.url)
       if (parsed.title) setImportTitle(parsed.title)
       if (parsed.company) setImportCompany(parsed.company)
@@ -560,8 +564,8 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
     const rightScore = recommendationByPosting.get(right.id)?.preliminaryScore ?? -1
     return rightScore - leftScore || right.lastCheckedAt.localeCompare(left.lastCheckedAt)
   })
-  const officialSearchPlatforms = selectedPlatforms.filter((platform): platform is Extract<JobMarketplaceId, 'boss' | '51job' | '58'> => (
-    platform === 'boss' || platform === '51job' || platform === '58'
+  const officialSearchPlatforms = selectedPlatforms.filter((platform): platform is Extract<JobMarketplaceId, 'boss' | '51job' | 'lagou' | 'liepin' | '58'> => (
+    platform === 'boss' || platform === '51job' || platform === 'lagou' || platform === 'liepin' || platform === '58'
   ))
   const primaryTitle = splitTerms(titles)[0]
   const primaryLocation = splitTerms(locations)[0]
@@ -589,27 +593,9 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
           <div className="job-radar-app__learning"><BrainCircuit size={14} aria-hidden="true" /><div><strong>{t('jobAgent.learning')}</strong><p>{t('jobAgent.learningHelp')}</p></div></div>
           <p className="job-radar-app__section-help">{t('jobAgent.learnReplies')} · {t('jobAgent.learnOutcomes')}</p>
           <button className="job-radar-app__market-search" type="button" onClick={() => void searchMarket()} disabled={Boolean(busySourceId) || !trustedDraft || selectedPlatforms.length === 0 || !titles.trim()}><Bot size={14} />{t('jobAgent.runNow')}</button>
-          <p className="job-radar-app__section-help">{t('jobAgent.runtimeBoundary')}</p>
-        </section>
-        <section><h2>{t('platforms')}</h2>
-          <p className="job-radar-app__section-help">{t('platformHelp')}</p>
-          <fieldset className="job-radar-app__platforms"><legend>{t('platformLegend')}</legend>{JOB_MARKETPLACE_IDS.map((platform) => {
-            const definition = jobMarketplaceRegistry[platform]
-            return <label key={platform} data-capability={definition.capability}>
-              <input type="checkbox" checked={selectedPlatforms.includes(platform)} onChange={() => setSelectedPlatforms((current) => current.includes(platform) ? current.filter((item) => item !== platform) : [...current, platform])} />
-              <span><strong>{t(`marketplace.${platform}.name`)}</strong><small>{t(`capability.${definition.capability}`)}</small></span>
-            </label>
-          })}</fieldset>
-          <button className="job-radar-app__market-search" type="button" onClick={() => void searchMarket()} disabled={Boolean(busySourceId) || !trustedDraft || selectedPlatforms.length === 0 || !titles.trim()}><Search size={14} />{t('searchMarket')}</button>
           {marketProgress ? <p className="job-radar-app__progress" role="status">{marketProgress}</p> : null}
           {officialSearchPlatforms.length > 0 ? <div className="job-radar-app__official-searches"><h3>{t('officialSearches')}</h3><p>{t('officialSearchHelp')}</p><ul>{officialSearchPlatforms.map((platform) => <li key={platform}><a href={buildOfficialMarketplaceSearchUrl({ platform, title: primaryTitle, location: primaryLocation })} target="_blank" rel="noopener noreferrer"><ExternalLink size={12} />{t('openMarketplace', { platform: t(`marketplace.${platform}.name`) })}</a><small>{t(`marketplace.${platform}.note`)}</small></li>)}</ul></div> : null}
-          <details className="job-radar-app__advanced"><summary>{t('advancedSources')}</summary>
-            <p>{t('advancedSourcesHelp')}</p>
-            <label>{t('sourceKind')}<select value={sourceKind} onChange={(event) => setSourceKind(event.target.value as SourceKind)}><option value="greenhouse">Greenhouse</option><option value="lever">Lever</option></select></label>
-            <label>{t('sourceKey')}<input value={sourceKey} onChange={(event) => setSourceKey(event.target.value)} placeholder="company-slug" /></label>
-            <button type="button" onClick={() => void addSource()} disabled={!sourceKey.trim()}>{t('addSource')}</button>
-            <ul>{sources.map((source) => <li key={source.id}><span>{source.label}<small>{source.kind}</small></span><button type="button" disabled={Boolean(busySourceId)} onClick={() => void refresh(source)} aria-label={t('refreshSource', { source: source.label })}>{busySourceId === source.id ? <LoaderCircle className="spin" size={14} /> : <RefreshCw size={14} />}</button></li>)}</ul>
-          </details>
+          <p className="job-radar-app__section-help">{t('jobAgent.runtimeBoundary')}</p>
         </section>
         <section><h2>{t('profile')}</h2>
           <label>{t('profileName')}<input value={profileName} onChange={(event) => setProfileName(event.target.value)} /></label>
@@ -625,7 +611,7 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
           <p className="job-radar-app__section-help">{t('importJobHelp')}</p>
           <label>{t('clipboardJob')}<textarea value={clipboardJobText} onChange={(event) => setClipboardJobText(event.target.value)} rows={6} placeholder={t('clipboardJobPlaceholder')} /></label>
           <button type="button" onClick={prefillFromClipboard} disabled={!clipboardJobText.trim()}><ClipboardPaste size={14} />{t('parseClipboardJob')}</button>
-          <label>{t('importPlatform')}<select value={importPlatform} onChange={(event) => setImportPlatform(event.target.value as JobMarketplaceId)}>{JOB_MARKETPLACE_IDS.map((platform) => <option key={platform} value={platform}>{t(`marketplace.${platform}.name`)}</option>)}</select></label>
+          <label>{t('importPlatform')}<select value={importPlatform} onChange={(event) => setImportPlatform(event.target.value as JobMarketplaceId)}>{PRIMARY_JOB_MARKETPLACE_IDS.map((platform) => <option key={platform} value={platform}>{t(`marketplace.${platform}.name`)}</option>)}</select></label>
           <label>{t('importUrl')}<input type="url" value={importUrl} onChange={(event) => setImportUrl(event.target.value)} placeholder="https://…" /></label>
           <label>{t('importTitle')}<input value={importTitle} onChange={(event) => setImportTitle(event.target.value)} /></label>
           <label>{t('importCompany')}<input value={importCompany} onChange={(event) => setImportCompany(event.target.value)} /></label>

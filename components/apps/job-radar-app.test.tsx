@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { IDBFactory } from 'fake-indexeddb'
 import { NextIntlClientProvider } from 'next-intl'
@@ -6,7 +6,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ResumeDraftProviderCore } from '@/components/resume-draft-provider'
 import { createDomainStore, type IndexedDbDomainStore } from '@/lib/agent/domain-store'
 import type { JobPosting, JobSearchProfile, JobSource } from '@/lib/jobs/job-domain'
-import { JobSourceError, type JobSourceAdapter } from '@/lib/jobs/sources'
+import { scoreJobRecommendation } from '@/lib/jobs/job-recommendation'
+import type { JobSourceAdapter } from '@/lib/jobs/sources'
 import { createResumeDraft, normalizeResumeData } from '@/lib/resume-model'
 import { writeDraftState } from '@/lib/resume-store'
 import en from '@/messages/en.json'
@@ -90,23 +91,17 @@ afterEach(async () => {
 })
 
 describe('JobRadarApp', () => {
-  it('shows the local-first empty state and adds an authorized source without refreshing it', async () => {
-    const user = userEvent.setup()
+  it('shows the local-first empty state with only BOSS Zhipin', async () => {
     const store = createStore()
     renderRadar({ store })
 
     expect(await screen.findByText('Import or paste a trusted resume before matching jobs.')).toBeVisible()
-    expect(screen.getByRole('group', { name: 'Platforms to search' })).toBeVisible()
-    await user.click(screen.getByText('Advanced: add a company board'))
-    await user.type(screen.getByLabelText('Public board identifier'), 'example')
-    await user.click(screen.getByRole('button', { name: 'Add source' }))
-
-    expect(await screen.findByText('Source added. Refresh it when you are ready.')).toBeVisible()
-    expect(await store.list('jobPostings')).toEqual([])
-    expect(screen.getByRole('button', { name: 'Refresh example' })).toBeVisible()
+    expect(screen.getByRole('list', { name: 'Agent work platforms' }).children).toHaveLength(1)
+    expect(screen.queryByText('Greenhouse')).not.toBeInTheDocument()
+    expect(screen.queryByText('Lever')).not.toBeInTheDocument()
   })
 
-  it('derives the initial search from the resume and searches selected automatic marketplaces', async () => {
+  it('derives the initial search and opens BOSS Zhipin search', async () => {
     const user = userEvent.setup()
     const store = createStore()
     const createAdapter = (kind: 'greenhouse' | 'lever'): JobSourceAdapter => ({
@@ -134,20 +129,17 @@ describe('JobRadarApp', () => {
     renderRadar({ store, storage: trustedStorage(), createAdapter })
 
     expect(await screen.findByDisplayValue('Platform Engineer')).toBeVisible()
-    expect(within(screen.getByRole('group', { name: 'Platforms to search' })).getByRole('checkbox', { name: /BOSS Zhipin/ })).toBeChecked()
     expect(screen.getByRole('link', { name: 'Search BOSS Zhipin' })).toHaveAttribute(
       'href',
       expect.stringContaining('query=Platform+Engineer')
     )
-    await user.click(screen.getByRole('button', { name: 'Search selected platforms' }))
+    await user.click(screen.getByRole('button', { name: 'Run Agent now' }))
 
-    expect(await screen.findByText(/Market search complete: 8 automatic sources/, {}, { timeout: 10_000 })).toHaveTextContent(
-      '0 source failures'
-    )
-    expect(await store.list('jobSources')).toHaveLength(8)
-    expect(await store.list('jobPostings')).toHaveLength(8)
+    expect(await screen.findByText('The selected platforms require official search or partner access. Open their official searches below.')).toBeVisible()
+    expect(await store.list('jobSources')).toHaveLength(0)
+    expect(await store.list('jobPostings')).toHaveLength(0)
     expect((await store.list('jobSearchProfiles'))[0]).toMatchObject({
-      platforms: ['greenhouse', 'lever', 'boss', '51job', '58'],
+      platforms: ['boss'],
       titles: ['Platform Engineer']
     })
   })
@@ -157,8 +149,8 @@ describe('JobRadarApp', () => {
     renderRadar({ store, storage: trustedStorage() })
 
     expect(await screen.findByRole('heading', { name: 'Job automation controls' })).toBeVisible()
-    expect(screen.getByText('Automatic on every platform')).toBeVisible()
-    expect(screen.getByRole('list', { name: 'Agent work platforms' }).children).toHaveLength(9)
+    expect(screen.getByText('Automatic on BOSS Zhipin')).toBeVisible()
+    expect(screen.getByRole('list', { name: 'Agent work platforms' }).children).toHaveLength(1)
     expect(screen.getByText(/Platforms without an authorized connector produce reviewable drafts only/)).toBeVisible()
     expect(screen.getByRole('button', { name: 'Run Agent now' })).toBeDisabled()
 
@@ -166,22 +158,21 @@ describe('JobRadarApp', () => {
     expect(screen.getByRole('button', { name: 'Run Agent now' })).toBeEnabled()
   })
 
-  it('surfaces partial refreshes, scores jobs, and preserves a saved application when ignored later', async () => {
+  it('shows scored jobs and preserves a saved application when ignored later', async () => {
     const user = userEvent.setup()
     const store = createStore()
     await store.put('jobSources', source)
     await store.put('jobSearchProfiles', profile)
-    const adapter: JobSourceAdapter = {
-      kind: 'greenhouse', validateSourceKey: (value) => value, recognizeUrl: () => null,
-      refresh: async () => ({
-        sourceId: source.id, completeness: 'partial', checkedAt: now,
-        postings: [posting], warnings: ['synthetic partial response']
-      })
-    }
-    renderRadar({ store, storage: trustedStorage(), createAdapter: () => adapter })
+    await store.put('jobPostings', posting)
+    await store.put('jobRecommendations', scoreJobRecommendation({
+      posting,
+      profile,
+      sourceDraftId: 'ada-draft',
+      facts: [],
+      now
+    }))
+    renderRadar({ store, storage: trustedStorage() })
 
-    await user.click(await screen.findByRole('button', { name: 'Refresh Example' }))
-    expect(await screen.findByText(/Partial refresh: 1 new/)).toBeVisible()
     expect(await screen.findByRole('heading', { name: 'Platform Engineer' })).toBeVisible()
     expect(screen.getByLabelText(/Preliminary relevance score/)).toBeVisible()
 
@@ -192,21 +183,4 @@ describe('JobRadarApp', () => {
     expect(await store.list('applicationRecords')).toHaveLength(1)
   })
 
-  it('cancels an in-flight refresh without committing partial postings', async () => {
-    const user = userEvent.setup()
-    const store = createStore()
-    await store.put('jobSources', source)
-    const adapter: JobSourceAdapter = {
-      kind: 'greenhouse', validateSourceKey: (value) => value, recognizeUrl: () => null,
-      refresh: ({ signal }) => new Promise((_resolve, reject) => {
-        signal?.addEventListener('abort', () => reject(new JobSourceError('REQUEST_ABORTED')), { once: true })
-      })
-    }
-    renderRadar({ store, storage: trustedStorage(), createAdapter: () => adapter })
-
-    await user.click(await screen.findByRole('button', { name: 'Refresh Example' }))
-    await user.click(await screen.findByRole('button', { name: 'Cancel refresh' }))
-    expect(await screen.findByText('Refresh canceled; no partial source state was committed.')).toBeVisible()
-    expect(await store.list('jobPostings')).toEqual([])
-  })
 })

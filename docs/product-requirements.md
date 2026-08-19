@@ -14,9 +14,8 @@ rules, user intent, and a complete action history.
 
 1. The user imports a trusted resume and confirms job goals, locations, compensation,
    exclusions, and communication preferences.
-2. After the user configures the model, the agent enables the complete platform
-   catalog automatically: Greenhouse, Lever, BOSS Zhipin, 51job, Lagou, Liepin,
-   LinkedIn, Indeed, and 58.com. Per-platform API configuration and platform selection
+2. After the user configures the model, the agent enables BOSS Zhipin automatically.
+   Per-platform API configuration and platform selection
    are not part of the primary flow.
 3. The local Browser Agent detects platform sessions already available in Chrome and
    starts discovery automatically. A missing or expired session opens the relevant
@@ -38,8 +37,8 @@ rules, user intent, and a complete action history.
 Being in the automatic catalog does not imply access. Every platform exposes independent
 capabilities for discovery, messaging, scheduling, and application submission:
 
-- **Built-in public discovery:** currently available for reviewed Greenhouse and
-  Lever public boards.
+- **Fixed-host official search:** currently available for BOSS Zhipin.
+  Results remain on the platform until its reviewed browser adapter is enabled.
 - **Official search:** opens a fixed-host platform search without reading login state.
 - **Local browser adapter:** uses the user's existing Chrome session and visible
   platform UI. Each adapter must verify the recipient, final content, and a platform

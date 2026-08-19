@@ -61,7 +61,7 @@
       "profileMissing": "Import a resume to establish your evidence base",
       "profileUnverified": "Demo and AI-created drafts are not verified career evidence",
       "jobsTitle": "Job Agent",
-      "jobsMissing": "Choose platforms and an automation policy to start discovering roles",
+      "jobsMissing": "Start the Agent on BOSS Zhipin",
       "jobsReady": "A discovered role has entered the target-job workflow",
       "targetTitle": "Target job",
       "targetMissing": "Add a job description to focus the analysis",
@@ -659,8 +659,8 @@
     "jobAgent": {
       "title": "Job automation controls",
       "description": "After model setup, automatically detect signed-in job platforms in the browser and start discovery.",
-      "zeroConfig": "Automatic on every platform",
-      "zeroConfigHelp": "All supported platforms are enabled without per-platform API configuration.",
+      "zeroConfig": "Automatic on BOSS Zhipin",
+      "zeroConfigHelp": "The first release supports only BOSS Zhipin and requires no platform API configuration.",
       "browserReady": "Browser Agent connected; it starts automatically when a trusted resume is available.",
       "browserMissing": "Local Browser Agent was not detected; reviewed public discovery remains available.",
       "enabled": "Enable Job Agent",
@@ -678,15 +678,7 @@
       },
       "platformLegend": "Agent work platforms",
       "platform": {
-        "greenhouse": "Greenhouse",
-        "lever": "Lever",
-        "boss": "BOSS Zhipin",
-        "51job": "51job",
-        "lagou": "Lagou",
-        "liepin": "Liepin",
-        "linkedin": "LinkedIn",
-        "indeed": "Indeed",
-        "58": "58.com"
+        "boss": "BOSS Zhipin"
       },
       "access": {
         "built-in": "Built-in public discovery",
@@ -719,11 +711,7 @@
     "platformHelp": "Company is optional. Automatic sources are searched inside Resume OS; restricted platforms open their official search instead of being scraped.",
     "platformLegend": "Platforms to search",
     "marketplace": {
-      "greenhouse": { "name": "Greenhouse", "note": "Reviewed public Job Board API." },
-      "lever": { "name": "Lever", "note": "Reviewed public Postings API." },
-      "boss": { "name": "BOSS Zhipin", "note": "Official search only until an authorized integration is available." },
-      "51job": { "name": "51job", "note": "Official search only; Resume OS does not automate or scrape the signed-in platform." },
-      "58": { "name": "58.com", "note": "Automatic access requires an approved 58 Open Platform partnership." }
+      "boss": { "name": "BOSS Zhipin", "note": "Official search and session detection are supported; the automatic send adapter is under verification." }
     },
     "capability": {
       "automatic": "Automatic public source",
