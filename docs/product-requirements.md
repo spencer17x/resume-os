@@ -14,15 +14,15 @@ rules, user intent, and a complete action history.
 
 1. The user imports a trusted resume and confirms job goals, locations, compensation,
    exclusions, and communication preferences.
-2. The user chooses platforms. The initial catalog includes Greenhouse, Lever, BOSS
-   Zhipin, 51job, Lagou, Liepin, LinkedIn, Indeed, and 58.com.
-3. The user chooses an automation level:
-   - **Copilot:** analyze and draft only.
-   - **Approval:** automatically discover, rank, and draft; confirm every external
-     message and application action.
-   - **Autopilot:** execute explicitly allowed actions only through an authorized
-     official connector. Unsupported, sensitive, or evidence-deficient questions
-     pause for the user.
+2. After the user configures the model, the agent enables the complete platform
+   catalog automatically: Greenhouse, Lever, BOSS Zhipin, 51job, Lagou, Liepin,
+   LinkedIn, Indeed, and 58.com. Per-platform API configuration and platform selection
+   are not part of the primary flow.
+3. The local Browser Agent detects platform sessions already available in Chrome and
+   starts discovery automatically. A missing or expired session opens the relevant
+   login page; login, QR code, SMS, 2FA, and CAPTCHA completion remain user actions.
+   After the first successful login, the local browser session is reused without
+   exporting cookies or credentials to Resume OS.
 4. The agent continuously discovers and deduplicates roles, explains its ranking,
    and rejects roles outside hard constraints.
 5. For a selected role, the agent maps requirements to saved evidence, creates a
@@ -35,14 +35,18 @@ rules, user intent, and a complete action history.
 
 ## Platform capability model
 
-Platform selection does not imply access. Every platform exposes independent
+Being in the automatic catalog does not imply access. Every platform exposes independent
 capabilities for discovery, messaging, scheduling, and application submission:
 
 - **Built-in public discovery:** currently available for reviewed Greenhouse and
   Lever public boards.
 - **Official search:** opens a fixed-host platform search without reading login state.
+- **Local browser adapter:** uses the user's existing Chrome session and visible
+  platform UI. Each adapter must verify the recipient, final content, and a platform
+  success receipt. It must fail closed when selectors, session state, or page content
+  are unknown.
 - **Authorized connector:** uses an official API, approved partnership, or other
-  platform-supported integration after user authorization.
+  platform-supported integration when one is available.
 - **Unavailable:** the UI may prepare a draft or handoff, but must not simulate an
   integration or claim that an action completed.
 
@@ -66,8 +70,9 @@ resume and application records.
 ## Runtime and data model
 
 The current MVP is local-first and runs only while the browser is active. It persists
-preferences and strategy locally, uses reviewed public discovery, and prepares drafts
-for platforms without a connector.
+preferences and strategy locally, uses reviewed public discovery, and includes a
+Manifest V3 bridge that detects platform tabs without reading cookies. Platform send
+adapters are enabled one at a time only after recipient, content, and receipt tests pass.
 
 Continuous background operation requires a later scheduler and encrypted server-side
 workspace. That phase needs an explicit product and privacy decision covering account
@@ -83,4 +88,3 @@ silent extension of the current browser-only data boundary.
 - User corrections required per outbound draft.
 - Unauthorized-action count, unsupported-claim count, and false-completion count:
   all must remain zero.
-

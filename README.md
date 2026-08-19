@@ -4,24 +4,24 @@
 
 Resume OS is a local-first, evidence-grounded job-search agent. It turns a trusted resume and explicit job preferences into cross-platform discovery, qualification, job-specific materials, and recruiter-conversation drafts. Users choose the platforms and automation level. The agent improves search and communication strategy from user corrections, replies, interviews, and outcomes without changing the user's career facts.
 
-The current MVP runs while the browser is open. Reviewed Greenhouse and Lever public sources can be searched directly; restricted platforms remain fixed-host searches or draft-only handoffs until an official API or approved connector is authorized. The target product requirements are documented in [docs/product-requirements.md](docs/product-requirements.md).
+The current MVP runs while the browser is open. Reviewed Greenhouse and Lever public sources can be searched directly. The bundled Manifest V3 Browser Agent detects supported platform tabs and local login state without reading cookies; platform-specific send adapters remain disabled until their recipient, final-content, and receipt checks are implemented. The target product requirements are documented in [docs/product-requirements.md](docs/product-requirements.md).
 
 The product is built around four principles:
 
 - **Evidence before claims:** saved career facts are the boundary for resume content; missing evidence becomes a question, not an invented achievement.
 - **Job-specific decisions:** the target role determines which verified experience should be emphasized.
-- **User-controlled autonomy:** users choose Copilot, approval, or authorized-autopilot mode. External actions require an official connector and the saved action policy.
+- **Zero-configuration automation:** after model setup, every supported platform is enabled and the Agent reuses available local Chrome sessions. Login challenges remain user actions.
 - **Local-first ownership:** resume drafts and AI configuration stay in the browser. The server handles individual requests without persisting career data or API keys.
 
 The primary workflow is:
 
 1. Import or paste an existing resume in Resume Studio.
-2. Enable Job Agent, choose platforms, and select an automation level. Resume OS derives the initial search from the trusted resume and saved preferences.
+2. Open Job Agent. It enables all supported platforms, detects available Chrome sessions, derives the initial search, and starts automatically.
 3. Run discovery. Reviewed public sources refresh inside Resume OS; restricted platforms open fixed-host searches or produce draft-only handoffs until an authorized connector exists.
 4. Confirm every extracted requirement and inspect the evidence and gaps.
 5. Ask the Resume Agent for job-specific, reviewable changes.
 6. Verify each claim and apply selected changes to a separate resume variant.
-7. Manage outreach and follow-ups in the conversation center. In the current MVP, messages and submissions remain reviewable drafts or manual handoffs; future automatic external actions require an authorized official connector and an explicit saved policy.
+7. Manage outreach and follow-ups in the conversation center. A browser adapter may send only after verifying the recipient and final content, and records completion only from a platform success receipt.
 
 Simulated resume generation is a **Demo / Sandbox** for exploring the interface. It does not represent verified user history and should not be used as the evidence source for a real application.
 

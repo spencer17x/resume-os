@@ -3227,6 +3227,7 @@ a {
 .job-radar-app__agent-heading h2 { color: var(--theme-fog); }
 .job-radar-app__agent-heading p { margin-top: 3px; color: var(--theme-muted); font-size: 9px; line-height: 1.45; }
 .job-radar-app aside .job-radar-app__agent-enabled { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 8px; border: 1px solid color-mix(in srgb, var(--theme-accent) 46%, var(--theme-line)); border-radius: 7px; padding: 8px; }
+.job-radar-app__agent-enabled > svg { color: var(--theme-accent-soft); }
 .job-radar-app aside .job-radar-app__agent-enabled input,
 .job-radar-app aside .job-radar-app__compact-check input,
 .job-radar-app aside .job-radar-app__agent-platforms input { width: 15px; min-height: 15px; margin: 1px 0 0; accent-color: var(--theme-accent); }
@@ -3237,9 +3238,9 @@ a {
 .job-radar-app__agent-control > .job-radar-app__section-help { display: flex; align-items: flex-start; gap: 5px; }
 .job-radar-app__agent-control > .job-radar-app__section-help svg { flex: 0 0 auto; }
 .job-radar-app__agent-platforms { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; margin: 0; border: 0; padding: 0; }
-.job-radar-app__agent-platforms legend { margin-bottom: 5px; color: var(--theme-muted); font-size: 9px; font-weight: 650; }
-.job-radar-app__agent-platforms label { display: grid; min-width: 0; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 5px; border: 1px solid var(--theme-line); border-radius: 6px; padding: 6px; cursor: pointer; }
-.job-radar-app__agent-platforms label:has(input:checked) { border-color: color-mix(in srgb, var(--theme-accent) 48%, var(--theme-line)); }
+.job-radar-app__agent-platforms > div { display: grid; min-width: 0; border: 1px solid var(--theme-line); border-radius: 6px; padding: 6px; }
+.job-radar-app__agent-platforms > div[data-session='available'] { border-color: color-mix(in srgb, #54b883 58%, var(--theme-line)); background: color-mix(in srgb, #54b883 7%, transparent); }
+.job-radar-app__agent-platforms > div[data-session='login-required'] { border-color: color-mix(in srgb, #d6a849 58%, var(--theme-line)); }
 .job-radar-app__agent-platforms strong,
 .job-radar-app__agent-platforms small { display: block; overflow-wrap: anywhere; }
 .job-radar-app__agent-platforms strong { color: var(--theme-fog); font-size: 9px; }

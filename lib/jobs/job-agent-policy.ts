@@ -49,9 +49,9 @@ export type JobAgentPreferences = z.infer<typeof jobAgentPreferencesSchema>
 
 export const DEFAULT_JOB_AGENT_PREFERENCES: JobAgentPreferences = {
   version: 1,
-  enabled: false,
-  autonomy: 'approval',
-  platforms: ['greenhouse', 'lever', 'boss', '51job'],
+  enabled: true,
+  autonomy: 'autopilot',
+  platforms: [...JOB_AGENT_PLATFORM_IDS],
   learnFromReplies: true,
   learnFromOutcomes: true
 }

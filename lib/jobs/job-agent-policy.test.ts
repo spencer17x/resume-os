@@ -24,6 +24,11 @@ describe('job agent policy', () => {
     })
   })
 
+  it('starts with every platform enabled and no platform-specific setup', () => {
+    expect(DEFAULT_JOB_AGENT_PREFERENCES).toMatchObject({ enabled: true, autonomy: 'autopilot' })
+    expect(DEFAULT_JOB_AGENT_PREFERENCES.platforms).toHaveLength(9)
+  })
+
   it('never sends or submits without both autopilot mode and an authorized connector', () => {
     const preferences = { ...DEFAULT_JOB_AGENT_PREFERENCES, enabled: true, autonomy: 'autopilot' as const }
     expect(canExecuteJobAgentAction({ action: 'discover', preferences })).toBe(true)

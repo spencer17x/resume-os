@@ -1,0 +1,45 @@
+{
+  "manifest_version": 3,
+  "name": "Resume OS Browser Agent",
+  "version": "0.1.0",
+  "description": "Local browser bridge for Resume OS job-platform sessions.",
+  "permissions": ["tabs"],
+  "host_permissions": [
+    "https://www.zhipin.com/*",
+    "https://we.51job.com/*",
+    "https://www.lagou.com/*",
+    "https://www.liepin.com/*",
+    "https://www.linkedin.com/*",
+    "https://www.indeed.com/*",
+    "https://www.58.com/*",
+    "https://boards.greenhouse.io/*",
+    "https://jobs.lever.co/*"
+  ],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://127.0.0.1/*",
+        "http://localhost/*",
+        "https://resume-os-phi.vercel.app/*"
+      ],
+      "js": ["resume-os-bridge.js"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://www.zhipin.com/*",
+        "https://we.51job.com/*",
+        "https://www.lagou.com/*",
+        "https://www.liepin.com/*",
+        "https://www.linkedin.com/*",
+        "https://www.indeed.com/*",
+        "https://www.58.com/*",
+        "https://boards.greenhouse.io/*",
+        "https://jobs.lever.co/*"
+      ],
+      "js": ["platform-probe.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

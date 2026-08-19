@@ -301,6 +301,12 @@ For a public deployment, also verify the browser network panel: Chrome-local tas
 
 For Job Agent, verify that refresh calls only `/api/jobs/discover`, the server calls only the fixed Greenhouse/Lever hosts, cancellation leaves no partial browser commit, career data is absent from the request, and selecting a platform does not imply connector authorization. In the current MVP, opening an application URL does not mark it submitted and an explicit submitted confirmation is required. Any later messaging or submission connector requires its own token, revocation, receipt, retry, and allow/deny-path verification before deployment.
 
+The optional Manifest V3 Browser Agent runs locally in Chrome. Its page bridge is
+allowlisted to the shipped Resume OS origin and loopback development origins. It may
+probe visible platform pages but must not request cookie permissions, export session
+credentials, or report a send as successful without a platform receipt. New deployment
+origins require an intentional manifest change and extension review.
+
 ## GitHub Pages boundary
 
 GitHub Pages serves static files and cannot execute the Next.js route handlers used for document extraction and OpenAI-compatible AI tasks. The current repository therefore cannot provide its complete workflow on GitHub Pages.

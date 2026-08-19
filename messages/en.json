@@ -658,7 +658,11 @@
     "cancel": "Cancel refresh",
     "jobAgent": {
       "title": "Job automation controls",
-      "description": "You choose where the Agent works and which actions it may take independently.",
+      "description": "After model setup, automatically detect signed-in job platforms in the browser and start discovery.",
+      "zeroConfig": "Automatic on every platform",
+      "zeroConfigHelp": "All supported platforms are enabled without per-platform API configuration.",
+      "browserReady": "Browser Agent connected; it starts automatically when a trusted resume is available.",
+      "browserMissing": "Local Browser Agent was not detected; reviewed public discovery remains available.",
       "enabled": "Enable Job Agent",
       "enabledHelp": "Runs only while this browser is open and never bypasses platform permissions.",
       "autonomy": "Automation level",
@@ -689,12 +693,17 @@
         "official-search": "Official search entry",
         "connector-required": "Official connector pending"
       },
+      "session": {
+        "available": "Signed-in session available",
+        "login-required": "Login or verification required",
+        "unknown": "Waiting for browser detection"
+      },
       "learning": "Strategy memory",
       "learningHelp": "Learns preferences, message feedback, and outcomes without changing career facts.",
       "learnReplies": "Improve openers and follow-ups from recruiter replies",
       "learnOutcomes": "Improve targeting from interviews, offers, and rejection reasons",
       "runNow": "Run Agent now",
-      "runtimeBoundary": "This MVP runs locally and supports reviewed public discovery. Continuous background work requires a later scheduler service.",
+      "runtimeBoundary": "Platform login, QR codes, SMS verification, and CAPTCHAs remain user actions. The Agent does not read or export cookies.",
       "communicationTitle": "Conversation and negotiation center",
       "communicationHelp": "Manage outreach, questions, interview scheduling, and follow-ups with job and evidence context attached.",
       "connectorBoundary": "Platforms without an authorized connector produce reviewable drafts only. The Agent does not read login sessions, simulate clicks, bypass CAPTCHAs, or claim a message was sent.",

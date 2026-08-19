@@ -25,7 +25,7 @@ Preserve these product invariants:
 - Durable user data belongs to the browser origin. Do not add server-side persistence, accounts, analytics, cloud sync, or uploaded-file retention without an explicit product decision.
 - Cloud use must remain explicit. Automatic mode may fall back to a cloud provider only when the saved preference allows it; do not introduce silent fallback.
 - API keys and career data must not be logged, echoed, or persisted by server routes.
-- Job discovery uses dedicated adapters for reviewed public sources. Never turn it into an arbitrary-URL fetcher, authenticated marketplace scraper, cookie/session replay mechanism, CAPTCHA bypass, or unattended application submitter.
+- Job discovery uses dedicated adapters for reviewed public sources. The local Browser Agent may operate visible, already-authenticated platform UI through reviewed per-platform adapters, but must never export or replay cookies, accept arbitrary target URLs, bypass login/2FA/CAPTCHA, scrape private marketplace data in bulk, or become an unattended application submitter. A message send requires deterministic recipient and final-content checks plus a platform success receipt.
 - Opening an employer application page is not proof of submission. Only an explicit user confirmation may move a local application record to `applied` and set `submittedAt`.
 
 ## Repository Map
@@ -68,6 +68,7 @@ Preserve these product invariants:
 - Uploaded PDF, DOCX, and TXT bytes are transient extraction inputs. Do not persist the original files or add them to the evidence store without an explicit product and privacy decision.
 - Propagate cancellation through browser requests, provider calls, document parsing, and long-running work. Ignore late responses after cancellation or input changes, and retain fingerprint-based stale-result protection.
 - Browser cloud requests must use `aiFetch` and its approved same-origin paths. Document extraction and the bounded `/api/jobs/discover` public-source route are the deliberate same-origin non-AI exceptions.
+- Browser-platform automation must stay in the bundled local extension. The web app communicates through the versioned, bounded bridge protocol; platform content, cookies, credentials, and raw private inbox data must not be exposed to page scripts or server routes.
 - Preserve request-guard, provider-host allowlist, no-redirect, timeout, rate-limit, payload-limit, and worker-resource boundaries when changing API routes.
 - Avoid adding a vector database or embedding pipeline unless the product scope explicitly changes. Retrieval currently means typed, explicit evidence references.
 

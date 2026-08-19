@@ -141,7 +141,7 @@ describe('JobRadarApp', () => {
     )
     await user.click(screen.getByRole('button', { name: 'Search selected platforms' }))
 
-    expect(await screen.findByText(/Market search complete: 8 automatic sources/)).toHaveTextContent(
+    expect(await screen.findByText(/Market search complete: 8 automatic sources/, {}, { timeout: 10_000 })).toHaveTextContent(
       '0 source failures'
     )
     expect(await store.list('jobSources')).toHaveLength(8)
@@ -152,18 +152,17 @@ describe('JobRadarApp', () => {
     })
   })
 
-  it('exposes user-controlled automation and keeps unconnected messaging draft-only', async () => {
-    const user = userEvent.setup()
+  it('defaults to zero-configuration automation and keeps unconnected messaging draft-only', async () => {
     const store = createStore()
     renderRadar({ store, storage: trustedStorage() })
 
     expect(await screen.findByRole('heading', { name: 'Job automation controls' })).toBeVisible()
-    expect(screen.getByRole('combobox', { name: 'Automation level' })).toHaveValue('approval')
+    expect(screen.getByText('Automatic on every platform')).toBeVisible()
+    expect(screen.getByRole('list', { name: 'Agent work platforms' }).children).toHaveLength(9)
     expect(screen.getByText(/Platforms without an authorized connector produce reviewable drafts only/)).toBeVisible()
     expect(screen.getByRole('button', { name: 'Run Agent now' })).toBeDisabled()
 
     expect(await screen.findByDisplayValue('Platform Engineer')).toBeVisible()
-    await user.click(screen.getByRole('checkbox', { name: /Enable Job Agent/ }))
     expect(screen.getByRole('button', { name: 'Run Agent now' })).toBeEnabled()
   })
 

@@ -26,14 +26,15 @@ import { refreshSelectedJobMarket } from '@/lib/jobs/job-market-search'
 import { importMarketplaceJob } from '@/lib/jobs/manual-job-import'
 import { parseJobClipboardText } from '@/lib/jobs/job-clipboard-import'
 import {
+  detectBrowserAgentSessions,
+  type BrowserPlatformSession
+} from '@/lib/jobs/browser-agent-protocol'
+import {
   DEFAULT_JOB_AGENT_PREFERENCES,
   JOB_AGENT_PLATFORM_IDS,
   JOB_AGENT_PREFERENCES_KEY,
-  jobAgentPlatformRegistry,
   parseJobAgentPreferences,
   serializeJobAgentPreferences,
-  type JobAgentAutonomy,
-  type JobAgentPlatformId,
   type JobAgentPreferences
 } from '@/lib/jobs/job-agent-policy'
 import {
@@ -82,6 +83,8 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
   const [sourceKey, setSourceKey] = useState('')
   const [selectedPlatforms, setSelectedPlatforms] = useState<JobMarketplaceId[]>([...DEFAULT_JOB_MARKETPLACES])
   const [agentPreferences, setAgentPreferences] = useState<JobAgentPreferences>(DEFAULT_JOB_AGENT_PREFERENCES)
+  const [browserSessions, setBrowserSessions] = useState<BrowserPlatformSession[]>([])
+  const [browserAgentAvailable, setBrowserAgentAvailable] = useState(false)
   const [profileName, setProfileName] = useState('')
   const [titles, setTitles] = useState('')
   const [locations, setLocations] = useState('')
@@ -107,6 +110,7 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
   const hydratedProfileIdRef = useRef('')
   const seededDraftIdRef = useRef('')
   const agentPreferencesHydratedRef = useRef(false)
+  const browserAutoRunRef = useRef(false)
 
   const load = useCallback(async () => {
     const [nextSources, nextProfiles, nextPostings, nextRecommendations, nextApplications] = await Promise.all([
@@ -153,6 +157,15 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
     window.localStorage.setItem(JOB_AGENT_PREFERENCES_KEY, serializeJobAgentPreferences(agentPreferences))
   }, [agentPreferences])
   useEffect(() => {
+    let active = true
+    void detectBrowserAgentSessions({ window }).then((response) => {
+      if (!active) return
+      setBrowserAgentAvailable(response.ok)
+      setBrowserSessions(response.sessions ?? [])
+    })
+    return () => { active = false }
+  }, [])
+  useEffect(() => {
     const refresh = () => { void load() }
     window.addEventListener(ACTIVE_WORKFLOW_CHANGED_EVENT, refresh)
     return () => window.removeEventListener(ACTIVE_WORKFLOW_CHANGED_EVENT, refresh)
@@ -182,6 +195,18 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
     setLocations(seed.locations.join(', '))
     setPreferredTerms(seed.preferredTerms.join(', '))
   }, [activeDraft, loaded, profiles.length, trustedDraft])
+  useEffect(() => {
+    if (
+      !browserAgentAvailable
+      || browserAutoRunRef.current
+      || !loaded
+      || !trustedDraft
+      || !titles.trim()
+      || busySourceId
+    ) return
+    browserAutoRunRef.current = true
+    void searchMarket()
+  }, [browserAgentAvailable, busySourceId, loaded, titles, trustedDraft])
 
   async function addSource() {
     setError('')
@@ -541,15 +566,6 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
   const primaryTitle = splitTerms(titles)[0]
   const primaryLocation = splitTerms(locations)[0]
 
-  function toggleAgentPlatform(platform: JobAgentPlatformId) {
-    setAgentPreferences((current) => ({
-      ...current,
-      platforms: current.platforms.includes(platform)
-        ? current.platforms.filter((item) => item !== platform)
-        : [...current.platforms, platform]
-    }))
-  }
-
   return <main className="job-radar-app" aria-label={t('title')}>
     <header className="job-radar-app__header">
       <div><span><Radar size={14} aria-hidden="true" />{t('eyebrow')}</span><h1>{t('title')}</h1><p>{t('description')}</p></div>
@@ -561,27 +577,18 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
       <aside>
         <section className="job-radar-app__agent-control">
           <div className="job-radar-app__agent-heading"><Bot size={16} aria-hidden="true" /><div><h2>{t('jobAgent.title')}</h2><p>{t('jobAgent.description')}</p></div></div>
-          <label className="job-radar-app__agent-enabled">
-            <input type="checkbox" checked={agentPreferences.enabled} onChange={(event) => setAgentPreferences((current) => ({ ...current, enabled: event.target.checked }))} />
-            <span><strong>{t('jobAgent.enabled')}</strong><small>{t('jobAgent.enabledHelp')}</small></span>
-          </label>
-          <label>{t('jobAgent.autonomy')}<select value={agentPreferences.autonomy} onChange={(event) => setAgentPreferences((current) => ({ ...current, autonomy: event.target.value as JobAgentAutonomy }))}>
-            <option value="copilot">{t('jobAgent.mode.copilot')}</option>
-            <option value="approval">{t('jobAgent.mode.approval')}</option>
-            <option value="autopilot">{t('jobAgent.mode.autopilot')}</option>
-          </select></label>
-          <p className="job-radar-app__section-help"><ShieldCheck size={12} aria-hidden="true" />{t(`jobAgent.modeHelp.${agentPreferences.autonomy}`)}</p>
-          <fieldset className="job-radar-app__agent-platforms"><legend>{t('jobAgent.platformLegend')}</legend>{JOB_AGENT_PLATFORM_IDS.map((platform) => {
-            const definition = jobAgentPlatformRegistry[platform]
-            return <label key={platform}>
-              <input type="checkbox" checked={agentPreferences.platforms.includes(platform)} onChange={() => toggleAgentPlatform(platform)} />
-              <span><strong>{t(`jobAgent.platform.${platform}`)}</strong><small>{t(`jobAgent.access.${definition.discovery}`)}</small></span>
-            </label>
-          })}</fieldset>
+          <div className="job-radar-app__agent-enabled"><ShieldCheck size={14} aria-hidden="true" /><span><strong>{t('jobAgent.zeroConfig')}</strong><small>{t('jobAgent.zeroConfigHelp')}</small></span></div>
+          <p className="job-radar-app__section-help" aria-live="polite">{browserAgentAvailable ? t('jobAgent.browserReady') : t('jobAgent.browserMissing')}</p>
+          <div className="job-radar-app__agent-platforms" role="list" aria-label={t('jobAgent.platformLegend')}>{JOB_AGENT_PLATFORM_IDS.map((platform) => {
+            const session = browserSessions.find((item) => item.platform === platform)
+            const state = session?.state ?? 'unknown'
+            return <div key={platform} role="listitem" data-session={state}>
+              <span><strong>{t(`jobAgent.platform.${platform}`)}</strong><small>{t(`jobAgent.session.${state}`)}</small></span>
+            </div>
+          })}</div>
           <div className="job-radar-app__learning"><BrainCircuit size={14} aria-hidden="true" /><div><strong>{t('jobAgent.learning')}</strong><p>{t('jobAgent.learningHelp')}</p></div></div>
-          <label className="job-radar-app__compact-check"><input type="checkbox" checked={agentPreferences.learnFromReplies} onChange={(event) => setAgentPreferences((current) => ({ ...current, learnFromReplies: event.target.checked }))} />{t('jobAgent.learnReplies')}</label>
-          <label className="job-radar-app__compact-check"><input type="checkbox" checked={agentPreferences.learnFromOutcomes} onChange={(event) => setAgentPreferences((current) => ({ ...current, learnFromOutcomes: event.target.checked }))} />{t('jobAgent.learnOutcomes')}</label>
-          <button className="job-radar-app__market-search" type="button" onClick={() => void searchMarket()} disabled={!agentPreferences.enabled || Boolean(busySourceId) || !trustedDraft || selectedPlatforms.length === 0 || !titles.trim()}><Bot size={14} />{t('jobAgent.runNow')}</button>
+          <p className="job-radar-app__section-help">{t('jobAgent.learnReplies')} · {t('jobAgent.learnOutcomes')}</p>
+          <button className="job-radar-app__market-search" type="button" onClick={() => void searchMarket()} disabled={Boolean(busySourceId) || !trustedDraft || selectedPlatforms.length === 0 || !titles.trim()}><Bot size={14} />{t('jobAgent.runNow')}</button>
           <p className="job-radar-app__section-help">{t('jobAgent.runtimeBoundary')}</p>
         </section>
         <section><h2>{t('platforms')}</h2>

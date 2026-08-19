@@ -658,7 +658,11 @@
     "cancel": "取消刷新",
     "jobAgent": {
       "title": "自动求职控制台",
-      "description": "你决定在哪些平台运行，以及 Agent 可以自主完成哪些动作。",
+      "description": "配置模型后自动检测浏览器中的招聘平台登录状态，并立即开始找岗。",
+      "zeroConfig": "全平台自动运行",
+      "zeroConfigHelp": "默认启用全部支持平台，无需逐个平台配置 API。",
+      "browserReady": "浏览器 Agent 已连接；检测到可信简历后会自动运行。",
+      "browserMissing": "未检测到本地浏览器 Agent；当前仍可使用公开岗位发现。",
       "enabled": "启用求职 Agent",
       "enabledHelp": "仅在当前浏览器打开时运行；不会绕过平台权限。",
       "autonomy": "自动化级别",
@@ -689,12 +693,17 @@
         "official-search": "官方搜索入口",
         "connector-required": "等待官方连接"
       },
+      "session": {
+        "available": "登录会话可用",
+        "login-required": "需要登录或验证",
+        "unknown": "等待浏览器检测"
+      },
       "learning": "策略记忆",
       "learningHelp": "只学习偏好、话术反馈和求职结果，不改写职业事实。",
       "learnReplies": "根据招聘方回复优化开场与跟进",
       "learnOutcomes": "根据面试、Offer 与拒绝原因优化筛选",
       "runNow": "立即运行一次",
-      "runtimeBoundary": "当前 MVP 支持本地运行和公开岗位发现。后台持续运行需要后续任务调度服务。",
+      "runtimeBoundary": "平台登录、扫码、短信验证和验证码仍由用户完成；Agent 不读取或导出 Cookie。",
       "communicationTitle": "沟通与协商中心",
       "communicationHelp": "统一管理开场、追问、面试安排与跟进；每条消息保留岗位和证据上下文。",
       "connectorBoundary": "尚未授权的平台只生成可审阅草稿，不会读取登录态、模拟点击、绕过验证码或声称消息已发送。",
