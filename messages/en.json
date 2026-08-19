@@ -1,7 +1,7 @@
 {
   "meta": {
-    "title": "Resume OS — Evidence-Grounded Resume Agent",
-    "description": "A local-first agent for tailoring resumes to target jobs with reviewable, evidence-grounded changes."
+    "title": "Resume OS — Automated Job Agent",
+    "description": "A local-first agent that finds jobs, prepares conversations, and improves from outcomes without inventing career evidence."
   },
   "nav": {
     "brand": "Resume OS",
@@ -37,7 +37,7 @@
     },
     "apps": {
       "studio": "Resume Studio",
-      "jobs": "Job Radar",
+      "jobs": "Job Agent",
       "agent": "Resume Agent",
       "jd-match": "Target Job",
       "resume-3d": "Resume 3D",
@@ -60,8 +60,8 @@
       "profileReady": "Resume evidence is ready",
       "profileMissing": "Import a resume to establish your evidence base",
       "profileUnverified": "Demo and AI-created drafts are not verified career evidence",
-      "jobsTitle": "Job Radar",
-      "jobsMissing": "Discover and save a role from an authorized public source",
+      "jobsTitle": "Job Agent",
+      "jobsMissing": "Choose platforms and an automation policy to start discovering roles",
       "jobsReady": "A discovered role has entered the target-job workflow",
       "targetTitle": "Target job",
       "targetMissing": "Add a job description to focus the analysis",
@@ -99,7 +99,7 @@
       "nextAgent": "Next, resolve evidence gaps and approve a plan",
       "nextReview": "Next, compare the variant and export the result",
       "openProfile": "Open Career Profile",
-      "openJobs": "Explore Job Radar",
+      "openJobs": "Open Job Agent",
       "openTarget": "Open Target Job",
       "openAgent": "Continue Agent run",
       "openReview": "Review tailored variant"
@@ -345,13 +345,13 @@
     "sandboxWarningTitle": "This is fictional sandbox data",
     "sandboxWarningDescription": "You can explore requirement extraction, but this resume cannot become verified career evidence.",
     "sandboxWarningAction": "Open Studio to paste or upload a trusted resume",
-    "promotionTitle": "Job Radar handoff",
+    "promotionTitle": "Job Agent handoff",
     "promotionLoaded": "{company} · {title} was loaded with its source fingerprint. Extracted requirements still require your review.",
     "promotionClosed": "This discovered posting is now closed. You may review it, but verify availability before continuing.",
-    "promotionInvalid": "The Job Radar handoff is missing, stale, or belongs to another resume. Return to Job Radar and analyze it again.",
+    "promotionInvalid": "The Job Agent handoff is missing, stale, or belongs to another resume. Return to Job Agent and analyze it again.",
     "savedWorkflow": "Target job and resumable Agent run saved in this browser.",
-    "savedPromotedWorkflow": "Target job and Agent run saved; the Job Radar application is linked locally.",
-    "promotionLinkFailed": "The Agent run was saved, but the Job Radar application could not be linked. Refresh the posting before preparing an application.",
+    "savedPromotedWorkflow": "Target job and Agent run saved; the Job Agent application is linked locally.",
+    "promotionLinkFailed": "The Agent run was saved, but the Job Agent application could not be linked. Refresh the posting before preparing an application.",
     "requirementConfirmedLocally": "Requirement confirmed for this review. Create the Agent run only after every requirement is confirmed.",
     "localSaveFailed": "Analysis is visible, but its Agent run could not be saved to browser storage.",
     "requirementSaved": "Requirement correction saved. The previous Agent run is now stale and cannot be applied.",
@@ -652,10 +652,60 @@
     "REQUEST_ABORTED": "The request was canceled."
   },
   "jobRadar": {
-    "eyebrow": "Cross-platform job Copilot",
-    "title": "Job Radar",
-    "description": "Turn your resume into platform searches, bring back promising jobs, and move from evidence-based analysis to a controlled application.",
+    "eyebrow": "Cross-platform job automation",
+    "title": "Job Agent",
+    "description": "Use a trusted resume and job goals to continuously discover, qualify, prepare conversations, and improve from replies and interview outcomes.",
     "cancel": "Cancel refresh",
+    "jobAgent": {
+      "title": "Job automation controls",
+      "description": "You choose where the Agent works and which actions it may take independently.",
+      "enabled": "Enable Job Agent",
+      "enabledHelp": "Runs only while this browser is open and never bypasses platform permissions.",
+      "autonomy": "Automation level",
+      "mode": {
+        "copilot": "Copilot only",
+        "approval": "Approve key actions (recommended)",
+        "autopilot": "Act after authorization"
+      },
+      "modeHelp": {
+        "copilot": "The Agent analyzes and advises; you perform every platform action.",
+        "approval": "The Agent finds jobs and drafts messages; external sends and submissions require approval.",
+        "autopilot": "Allowed actions run only through authorized official connectors; sensitive or unsupported answers still pause."
+      },
+      "platformLegend": "Agent work platforms",
+      "platform": {
+        "greenhouse": "Greenhouse",
+        "lever": "Lever",
+        "boss": "BOSS Zhipin",
+        "51job": "51job",
+        "lagou": "Lagou",
+        "liepin": "Liepin",
+        "linkedin": "LinkedIn",
+        "indeed": "Indeed",
+        "58": "58.com"
+      },
+      "access": {
+        "built-in": "Built-in public discovery",
+        "official-search": "Official search entry",
+        "connector-required": "Official connector pending"
+      },
+      "learning": "Strategy memory",
+      "learningHelp": "Learns preferences, message feedback, and outcomes without changing career facts.",
+      "learnReplies": "Improve openers and follow-ups from recruiter replies",
+      "learnOutcomes": "Improve targeting from interviews, offers, and rejection reasons",
+      "runNow": "Run Agent now",
+      "runtimeBoundary": "This MVP runs locally and supports reviewed public discovery. Continuous background work requires a later scheduler service.",
+      "communicationTitle": "Conversation and negotiation center",
+      "communicationHelp": "Manage outreach, questions, interview scheduling, and follow-ups with job and evidence context attached.",
+      "connectorBoundary": "Platforms without an authorized connector produce reviewable drafts only. The Agent does not read login sessions, simulate clicks, bypass CAPTCHAs, or claim a message was sent.",
+      "stage": {
+        "discover": "Discover",
+        "qualify": "Qualify",
+        "tailor": "Prepare",
+        "chat": "Communicate",
+        "learn": "Improve"
+      }
+    },
     "platforms": "Job platforms",
     "platformHelp": "Company is optional. Automatic sources are searched inside Resume OS; restricted platforms open their official search instead of being scraped.",
     "platformLegend": "Platforms to search",

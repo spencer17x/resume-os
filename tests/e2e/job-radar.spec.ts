@@ -70,7 +70,7 @@ test('refreshes Lever, rejects arbitrary source URLs, and cancels a late source 
   })
 
   await page.goto('/en/jobs')
-  const radar = page.getByRole('application', { name: 'Job Radar' })
+  const radar = page.getByRole('application', { name: 'Job Agent' })
   await radar.getByRole('textbox', { name: 'Profile name' }).fill('Platform roles')
   await radar.getByRole('textbox', { name: 'Target titles' }).fill('Platform Engineer')
   await radar.getByRole('button', { name: 'Save profile' }).click()
@@ -109,13 +109,14 @@ test('derives a resume search and scans selected public marketplaces without a c
   })
 
   await page.goto('/en/jobs')
-  const radar = page.getByRole('application', { name: 'Job Radar' })
+  const radar = page.getByRole('application', { name: 'Job Agent' })
   await expect(radar.getByRole('textbox', { name: 'Target titles' })).toHaveValue('Platform Engineer')
-  await expect(radar.getByRole('checkbox', { name: /Greenhouse/ })).toBeChecked()
-  await expect(radar.getByRole('checkbox', { name: /Lever/ })).toBeChecked()
+  const searchPlatforms = radar.getByRole('group', { name: 'Platforms to search' })
+  await expect(searchPlatforms.getByRole('checkbox', { name: /Greenhouse/ })).toBeChecked()
+  await expect(searchPlatforms.getByRole('checkbox', { name: /Lever/ })).toBeChecked()
   await expect(radar.getByRole('link', { name: 'Search BOSS Zhipin' })).toHaveAttribute('href', /query=Platform\+Engineer/)
 
-  await radar.getByRole('checkbox', { name: /Lever/ }).uncheck()
+  await searchPlatforms.getByRole('checkbox', { name: /Lever/ }).uncheck()
   await radar.getByRole('button', { name: 'Search selected platforms' }).click()
   await expect(radar.getByRole('status')).toContainText('3 automatic sources')
   await expect(radar.getByRole('heading', { name: /Platform Engineer/ })).toHaveCount(3)
@@ -136,7 +137,7 @@ test('brings a user-selected platform job into Target Job without fetching the p
   })
 
   await page.goto('/en/jobs')
-  const radar = page.getByRole('application', { name: 'Job Radar' })
+  const radar = page.getByRole('application', { name: 'Job Agent' })
   await expect(radar.getByRole('textbox', { name: 'Target titles' })).toHaveValue('Platform Engineer')
   await radar.getByRole('textbox', { name: 'Quick paste' }).fill(`
 Job title: Senior Platform Engineer
@@ -162,10 +163,10 @@ Job description: Build TypeScript developer platforms and improve delivery relia
   expect(discoveryRequests).toBe(0)
 })
 
-test('keeps the bilingual Job Radar route usable without horizontal overflow on mobile', async ({ page }, testInfo) => {
-  test.skip(!testInfo.project.name.startsWith('mobile'), 'Mobile Job Radar coverage')
+test('keeps the bilingual Job Agent route usable without horizontal overflow on mobile', async ({ page }, testInfo) => {
+  test.skip(!testInfo.project.name.startsWith('mobile'), 'Mobile Job Agent coverage')
   await page.goto('/zh/jobs')
-  await expect(page.getByRole('heading', { name: '岗位雷达', level: 1 })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '求职 Agent', level: 1 })).toBeVisible()
   await expect(page.getByText('请先导入或粘贴可信简历，再进行岗位匹配。')).toBeVisible()
   await expect(page.getByRole('group', { name: '筛选岗位' })).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()?.width ?? 0)

@@ -101,7 +101,7 @@ Chrome does not currently guarantee Chinese as a Prompt API input or output lang
 
 ## Data that crosses the device boundary
 
-- A Job Radar refresh sends the configured public provider enum and board identifier to the same-origin discovery route. That route fetches public posting data from the fixed official host. Resume drafts, career facts, recommendation scores, application notes, and application status are not included in source requests.
+- A Job Agent discovery refresh sends the configured public provider enum and board identifier to the same-origin discovery route. That route fetches public posting data from the fixed official host. Resume drafts, career facts, recommendation scores, conversation drafts, application notes, and application status are not included in source requests.
 - A PDF/DOCX/TXT upload is sent to the same-origin extraction route. Bytes are processed transiently and are not stored by Resume OS. The route returns extracted text.
 - Pasted or extracted raw resume text is processed in the browser when Chrome Built-in AI is selected. It is sent through the same-origin parse route to the configured OpenAI-compatible provider only when that provider is explicitly selected or Automatic mode has saved fallback consent and the local model is unavailable or over its context budget.
 - Demo / Sandbox generation follows the same saved provider preference. Locally generated and cloud-generated demo resumes are both classified as `ai-generated` and never become verified Career Evidence.
@@ -299,7 +299,7 @@ corepack pnpm@11.17.0 test:production-extraction
 
 For a public deployment, also verify the browser network panel: Chrome-local tasks must not call cloud routes, Automatic mode with fallback disabled must stop locally, and cloud tasks must call only the same-origin API before the configured provider.
 
-For Job Radar, verify that refresh calls only `/api/jobs/discover`, the server calls only the fixed Greenhouse/Lever hosts, cancellation leaves no partial browser commit, career data is absent from the request, opening an application URL does not mark it submitted, and an explicit submitted confirmation is required.
+For Job Agent, verify that refresh calls only `/api/jobs/discover`, the server calls only the fixed Greenhouse/Lever hosts, cancellation leaves no partial browser commit, career data is absent from the request, and selecting a platform does not imply connector authorization. In the current MVP, opening an application URL does not mark it submitted and an explicit submitted confirmation is required. Any later messaging or submission connector requires its own token, revocation, receipt, retry, and allow/deny-path verification before deployment.
 
 ## GitHub Pages boundary
 

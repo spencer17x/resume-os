@@ -97,7 +97,7 @@ describe('WorkflowOverview', () => {
     )
 
     expect(await screen.findByText('Add a job description to focus the analysis')).toBeVisible()
-    fireEvent.click(screen.getByRole('button', { name: 'Explore Job Radar' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Open Job Agent' }))
     expect(mocks.openApp).toHaveBeenCalledWith('jobs')
   })
 

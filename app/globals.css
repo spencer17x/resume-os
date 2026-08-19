@@ -3221,6 +3221,34 @@ a {
 .job-radar-app__advanced > p,
 .job-radar-app__official-searches > p,
 .job-radar-app__progress { color: var(--theme-muted); font-size: 9px; line-height: 1.45; }
+.job-radar-app__agent-control { background: linear-gradient(145deg, color-mix(in srgb, var(--theme-accent) 10%, var(--theme-panel)), var(--theme-panel)); }
+.job-radar-app__agent-heading { display: flex; align-items: flex-start; gap: 8px; color: var(--theme-accent-soft); }
+.job-radar-app__agent-heading > div { min-width: 0; }
+.job-radar-app__agent-heading h2 { color: var(--theme-fog); }
+.job-radar-app__agent-heading p { margin-top: 3px; color: var(--theme-muted); font-size: 9px; line-height: 1.45; }
+.job-radar-app aside .job-radar-app__agent-enabled { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 8px; border: 1px solid color-mix(in srgb, var(--theme-accent) 46%, var(--theme-line)); border-radius: 7px; padding: 8px; }
+.job-radar-app aside .job-radar-app__agent-enabled input,
+.job-radar-app aside .job-radar-app__compact-check input,
+.job-radar-app aside .job-radar-app__agent-platforms input { width: 15px; min-height: 15px; margin: 1px 0 0; accent-color: var(--theme-accent); }
+.job-radar-app__agent-enabled strong,
+.job-radar-app__agent-enabled small { display: block; }
+.job-radar-app__agent-enabled strong { color: var(--theme-fog); font-size: 10px; }
+.job-radar-app__agent-enabled small { margin-top: 2px; color: var(--theme-muted); font-size: 8px; font-weight: 500; }
+.job-radar-app__agent-control > .job-radar-app__section-help { display: flex; align-items: flex-start; gap: 5px; }
+.job-radar-app__agent-control > .job-radar-app__section-help svg { flex: 0 0 auto; }
+.job-radar-app__agent-platforms { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; margin: 0; border: 0; padding: 0; }
+.job-radar-app__agent-platforms legend { margin-bottom: 5px; color: var(--theme-muted); font-size: 9px; font-weight: 650; }
+.job-radar-app__agent-platforms label { display: grid; min-width: 0; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 5px; border: 1px solid var(--theme-line); border-radius: 6px; padding: 6px; cursor: pointer; }
+.job-radar-app__agent-platforms label:has(input:checked) { border-color: color-mix(in srgb, var(--theme-accent) 48%, var(--theme-line)); }
+.job-radar-app__agent-platforms strong,
+.job-radar-app__agent-platforms small { display: block; overflow-wrap: anywhere; }
+.job-radar-app__agent-platforms strong { color: var(--theme-fog); font-size: 9px; }
+.job-radar-app__agent-platforms small { margin-top: 2px; color: var(--theme-muted); font-size: 7px; font-weight: 500; }
+.job-radar-app__learning { display: flex; align-items: flex-start; gap: 7px; border-top: 1px solid var(--theme-line); padding-top: 8px; }
+.job-radar-app__learning svg { flex: 0 0 auto; color: var(--theme-accent-soft); }
+.job-radar-app__learning strong { font-size: 9px; }
+.job-radar-app__learning p { margin-top: 2px; color: var(--theme-muted); font-size: 8px; line-height: 1.4; }
+.job-radar-app aside .job-radar-app__compact-check { display: flex; align-items: flex-start; gap: 6px; font-size: 9px; font-weight: 500; }
 .job-radar-app__platforms { display: grid; gap: 6px; margin: 0; border: 0; padding: 0; }
 .job-radar-app__platforms legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
 .job-radar-app__platforms label {
@@ -3254,6 +3282,18 @@ a {
 .job-radar-app aside li small { display: block; margin-top: 2px; color: var(--theme-muted); font-size: 9px; }
 .job-radar-app aside li button { width: 32px; padding: 0; }
 .job-radar-app__inbox { min-width: 0; }
+.job-radar-app__communication { display: grid; gap: 10px; border-bottom: 1px solid var(--theme-line); background: color-mix(in srgb, var(--theme-accent) 4%, var(--theme-panel)); padding: 14px 16px; }
+.job-radar-app__communication > div { display: flex; align-items: flex-start; gap: 8px; }
+.job-radar-app__communication > div svg { flex: 0 0 auto; color: var(--theme-accent-soft); }
+.job-radar-app__communication strong,
+.job-radar-app__communication small { display: block; }
+.job-radar-app__communication strong { font-size: 11px; }
+.job-radar-app__communication small,
+.job-radar-app__communication > p { margin-top: 2px; color: var(--theme-muted); font-size: 9px; line-height: 1.45; }
+.job-radar-app__communication ol { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1px; overflow: hidden; border: 1px solid var(--theme-line); border-radius: 6px; background: var(--theme-line); counter-reset: agent-stage; }
+.job-radar-app__communication li { min-width: 0; background: var(--theme-panel-strong); padding: 7px; color: var(--theme-muted); font-size: 8px; text-align: center; counter-increment: agent-stage; }
+.job-radar-app__communication li::before { content: counter(agent-stage); display: grid; width: 17px; height: 17px; margin: 0 auto 4px; place-items: center; border: 1px solid var(--theme-line); border-radius: 50%; font-size: 7px; }
+.job-radar-app__communication li[data-ready='true'] { color: var(--theme-accent-soft); }
 .job-radar-app__toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px 16px; border-bottom: 1px solid var(--theme-line); }
 .job-radar-app__toolbar > div { display: flex; flex-wrap: wrap; gap: 4px; }
 .job-radar-app__toolbar button { min-height: 28px; border: 1px solid transparent; border-radius: 999px; background: transparent; padding: 4px 9px; color: var(--theme-muted); font-size: 10px; }
@@ -3310,6 +3350,9 @@ a {
   .application-pipeline > header { flex-direction: column; }
   .job-radar-app__jobs > li { border-right: 0; }
   .job-radar-app__toolbar { align-items: flex-start; flex-direction: column; }
+  .job-radar-app__communication ol { grid-template-columns: 1fr; }
+  .job-radar-app__communication li { display: flex; align-items: center; gap: 7px; text-align: left; }
+  .job-radar-app__communication li::before { margin: 0; flex: 0 0 auto; }
 }
 
 @media (prefers-reduced-motion: reduce) {

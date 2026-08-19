@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { IDBFactory } from 'fake-indexeddb'
 import { NextIntlClientProvider } from 'next-intl'
@@ -134,7 +134,7 @@ describe('JobRadarApp', () => {
     renderRadar({ store, storage: trustedStorage(), createAdapter })
 
     expect(await screen.findByDisplayValue('Platform Engineer')).toBeVisible()
-    expect(screen.getByRole('checkbox', { name: /BOSS Zhipin/ })).toBeChecked()
+    expect(within(screen.getByRole('group', { name: 'Platforms to search' })).getByRole('checkbox', { name: /BOSS Zhipin/ })).toBeChecked()
     expect(screen.getByRole('link', { name: 'Search BOSS Zhipin' })).toHaveAttribute(
       'href',
       expect.stringContaining('query=Platform+Engineer')
@@ -150,6 +150,21 @@ describe('JobRadarApp', () => {
       platforms: ['greenhouse', 'lever', 'boss', '51job', '58'],
       titles: ['Platform Engineer']
     })
+  })
+
+  it('exposes user-controlled automation and keeps unconnected messaging draft-only', async () => {
+    const user = userEvent.setup()
+    const store = createStore()
+    renderRadar({ store, storage: trustedStorage() })
+
+    expect(await screen.findByRole('heading', { name: 'Job automation controls' })).toBeVisible()
+    expect(screen.getByRole('combobox', { name: 'Automation level' })).toHaveValue('approval')
+    expect(screen.getByText(/Platforms without an authorized connector produce reviewable drafts only/)).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Run Agent now' })).toBeDisabled()
+
+    expect(await screen.findByDisplayValue('Platform Engineer')).toBeVisible()
+    await user.click(screen.getByRole('checkbox', { name: /Enable Job Agent/ }))
+    expect(screen.getByRole('button', { name: 'Run Agent now' })).toBeEnabled()
   })
 
   it('surfaces partial refreshes, scores jobs, and preserves a saved application when ignored later', async () => {

@@ -2,24 +2,26 @@
 
 [Live Demo](https://resume-os-phi.vercel.app/en) · [中文体验](https://resume-os-phi.vercel.app/zh) · [Deployment and data boundaries](docs/deployment.md)
 
-Resume OS is a local-first, evidence-grounded job-search Copilot. It turns a trusted resume into cross-platform search entry points, refreshes reviewed public sources where automatic access is available, lets the user bring a promising marketplace job back into one local inbox, and carries that job through reviewable resume tailoring and application tracking. The master resume is not silently rewritten, and Resume OS never submits an application on the user's behalf.
+Resume OS is a local-first, evidence-grounded job-search agent. It turns a trusted resume and explicit job preferences into cross-platform discovery, qualification, job-specific materials, and recruiter-conversation drafts. Users choose the platforms and automation level. The agent improves search and communication strategy from user corrections, replies, interviews, and outcomes without changing the user's career facts.
+
+The current MVP runs while the browser is open. Reviewed Greenhouse and Lever public sources can be searched directly; restricted platforms remain fixed-host searches or draft-only handoffs until an official API or approved connector is authorized. The target product requirements are documented in [docs/product-requirements.md](docs/product-requirements.md).
 
 The product is built around four principles:
 
 - **Evidence before claims:** saved career facts are the boundary for resume content; missing evidence becomes a question, not an invented achievement.
 - **Job-specific decisions:** the target role determines which verified experience should be emphasized.
-- **Human approval:** AI proposes precise changes, while the user reviews, confirms, applies, or discards them.
+- **User-controlled autonomy:** users choose Copilot, approval, or authorized-autopilot mode. External actions require an official connector and the saved action policy.
 - **Local-first ownership:** resume drafts and AI configuration stay in the browser. The server handles individual requests without persisting career data or API keys.
 
 The primary workflow is:
 
 1. Import or paste an existing resume in Resume Studio.
-2. Choose job platforms in Job Radar; Resume OS derives an initial search, refreshes reviewed public sources, and opens fixed-host searches for restricted platforms.
-3. Select a promising role on a platform and paste its official URL and job description back into Job Radar, or choose an automatically discovered role. Resume OS ranks it locally and promotes it to Target Job.
+2. Enable Job Agent, choose platforms, and select an automation level. Resume OS derives the initial search from the trusted resume and saved preferences.
+3. Run discovery. Reviewed public sources refresh inside Resume OS; restricted platforms open fixed-host searches or produce draft-only handoffs until an authorized connector exists.
 4. Confirm every extracted requirement and inspect the evidence and gaps.
 5. Ask the Resume Agent for job-specific, reviewable changes.
 6. Verify each claim and apply selected changes to a separate resume variant.
-7. Check the local application packet, open the employer site yourself, and explicitly mark it submitted only after completing the application.
+7. Manage outreach and follow-ups in the conversation center. In the current MVP, messages and submissions remain reviewable drafts or manual handoffs; future automatic external actions require an authorized official connector and an explicit saved policy.
 
 Simulated resume generation is a **Demo / Sandbox** for exploring the interface. It does not represent verified user history and should not be used as the evidence source for a real application.
 
@@ -27,7 +29,7 @@ Resume 3D, Resume Book, Projects, Timeline, and Terminal are secondary showcase 
 
 ## What kind of agent is this?
 
-Resume OS is a **domain agent**, not a general computer-use agent. Its bounded workflow is Career Profile → target-job requirements → evidence mapping → gap questions → optimization plan → reviewable changes → job-specific resume variant. The model can propose structured output, but deterministic validators, explicit approval steps, and saved run state control what may be applied.
+Resume OS is a **job-search domain agent**, not an unrestricted computer-use bot. Its bounded loop is Career Profile → discovery → qualification → evidence mapping → job-specific material → recruiter conversation → outcome feedback. The model can propose structured output, but deterministic validators, platform capabilities, the saved autonomy policy, and evidence boundaries control what may be applied or sent.
 
 The project uses a narrow, structured form of retrieval rather than a conventional vector RAG stack:
 
@@ -54,7 +56,7 @@ There is currently no embedding pipeline, vector database, document chunk index,
 ```text
 /{locale}                 Desktop or mobile workflow home
 /{locale}/studio          Resume import, drafts, and Demo / Sandbox generation
-/{locale}/jobs            Job Radar sources, recommendations, and applications
+/{locale}/jobs            Job Agent controls, sources, conversations, recommendations, and applications
 /{locale}/agent           Evidence-grounded Resume Agent
 /{locale}/jd-match        Target-job evidence and gap analysis
 /{locale}/3d              Three.js resume scene
@@ -116,16 +118,16 @@ Resume OS does not require a server-side database, account system, or cloud-sync
 
 Uploaded PDF/DOCX/TXT bytes are processed transiently by the same-origin extraction route and are not written to the domain store. The original document bytes are not stored in IndexedDB. Clearing site data, using a different browser profile, or moving to a different deployment origin produces a separate local workspace unless the user exports or migrates it separately.
 
-## Job Radar source and submission boundary
+## Job Agent platform and action boundary
 
-Job Radar starts from the resume rather than a required target company. Users can select Greenhouse, Lever, BOSS Zhipin, 51job, and 58.com. Platform selection is capability-aware:
+Job Agent starts from the resume rather than a required target company. Its platform catalog includes Greenhouse, Lever, BOSS Zhipin, 51job, Lagou, Liepin, LinkedIn, Indeed, and 58.com. Platform selection is capability-aware and never implies that a connector is installed:
 
 - Greenhouse and Lever are automatic sources backed by a bundled, reviewed company-board catalog; users may optionally add another public company board in Advanced settings.
 - BOSS Zhipin and 51job open fixed-host official searches carrying the primary target title where supported. Resume OS does not scrape or automate their signed-in products.
 - 58.com opens the official jobs product and is labeled as requiring an approved Open Platform partnership before automatic access can be enabled.
 
 For a role selected on one of these platforms, the user may paste its official HTTPS
-URL, title, company, location, and description into Job Radar. The URL is accepted only
+URL, title, company, location, and description into Job Agent. The URL is accepted only
 when its hostname matches the selected platform. Resume OS never fetches that URL,
 reads the platform session, or infers data the user did not provide. The imported role
 is stored locally, scored against the active search profile, and handed directly to

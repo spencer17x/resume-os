@@ -298,7 +298,7 @@ describe('DesktopShell', () => {
     const launcher = within(screen.getByRole('navigation', { name: 'Applications' }))
     expect(launcher.getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual([
       'Resume Studio',
-      'Job Radar',
+      'Job Agent',
       'Resume Agent',
       'Target Job',
       'Resume 3D',
@@ -688,7 +688,7 @@ describe('DesktopShell', () => {
       if (appId === 'studio') {
         expect(view.getByRole('region', { name: 'Resume Studio' })).toBeVisible()
       } else if (appId === 'jobs') {
-        expect(view.getByRole('heading', { name: 'Job Radar' })).toBeVisible()
+        expect(view.getByRole('heading', { name: 'Job Agent' })).toBeVisible()
       } else if (appId === 'agent' || appId === 'jd-match') {
         expect(view.getByRole('heading', { name: 'Create a resume draft first' })).toBeVisible()
         expect(view.getByRole('link', { name: 'Open Resume Studio' })).toBeVisible()

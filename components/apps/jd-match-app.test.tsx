@@ -140,7 +140,7 @@ afterEach(() => {
 })
 
 describe('JDMatchApp', () => {
-  it('loads a fingerprinted Job Radar handoff and links it only after requirement confirmation', async () => {
+  it('loads a fingerprinted Job Agent handoff and links it only after requirement confirmation', async () => {
     const user = userEvent.setup()
     const intent = {
       postingId: 'posting-1', recommendationId: 'recommendation-1', sourceDraftId: 'ada',
@@ -176,7 +176,7 @@ describe('JDMatchApp', () => {
       targetJobId: 'target-1',
       now: expect.any(String)
     }))
-    expect(screen.getByText(/Job Radar application is linked locally/)).toBeVisible()
+    expect(screen.getByText(/Job Agent application is linked locally/)).toBeVisible()
   })
 
   it('warns that sandbox resumes cannot become verified career evidence', async () => {

@@ -181,7 +181,7 @@ test('renders the AI agent constellation across desktop motion states and viewpo
     elements.map((element) => element.getAttribute('aria-label'))
   )).toEqual([
     'Resume Studio',
-    'Job Radar',
+    'Job Agent',
     'Resume Agent',
     'Target Job',
     'Resume 3D',
@@ -195,7 +195,7 @@ test('renders the AI agent constellation across desktop motion states and viewpo
     elements.map((element) => element.getAttribute('aria-label'))
   )).toEqual([
     'Resume Studio',
-    'Job Radar',
+    'Job Agent',
     'Resume Agent',
     'Resume 3D',
     'Resume Book',

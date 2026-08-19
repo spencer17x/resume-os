@@ -373,7 +373,7 @@ test('builds a reviewable Evidence Agent run and saves a variant without mutatin
   const masterBefore = await readActiveMaster(page)
 
   await page.goto('/en/jobs')
-  const radar = page.getByRole('application', { name: 'Job Radar' })
+  const radar = page.getByRole('application', { name: 'Job Agent' })
   await radar.getByRole('textbox', { name: 'Profile name' }).fill('AI platform roles')
   await radar.getByRole('textbox', { name: 'Target titles' }).fill('Staff AI Platform Engineer')
   await radar.getByRole('button', { name: 'Save profile' }).click()
@@ -394,7 +394,7 @@ test('builds a reviewable Evidence Agent run and saves a variant without mutatin
   await expect(jdMatch.getByText('Not yet mapped', { exact: true })).toBeVisible()
   await jdMatch.getByRole('button', { name: 'Confirm requirement' }).click()
   await jdMatch.getByRole('button', { name: 'Create Agent run' }).click()
-  await expect(jdMatch.getByText('Target job and Agent run saved; the Job Radar application is linked locally.')).toBeVisible()
+  await expect(jdMatch.getByText('Target job and Agent run saved; the Job Agent application is linked locally.')).toBeVisible()
 
   const dock = page.getByRole('navigation', { name: 'Dock' })
   await dock.getByRole('button', { name: 'Resume Agent' }).click()
@@ -457,7 +457,7 @@ test('builds a reviewable Evidence Agent run and saves a variant without mutatin
   })
 
   await page.goto('/en/jobs')
-  const applicationRadar = page.getByRole('application', { name: 'Job Radar' })
+  const applicationRadar = page.getByRole('application', { name: 'Job Agent' })
   await expect(applicationRadar.getByRole('heading', { name: 'Application packets' })).toBeVisible()
   await applicationRadar.getByRole('button', { name: 'Check application packet' }).click()
   await expect(applicationRadar.getByRole('link', { name: 'Open application site' })).toHaveAttribute(
