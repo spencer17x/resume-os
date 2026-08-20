@@ -155,7 +155,7 @@ describe('JobRadarApp', () => {
 
     expect(await screen.findByRole('heading', { name: 'Complete job setup first' })).toBeVisible()
     expect(screen.getByRole('navigation', { name: 'Job workspace navigation' }).querySelectorAll('a')).toHaveLength(7)
-    expect(screen.getByRole('link', { name: /Start setup/ })).toHaveAttribute('href', '/jobs/preferences')
+    expect(screen.getByRole('link', { name: /Start setup/ })).toHaveAttribute('href', '/en/jobs/setup')
     expect(screen.queryByRole('button', { name: 'Start Agent' })).not.toBeInTheDocument()
   })
 

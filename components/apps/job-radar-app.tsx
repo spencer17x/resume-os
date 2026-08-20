@@ -1,5 +1,6 @@
 'use client'
 
+import dynamic from 'next/dynamic'
 import {
   Activity,
   Bot,
@@ -22,15 +23,11 @@ import {
   X
 } from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, usePathname, useRouter } from '@/i18n/navigation'
+import { useCallback, useEffect, useRef, useState, type ComponentPropsWithoutRef } from 'react'
+import { usePathname } from '@/i18n/navigation'
 import { useResumeDraft } from '@/components/resume-draft-provider'
 import { ApplicationPipeline } from '@/components/apps/application-pipeline'
-import { InterviewWorkspace } from '@/components/apps/interview-workspace'
-import { JDMatchApp } from '@/components/apps/jd-match-app'
-import { ResumeStudioApp } from '@/components/apps/resume-studio-app'
-import { ResumeAgentApp } from '@/components/apps/resume-agent-app'
-import { SettingsApp } from '@/components/apps/settings-app'
+import type { JobSetupValues } from '@/components/apps/job-agent-setup'
 import { careerEvidenceSourceId } from '@/lib/agent/career-evidence'
 import { ACTIVE_WORKFLOW_CHANGED_EVENT } from '@/lib/agent/workflow-persistence'
 import { createDomainStore, type IndexedDbDomainStore } from '@/lib/agent/domain-store'
@@ -107,12 +104,63 @@ import {
 import { createSameOriginJobSourceAdapter, JobSourceError } from '@/lib/jobs/sources'
 import type { JobSourceAdapter } from '@/lib/jobs/sources'
 import type { AppId } from '@/lib/desktop/types'
-import { renderResumeDocx, resumeDocxFileName } from '@/lib/resume-docx'
-import { renderResumePdf, resumePdfFileName } from '@/lib/resume-pdf'
 
 type SourceKind = Extract<JobSource['kind'], 'greenhouse' | 'lever'>
 type Filter = 'all' | 'new' | 'saved' | 'needs-analysis' | 'ready' | 'applied' | 'ignored' | 'closed'
-type JobWorkspaceSection = 'overview' | 'opportunities' | 'resumes' | 'conversations' | 'applications' | 'interviews' | 'activity' | 'preferences' | 'profile' | 'target-job' | 'settings'
+type JobWorkspaceSection = 'overview' | 'opportunities' | 'resumes' | 'conversations' | 'applications' | 'interviews' | 'activity' | 'preferences' | 'profile' | 'target-job' | 'settings' | 'setup'
+
+const LazyInterviewWorkspace = dynamic(
+  () => import('@/components/apps/interview-workspace').then((module) => module.InterviewWorkspace),
+  { loading: JobEmbeddedLoading }
+)
+const LazyJDMatchApp = dynamic(
+  () => import('@/components/apps/jd-match-app').then((module) => module.JDMatchApp),
+  { loading: JobEmbeddedLoading }
+)
+const LazyResumeStudioApp = dynamic(
+  () => import('@/components/apps/resume-studio-app').then((module) => module.ResumeStudioApp),
+  { loading: JobEmbeddedLoading }
+)
+const LazyResumeAgentApp = dynamic(
+  () => import('@/components/apps/resume-agent-app').then((module) => module.ResumeAgentApp),
+  { loading: JobEmbeddedLoading }
+)
+const LazySettingsApp = dynamic(
+  () => import('@/components/apps/settings-app').then((module) => module.SettingsApp),
+  { loading: JobEmbeddedLoading }
+)
+const LazyJobAgentSetup = dynamic(
+  () => import('@/components/apps/job-agent-setup').then((module) => module.JobAgentSetup),
+  { loading: JobEmbeddedLoading }
+)
+
+function JobEmbeddedLoading() {
+  const t = useTranslations('jobRadar.workspace')
+  return <div className="job-embedded-loading" role="status" aria-label={t('loadingModule')} aria-busy="true"><span /></div>
+}
+
+function Link({ href, onClick, ...props }: Omit<ComponentPropsWithoutRef<'a'>, 'href'> & { href: string }) {
+  const locale = useLocale()
+  return <a {...props} href={`/${locale}${href}`} onClick={(event) => {
+    onClick?.(event)
+    if (
+      event.defaultPrevented
+      || event.button !== 0
+      || event.metaKey
+      || event.ctrlKey
+      || event.shiftKey
+      || event.altKey
+      || props.target === '_blank'
+    ) return
+    event.preventDefault()
+    navigateJobWorkspace(locale, href)
+  }} />
+}
+
+function navigateJobWorkspace(locale: string, href: string) {
+  const localizedHref = href.startsWith(`/${locale}/`) ? href : `/${locale}${href}`
+  window.history.pushState(null, '', localizedHref)
+}
 
 export type JobRadarAppProps = {
   appId?: AppId
@@ -125,7 +173,6 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
   const desktopT = useTranslations('desktop')
   const locale = useLocale()
   const pathname = usePathname()
-  const router = useRouter()
   const workspaceSection = jobWorkspaceSection(pathname)
   const { activeDraft } = useResumeDraft()
   const trustedDraft = Boolean(activeDraft && ['paste', 'upload'].includes(activeDraft.source))
@@ -156,6 +203,19 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
   const [requiredTerms, setRequiredTerms] = useState('')
   const [preferredTerms, setPreferredTerms] = useState('')
   const [excludedTerms, setExcludedTerms] = useState('')
+  const [advancedSetup, setAdvancedSetup] = useState({
+    blockedCompanies: '',
+    industries: '',
+    experienceLevels: '',
+    educationLevels: '',
+    companySizes: '',
+    financingStages: '',
+    minimumSalary: '',
+    maximumSalary: '',
+    maximumAgeDays: 30,
+    workplaceTypes: [] as JobSetupValues['workplaceTypes'],
+    employmentTypes: [] as JobSetupValues['employmentTypes']
+  })
   const [importPlatform, setImportPlatform] = useState<JobMarketplaceId>('boss')
   const [clipboardJobText, setClipboardJobText] = useState('')
   const [importUrl, setImportUrl] = useState('')
@@ -180,6 +240,37 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
   const agentSetupComplete = trustedDraft && Boolean(savedSearchProfile?.titles.length)
   const agentExecutionEnabled = agentPreferences.enabled && agentSetupComplete
   const agentRunning = agentExecutionEnabled && browserAgentAvailable
+  const setupAnalysis = activeDraft && trustedDraft ? {
+    name: activeDraft.data.profile.name,
+    role: activeDraft.data.profile.title || activeDraft.data.targetRole || '',
+    suggestedTitles: deriveJobSearchSeed(activeDraft.data).titles,
+    skills: activeDraft.data.skills.flatMap((group) => group.items),
+    experienceCount: activeDraft.data.experiences.length
+  } : null
+  const setupValues: JobSetupValues = {
+    profileName,
+    titles,
+    locations,
+    preferredCompanies,
+    blockedCompanies: advancedSetup.blockedCompanies,
+    requiredTerms,
+    preferredTerms,
+    excludedTerms,
+    industries: advancedSetup.industries,
+    experienceLevels: advancedSetup.experienceLevels,
+    educationLevels: advancedSetup.educationLevels,
+    companySizes: advancedSetup.companySizes,
+    financingStages: advancedSetup.financingStages,
+    minimumSalary: advancedSetup.minimumSalary,
+    maximumSalary: advancedSetup.maximumSalary,
+    maximumAgeDays: advancedSetup.maximumAgeDays,
+    workplaceTypes: advancedSetup.workplaceTypes,
+    employmentTypes: advancedSetup.employmentTypes,
+    minimumMatchScore: agentPreferences.minimumMatchScore ?? 70,
+    dailyContactLimit: agentPreferences.dailyContactLimit ?? 20,
+    autonomy: agentPreferences.autonomy,
+    autoSendResume: agentPreferences.autoSendResume ?? true
+  }
 
   const load = useCallback(async () => {
     const [nextSources, nextProfiles, nextPostings, nextRecommendations, nextApplications, nextThreads, nextMessages] = await Promise.all([
@@ -276,6 +367,19 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
     setRequiredTerms(profile.requiredTerms.join(', '))
     setPreferredTerms(profile.preferredTerms.join(', '))
     setExcludedTerms(profile.excludedTerms.join(', '))
+    setAdvancedSetup({
+      blockedCompanies: profile.blockedCompanies?.join(', ') ?? '',
+      industries: profile.industries?.join(', ') ?? '',
+      experienceLevels: profile.experienceLevels?.join(', ') ?? '',
+      educationLevels: profile.educationLevels?.join(', ') ?? '',
+      companySizes: profile.companySizes?.join(', ') ?? '',
+      financingStages: profile.financingStages?.join(', ') ?? '',
+      minimumSalary: profile.minimumMonthlySalary?.toString() ?? '',
+      maximumSalary: profile.maximumMonthlySalary?.toString() ?? '',
+      maximumAgeDays: profile.maximumAgeDays,
+      workplaceTypes: profile.workplaceTypes,
+      employmentTypes: profile.employmentTypes
+    })
   }, [profiles])
 
   useEffect(() => {
@@ -324,6 +428,27 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
     })
   }
 
+  function updateSetupValue(key: keyof JobSetupValues, value: JobSetupValues[keyof JobSetupValues]) {
+    if (key === 'profileName') return setProfileName(String(value))
+    if (key === 'titles') return setTitles(String(value))
+    if (key === 'locations') return setLocations(String(value))
+    if (key === 'preferredCompanies') return setPreferredCompanies(String(value))
+    if (key === 'requiredTerms') return setRequiredTerms(String(value))
+    if (key === 'preferredTerms') return setPreferredTerms(String(value))
+    if (key === 'excludedTerms') return setExcludedTerms(String(value))
+    if (key === 'minimumMatchScore' || key === 'dailyContactLimit' || key === 'autonomy' || key === 'autoSendResume') {
+      setAgentPreferences((current) => ({ ...current, [key]: value }))
+      return
+    }
+    setAdvancedSetup((current) => ({ ...current, [key]: value }))
+  }
+
+  async function startConfiguredAgent() {
+    setAgentPreferences((current) => ({ ...current, enabled: true }))
+    browserAutoRunRef.current = false
+    navigateJobWorkspace(locale, '/jobs')
+  }
+
   async function syncConversationSignals() {
     const response = await collectBossConversationSignals({ window })
     const now = new Date().toISOString()
@@ -339,7 +464,9 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
       await load()
       if (agentPreferences.autonomy === 'autopilot') {
         for (const thread of updated.filter((item) => item.recruitmentStage === 'resume-requested')) {
-          await sendRequestedResume(thread)
+          if ((agentPreferences.autoSendResume ?? true) && await hasAutomaticContactCapacity()) {
+            await sendRequestedResume(thread)
+          }
         }
         for (const message of [...signalDrafts, ...followUps]) await tryAutopilotMessage(message)
       }
@@ -358,6 +485,7 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
 
   async function tryAutopilotMessage(message: BossConversationMessage) {
     try {
+      if (!await hasAutomaticContactCapacity()) return
       const thread = await store.get('bossConversationThreads', message.threadId)
       if (!thread) return
       const response = await inspectBossBrowserConversation({ window, timeoutMs: 3_000 })
@@ -378,6 +506,13 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
     } catch {
       // The draft remains reviewable when the exact BOSS conversation is not active.
     }
+  }
+
+  async function hasAutomaticContactCapacity() {
+    const limit = agentPreferences.dailyContactLimit ?? 20
+    const today = new Date().toISOString().slice(0, 10)
+    const messages = await store.list('bossConversationMessages')
+    return messages.filter((message) => message.sentAt?.slice(0, 10) === today).length < limit
   }
 
   async function sendRequestedResume(preparedThread: BossConversationThread) {
@@ -408,11 +543,14 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
       const mimeType = usePdf
         ? 'application/pdf' as const
         : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' as const
-      const bytes = usePdf ? renderResumePdf(variant.data) : renderResumeDocx(variant.data)
+      const artifactModule = usePdf ? await import('@/lib/resume-pdf') : await import('@/lib/resume-docx')
+      const bytes = usePdf
+        ? (artifactModule as typeof import('@/lib/resume-pdf')).renderResumePdf(variant.data)
+        : (artifactModule as typeof import('@/lib/resume-docx')).renderResumeDocx(variant.data)
       const bytesBase64 = bytesToBase64(bytes)
       const fileName = usePdf
-        ? resumePdfFileName(variant.data, variant.name)
-        : resumeDocxFileName(variant.data, variant.name)
+        ? (artifactModule as typeof import('@/lib/resume-pdf')).resumePdfFileName(variant.data, variant.name)
+        : (artifactModule as typeof import('@/lib/resume-docx')).resumeDocxFileName(variant.data, variant.name)
       const contentFingerprint = createJobInputFingerprint(bytesBase64)
       const sentThread = await executeBossResumeAttachment({
         store,
@@ -493,13 +631,21 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
         adjacentTitles: [],
         locations: splitTerms(locations),
         excludedLocations: [],
-        workplaceTypes: [],
-        employmentTypes: [],
         requiredTerms: splitTerms(requiredTerms),
         preferredTerms: splitTerms(preferredTerms),
         excludedTerms: splitTerms(excludedTerms),
         preferredCompanies: splitTerms(preferredCompanies),
-        maximumAgeDays: 30,
+        blockedCompanies: splitTerms(advancedSetup.blockedCompanies),
+        experienceLevels: splitTerms(advancedSetup.experienceLevels),
+        educationLevels: splitTerms(advancedSetup.educationLevels),
+        industries: splitTerms(advancedSetup.industries),
+        companySizes: splitTerms(advancedSetup.companySizes),
+        financingStages: splitTerms(advancedSetup.financingStages),
+        ...(advancedSetup.minimumSalary ? { minimumMonthlySalary: Number(advancedSetup.minimumSalary) } : {}),
+        ...(advancedSetup.maximumSalary ? { maximumMonthlySalary: Number(advancedSetup.maximumSalary) } : {}),
+        workplaceTypes: advancedSetup.workplaceTypes,
+        employmentTypes: advancedSetup.employmentTypes,
+        maximumAgeDays: advancedSetup.maximumAgeDays,
         createdAt: existing?.createdAt ?? now,
         updatedAt: now
       })
@@ -571,6 +717,8 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
       const queueResult = await queueBossCandidates({
         store,
         sourceDraftId: activeDraft.id,
+        minimumScore: agentPreferences.minimumMatchScore ?? 70,
+        maximumCandidates: agentPreferences.dailyContactLimit ?? 20,
         now: new Date().toISOString()
       })
       const analysisResult = await analyzeBossCandidateQueue({
@@ -728,7 +876,7 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
         sourceDraftId: activeDraft.id
       }))
       await decide(recommendation, 'saved')
-      router.push('/jobs/target-job')
+      navigateJobWorkspace(locale, '/jobs/target-job')
     } catch {
       setError(t('errors.promotion'))
     }
@@ -770,7 +918,7 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
       setImportCompany('')
       setImportLocation('')
       setImportDescription('')
-      router.push('/jobs/target-job')
+      navigateJobWorkspace(locale, '/jobs/target-job')
     } catch {
       setError(t('errors.importJob'))
     }
@@ -986,7 +1134,7 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
     <aside className="job-workspace__sidebar">
       <div className="job-workspace__brand"><span><Bot size={19} aria-hidden="true" /></span><strong>{t('workspace.brand')}</strong></div>
       <nav aria-label={t('workspace.navigation')}>{navItems.map(({ id, href, icon: Icon }) => <Link key={id} href={href} data-active={workspaceSection === id}><Icon size={17} aria-hidden="true" /><span>{t(`workspace.nav.${id}`)}</span></Link>)}</nav>
-      <div className="job-workspace__sidebar-footer"><Link href="/jobs/preferences" data-active={workspaceSection === 'preferences'}><SlidersHorizontal size={17} aria-hidden="true" /><span>{t('workspace.nav.preferences')}</span></Link><Link href="/jobs/profile" data-active={workspaceSection === 'profile'} aria-label={activeDraft?.data.profile.name || t('workspace.candidate')}><span>{activeDraft?.data.profile.name?.slice(0, 1) || 'R'}</span><strong>{activeDraft?.data.profile.name || t('workspace.candidate')}</strong></Link></div>
+      <div className="job-workspace__sidebar-footer"><Link href="/jobs/setup" data-active={workspaceSection === 'setup' || workspaceSection === 'preferences'}><SlidersHorizontal size={17} aria-hidden="true" /><span>{t('workspace.nav.preferences')}</span></Link><Link href="/jobs/profile" data-active={workspaceSection === 'profile'} aria-label={activeDraft?.data.profile.name || t('workspace.candidate')}><span>{activeDraft?.data.profile.name?.slice(0, 1) || 'R'}</span><strong>{activeDraft?.data.profile.name || t('workspace.candidate')}</strong></Link></div>
     </aside>
     <section className="job-workspace__main">
       <header className="job-workspace__topbar"><h1>{t(`workspace.pageTitle.${workspaceSection}`)}</h1><div><span data-connected={browserAgentAvailable}><i />{browserAgentAvailable ? t('workspace.connected') : t('workspace.disconnected')}</span><Link href="/jobs/settings" aria-label={t('workspace.settings')}><Settings2 size={18} /></Link></div></header>
@@ -996,7 +1144,7 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
       {workspaceSection === 'overview' ? <div className="job-overview">
         <section className="job-overview__agent">
           <div><span data-running={agentRunning} /><div><h2>{!agentSetupComplete ? t('workspace.setupRequired') : !agentPreferences.enabled ? t('workspace.agentPaused') : browserAgentAvailable ? t('workspace.agentRunning') : t('workspace.agentReady')}</h2><p>{agentSetupComplete ? t('workspace.targetSummary', { titles: savedSearchProfile?.titles.slice(0, 2).join('、') || t('unknown'), location: savedSearchProfile?.locations[0] || t('unknown') }) : t('workspace.setupHelp')}</p></div></div>
-          <div>{!agentSetupComplete ? <Link className="job-button job-button--primary" href={!trustedDraft ? '/jobs/profile' : '/jobs/preferences'}>{t('workspace.setupAction')}<ChevronRight size={16} /></Link> : <><button type="button" className="job-button job-button--secondary" onClick={toggleJobAgent}>{agentPreferences.enabled ? <Pause size={15} /> : <Play size={15} />}{agentPreferences.enabled ? t('workspace.pauseAgent') : t('workspace.startAgent')}</button><Link className="job-button job-button--primary" href={pendingRequirements > 0 ? '/jobs/resumes' : pendingMessages > 0 ? '/jobs/conversations' : '/jobs/opportunities'}>{t('workspace.reviewTasks')}<ChevronRight size={16} /></Link></>}</div>
+          <div>{!agentSetupComplete ? <Link className="job-button job-button--primary" href="/jobs/setup">{t('workspace.setupAction')}<ChevronRight size={16} /></Link> : <><button type="button" className="job-button job-button--secondary" onClick={toggleJobAgent}>{agentPreferences.enabled ? <Pause size={15} /> : <Play size={15} />}{agentPreferences.enabled ? t('workspace.pauseAgent') : t('workspace.startAgent')}</button><Link className="job-button job-button--primary" href={pendingRequirements > 0 ? '/jobs/resumes' : pendingMessages > 0 ? '/jobs/conversations' : '/jobs/opportunities'}>{t('workspace.reviewTasks')}<ChevronRight size={16} /></Link></>}</div>
         </section>
         <div className="job-overview__columns">
           <section><h2>{t('workspace.todayActivity')}</h2><div className="job-overview__timeline">
@@ -1019,19 +1167,21 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
         <section className="job-opportunities__detail">{selectedPosting ? <><header><span>{selectedPosting.company}</span><h2>{selectedPosting.title}</h2><p>{[selectedPosting.location, selectedPosting.workplaceType, selectedPosting.employmentType].filter(Boolean).join(' · ') || t('unknown')}</p></header><div className="job-opportunities__score"><span>{t('workspace.matchScore')}</span><strong>{selectedRecommendation?.preliminaryScore !== undefined ? `${Math.round(selectedRecommendation.preliminaryScore)}%` : '—'}</strong></div><section><h3>{t('whyRecommended')}</h3>{selectedRecommendation?.reasons.length ? <ol>{selectedRecommendation.reasons.slice(0, 3).map((reason) => <li key={reason.code}><CheckCircle2 size={15} />{t('reason', { code: reason.code, contribution: reason.contribution })}</li>)}</ol> : <p>{t('unknownRecommendation')}</p>}</section><p className="job-opportunities__description">{selectedPosting.description.slice(0, 520)}</p><footer>{selectedRecommendation ? <><button type="button" className="job-button job-button--primary" onClick={() => void analyzePosting(selectedPosting, selectedRecommendation)}>{t('workspace.confirmInterest')}</button><button type="button" className="job-button job-button--secondary" onClick={() => void decide(selectedRecommendation, 'saved')}><Save size={14} />{t('save')}</button><button type="button" className="job-button job-button--secondary" onClick={() => void decide(selectedRecommendation, 'ignored')}>{t('ignore')}</button></> : null}<a href={selectedPosting.canonicalUrl} target="_blank" rel="noopener noreferrer"><ExternalLink size={15} />{t('openOriginal')}</a></footer></> : <p className="job-workspace__empty">{t('workspace.selectOpportunity')}</p>}</section>
       </div> : null}
 
-      {workspaceSection === 'resumes' ? <div className="job-workspace__content"><section className="job-section-heading"><div><h2>{t('workspace.resumeTasksTitle')}</h2><p>{t('workspace.resumeTasksHelp')}</p></div><span>{pendingRequirements + readyApplications}</span></section><div className="job-resume-agent"><ResumeAgentApp appId="agent" /></div><ApplicationPipeline packets={packets} pendingId={busyApplicationId} onPrepare={(id) => void prepareApplication(id)} onMarkApplied={(id) => void confirmApplied(id)} onNotesChange={(id, notes) => void saveApplicationNotes(id, notes)} /></div> : null}
+      {workspaceSection === 'resumes' ? <div className="job-workspace__content"><section className="job-section-heading"><div><h2>{t('workspace.resumeTasksTitle')}</h2><p>{t('workspace.resumeTasksHelp')}</p></div><span>{pendingRequirements + readyApplications}</span></section><div className="job-resume-agent"><LazyResumeAgentApp appId="agent" /></div><ApplicationPipeline packets={packets} pendingId={busyApplicationId} onPrepare={(id) => void prepareApplication(id)} onMarkApplied={(id) => void confirmApplied(id)} onNotesChange={(id, notes) => void saveApplicationNotes(id, notes)} /></div> : null}
 
       {workspaceSection === 'conversations' ? <div className="job-workspace__content"><section className="job-section-heading"><div><h2>{t('jobAgent.messageQueueTitle')}</h2><p>{t('jobAgent.messageQueueHelp')}</p></div><span>{conversationMessages.length}</span></section><BossConversationQueue threads={conversationThreads} messages={conversationMessages} applications={applications} postings={postings} pendingMessageId={busyConversationMessageId} pendingResumeThreadId={busyResumeThreadId} onRevise={(messageId, body) => void reviseConversationMessage(messageId, body)} onVerify={(messageId) => void verifyAndApproveConversationMessage(messageId)} onSend={(messageId) => void sendApprovedConversationMessage(messageId)} onSendResume={(thread) => void sendRequestedResume(thread)} /></div> : null}
 
       {workspaceSection === 'applications' ? <div className="job-workspace__content"><section className="job-section-heading"><div><h2>{t('application.title')}</h2><p>{t('application.description')}</p></div><span>{applications.length}</span></section><ApplicationPipeline packets={packets} pendingId={busyApplicationId} onPrepare={(id) => void prepareApplication(id)} onMarkApplied={(id) => void confirmApplied(id)} onNotesChange={(id, notes) => void saveApplicationNotes(id, notes)} /></div> : null}
 
-      {workspaceSection === 'interviews' ? <InterviewWorkspace store={store} applications={applications} postings={postings} locale={locale} onChanged={load} /> : null}
+      {workspaceSection === 'interviews' ? <LazyInterviewWorkspace store={store} applications={applications} postings={postings} locale={locale} onChanged={load} /> : null}
 
-      {workspaceSection === 'profile' ? <div className="job-workspace__embedded" role="application" aria-label={desktopT('apps.studio')}><ResumeStudioApp appId="studio" /></div> : null}
+      {workspaceSection === 'setup' ? <LazyJobAgentSetup trustedResume={trustedDraft} resumeEditor={<LazyResumeStudioApp appId="studio" />} analysis={setupAnalysis} values={setupValues} onChange={updateSetupValue} onSave={async () => Boolean(await saveProfile())} onStart={startConfiguredAgent} /> : null}
 
-      {workspaceSection === 'target-job' ? <div className="job-workspace__embedded" role="application" aria-label={desktopT('apps.jd-match')}><JDMatchApp appId="jd-match" /></div> : null}
+      {workspaceSection === 'profile' ? <div className="job-workspace__embedded" role="application" aria-label={desktopT('apps.studio')}><LazyResumeStudioApp appId="studio" /></div> : null}
 
-      {workspaceSection === 'settings' ? <div className="job-workspace__embedded" role="application" aria-label={desktopT('apps.settings')}><SettingsApp appId="settings" /></div> : null}
+      {workspaceSection === 'target-job' ? <div className="job-workspace__embedded" role="application" aria-label={desktopT('apps.jd-match')}><LazyJDMatchApp appId="jd-match" /></div> : null}
+
+      {workspaceSection === 'settings' ? <div className="job-workspace__embedded" role="application" aria-label={desktopT('apps.settings')}><LazySettingsApp appId="settings" /></div> : null}
 
       {workspaceSection === 'activity' ? <div className="job-workspace__content"><section className="job-section-heading"><div><h2>{t('workspace.activityTitle')}</h2><p>{t('workspace.activityHelp')}</p></div></section><div className="job-activity-list">{postings.slice(0, 12).map((posting) => <article key={posting.id}><span><BriefcaseBusiness size={16} /></span><div><strong>{t('workspace.activityPosting', { title: posting.title })}</strong><p>{posting.company} · {posting.lastCheckedAt.slice(0, 10)}</p></div></article>)}{postings.length === 0 ? <p className="job-workspace__empty">{t('workspace.noActivity')}</p> : null}</div></div> : null}
 
@@ -1118,6 +1268,7 @@ function jobWorkspaceSection(pathname: string): JobWorkspaceSection {
     || section === 'profile'
     || section === 'target-job'
     || section === 'settings'
+    || section === 'setup'
     ? section
     : 'overview'
 }

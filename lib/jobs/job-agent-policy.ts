@@ -30,7 +30,10 @@ export const jobAgentPreferencesSchema = z.object({
   autonomy: jobAgentAutonomySchema,
   platforms: z.array(jobAgentPlatformIdSchema).max(JOB_AGENT_PLATFORM_IDS.length),
   learnFromReplies: z.boolean(),
-  learnFromOutcomes: z.boolean()
+  learnFromOutcomes: z.boolean(),
+  minimumMatchScore: z.number().int().min(0).max(100).optional(),
+  dailyContactLimit: z.number().int().min(1).max(100).optional(),
+  autoSendResume: z.boolean().optional()
 })
 
 const persistedJobAgentPreferencesSchema = jobAgentPreferencesSchema.extend({
@@ -45,7 +48,10 @@ export const DEFAULT_JOB_AGENT_PREFERENCES: JobAgentPreferences = {
   autonomy: 'autopilot',
   platforms: [...JOB_AGENT_PLATFORM_IDS],
   learnFromReplies: true,
-  learnFromOutcomes: true
+  learnFromOutcomes: true,
+  minimumMatchScore: 70,
+  dailyContactLimit: 20,
+  autoSendResume: true
 }
 
 export const JOB_AGENT_PREFERENCES_KEY = 'resume-os:job-agent-preferences:v1'

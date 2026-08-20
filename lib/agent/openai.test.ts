@@ -160,6 +160,18 @@ describe('agent OpenAI boundary', () => {
     }))
   })
 
+  it('allows the built-in OpenRouter BYOK host with an exact HTTPS origin', async () => {
+    await generateAgentText('prompt', {
+      request: byokRequest({
+        baseURL: 'https://openrouter.ai/api/v1',
+        model: 'openai/gpt-4.1-mini'
+      })
+    })
+    expect(sdkMocks.createOpenAI).toHaveBeenCalledWith(expect.objectContaining({
+      baseURL: 'https://openrouter.ai/api/v1'
+    }))
+  })
+
   it('allows an HTTP loopback provider only in explicit local-only mode', async () => {
     vi.stubEnv('RESUME_OS_LOCAL_ONLY', '1')
 
@@ -343,6 +355,34 @@ describe('agent OpenAI boundary', () => {
     expect(body.code).toBe('AI_UNAVAILABLE')
     expect(JSON.stringify(body)).not.toContain('credential secret')
     expect(JSON.stringify(log.mock.calls)).not.toContain('credential secret')
+  })
+
+  it.each([
+    [400, 'AI_PROVIDER_REQUEST_REJECTED', 400],
+    [401, 'AI_PROVIDER_UNAUTHORIZED', 401],
+    [402, 'AI_PROVIDER_PAYMENT_REQUIRED', 402],
+    [403, 'AI_PROVIDER_FORBIDDEN', 403],
+    [404, 'AI_MODEL_NOT_FOUND', 404],
+    [429, 'RATE_LIMITED', 429]
+  ])('maps provider status %i to a safe actionable code', async (statusCode, code, status) => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const response = createAgentErrorResponse({
+      name: 'AI_APICallError',
+      statusCode,
+      responseBody: 'provider response containing private credential detail'
+    })
+    const body = await response.json()
+
+    expect(response.status).toBe(status)
+    expect(body.code).toBe(code)
+    expect(JSON.stringify(body)).not.toContain('private credential detail')
+    expect(JSON.stringify(log.mock.calls)).not.toContain('private credential detail')
+  })
+
+  it('recognizes provider model lookup errors without exposing the model identifier', async () => {
+    const response = createAgentErrorResponse({ name: 'AI_NoSuchModelError', modelId: 'private-model-id' })
+    expect(response.status).toBe(404)
+    expect(await response.json()).toMatchObject({ code: 'AI_MODEL_NOT_FOUND' })
   })
 
   it('distinguishes aborts without logging raw errors', async () => {

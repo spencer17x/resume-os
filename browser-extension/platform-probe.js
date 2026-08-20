@@ -332,9 +332,10 @@ function collectBossJobs() {
     const company = card?.querySelector('[class*="company-name"], [class*="company"]')?.textContent?.trim() ?? ''
     const locationText = card?.querySelector('[class*="job-area"], [class*="location"]')?.textContent?.trim()
     const summary = card?.textContent?.replace(/\s+/gu, ' ').trim().slice(0, 20_000) ?? ''
+    const salary = /(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)K/iu.exec(summary)
     if (!title || !company || !summary) return []
     seen.add(externalId)
-    return [{ externalId, url: url.toString(), title: title.slice(0, 300), company: company.slice(0, 300), summary, ...(locationText ? { location: locationText.slice(0, 500) } : {}) }]
+    return [{ externalId, url: url.toString(), title: title.slice(0, 300), company: company.slice(0, 300), summary, ...(locationText ? { location: locationText.slice(0, 500) } : {}), ...(salary ? { minimumMonthlySalary: Math.round(Number(salary[1]) * 1_000), maximumMonthlySalary: Math.round(Number(salary[2]) * 1_000) } : {}) }]
   }).slice(0, 50)
 }
 

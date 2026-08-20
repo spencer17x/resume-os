@@ -94,6 +94,7 @@ function exclusionReason(
   if (posting.status === 'closed' || posting.status === 'stale') return 'posting-not-open'
   if (freshnessAgeDays(posting, now) > profile.maximumAgeDays) return 'posting-too-old'
   if (profile.excludedTerms.some((term) => includesTerm(text, term))) return 'excluded-term'
+  if (profile.blockedCompanies?.some((company) => sameText(company, posting.company))) return 'blocked-company'
   if (profile.requiredTerms.some((term) => !includesTerm(text, term))) return 'required-term-missing'
   if (
     posting.location
@@ -109,6 +110,16 @@ function exclusionReason(
     && profile.employmentTypes.length > 0
     && !profile.employmentTypes.includes(posting.employmentType)
   ) return 'employment-type-mismatch'
+  if (
+    profile.minimumMonthlySalary !== undefined
+    && posting.compensation?.maximum !== undefined
+    && posting.compensation.maximum < profile.minimumMonthlySalary
+  ) return 'salary-below-minimum'
+  if (
+    profile.maximumMonthlySalary !== undefined
+    && posting.compensation?.minimum !== undefined
+    && posting.compensation.minimum > profile.maximumMonthlySalary
+  ) return 'salary-above-maximum'
   return null
 }
 
@@ -116,6 +127,7 @@ function hasUnknownHardPreference(posting: JobPosting, profile: JobSearchProfile
   return (profile.workplaceTypes.length > 0 && !posting.workplaceType)
     || (profile.employmentTypes.length > 0 && !posting.employmentType)
     || (profile.locations.length > 0 && !posting.location)
+    || ((profile.minimumMonthlySalary !== undefined || profile.maximumMonthlySalary !== undefined) && !posting.compensation)
 }
 
 function titleRelevance(title: string, profile: JobSearchProfile) {
@@ -138,6 +150,17 @@ function softPreferenceFit(posting: JobPosting, profile: JobSearchProfile, text:
   }
   if ((profile.preferredCompanies?.length ?? 0) > 0) {
     signals.push(profile.preferredCompanies!.some((company) => sameText(company, posting.company)) ? 100 : 0)
+  }
+  for (const terms of [
+    profile.experienceLevels,
+    profile.educationLevels,
+    profile.industries,
+    profile.companySizes,
+    profile.financingStages
+  ]) {
+    if ((terms?.length ?? 0) > 0) {
+      signals.push(terms!.some((term) => includesTerm(text, term)) ? 100 : 0)
+    }
   }
   return signals.length === 0 ? 0 : signals.reduce((total, value) => total + value, 0) / signals.length
 }

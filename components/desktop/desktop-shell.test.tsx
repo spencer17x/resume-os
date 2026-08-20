@@ -242,9 +242,9 @@ describe('DesktopShell', () => {
   it('marks desktop chrome with the Tahoe design system and material roles', async () => {
     renderDesktop()
 
-    expect(screen.getByTestId('desktop-shell')).toHaveAttribute('data-design-system', 'macos-tahoe')
-    expect(screen.getByTestId('menu-bar')).toHaveAttribute('data-material', 'clear')
-    expect(screen.getByTestId('dock').querySelector('[data-material="regular"]')).toBeInTheDocument()
+    expect(await screen.findByTestId('desktop-shell')).toHaveAttribute('data-design-system', 'macos-tahoe')
+    expect(await screen.findByTestId('menu-bar')).toHaveAttribute('data-material', 'clear')
+    expect((await screen.findByTestId('dock')).querySelector('[data-material="regular"]')).toBeInTheDocument()
     expect(await screen.findByRole('application', { name: 'Resume Studio' })).toHaveAttribute('data-material', 'window')
   })
 
@@ -270,17 +270,17 @@ describe('DesktopShell', () => {
     expect(css).toContain('image-set(')
   })
 
-  it('localizes the window manager region label', () => {
+  it('localizes the window manager region label', async () => {
     renderDesktop({ descriptor: null, locale: 'zh' })
 
-    expect(screen.getByRole('region', { name: '应用程序' })).toBeVisible()
+    expect(await screen.findByRole('region', { name: '应用程序' })).toBeVisible()
   })
 
   it('shows only the desktop on the locale root', async () => {
     renderDesktop({ root: true })
 
     await waitFor(() => expect(screen.queryByRole('application')).not.toBeInTheDocument())
-    expect(screen.getByTestId('desktop-surface')).toBeVisible()
+    expect(await screen.findByTestId('desktop-surface')).toBeVisible()
     const ambient = screen.getByTestId('desktop-ambient')
     const phases = [...ambient.querySelectorAll<HTMLElement>('[data-agent-phase]')]
       .map((element) => element.dataset.agentPhase)
@@ -318,15 +318,15 @@ describe('DesktopShell', () => {
     const cancelFrame = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {})
     renderDesktop({ root: true })
 
-    const surface = screen.getByTestId('desktop-surface')
-    const ambient = screen.getByTestId('desktop-ambient')
+    const surface = await screen.findByTestId('desktop-surface')
+    const ambient = await screen.findByTestId('desktop-ambient')
     fireEvent.pointerMove(surface, { clientX: 120, clientY: 80 })
     expect(ambient).toHaveAttribute('data-pointer', 'true')
 
     const scheduledFrames = requestFrame.mock.calls.length
     fireEvent.click(within(screen.getByTestId('dock')).getByRole('button', { name: 'Settings' }))
     const settings = await screen.findByRole('application', { name: 'Settings' })
-    fireEvent.click(within(settings).getByRole('radio', { name: 'Reduced motion' }))
+    fireEvent.click(await within(settings).findByRole('radio', { name: 'Reduced motion' }))
 
     await waitFor(() => expect(ambient).toHaveAttribute('data-reduced-motion', 'true'))
     expect(ambient).toHaveAttribute('data-story-mode', 'poster')
@@ -337,13 +337,13 @@ describe('DesktopShell', () => {
     expect(ambient).toHaveAttribute('data-pointer', 'false')
   })
 
-  it('cleans up constellation frames and pointer listeners on unmount', () => {
+  it('cleans up constellation frames and pointer listeners on unmount', async () => {
     const requestFrame = vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(83)
     const cancelFrame = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {})
     const view = renderDesktop({ root: true })
 
-    const surface = screen.getByTestId('desktop-surface')
-    const ambient = screen.getByTestId('desktop-ambient')
+    const surface = await screen.findByTestId('desktop-surface')
+    const ambient = await screen.findByTestId('desktop-ambient')
     fireEvent.pointerMove(surface, { clientX: 100, clientY: 60 })
     expect(ambient).toHaveAttribute('data-pointer', 'true')
     expect(requestFrame).toHaveBeenCalled()
@@ -425,7 +425,7 @@ describe('DesktopShell', () => {
 
     fireEvent.click(within(screen.getByTestId('dock')).getByRole('button', { name: 'Settings' }))
     const settings = await screen.findByRole('application', { name: 'Settings' })
-    const motionControl = within(settings).getByRole('radiogroup', { name: 'Motion preference' })
+    const motionControl = await within(settings).findByRole('radiogroup', { name: 'Motion preference' })
 
     expect(motionControl).toBeVisible()
     expect(motionControl).not.toHaveClass('motion-mode-control--compact')
@@ -669,7 +669,7 @@ describe('DesktopShell', () => {
     expect(css).toMatch(/\.desktop-window__control\s*{[^}]*width:\s*28px;[^}]*height:\s*28px;/)
   })
 
-  it('keeps fixed shell regions and loads every registered application', () => {
+  it('keeps fixed shell regions and loads every registered application', async () => {
     renderDesktop({ descriptor: null })
     expect(screen.getByTestId('desktop-shell')).toBeVisible()
     expect(screen.getByTestId('menu-bar')).toBeVisible()
@@ -687,29 +687,29 @@ describe('DesktopShell', () => {
         </NextIntlClientProvider>
       )
       if (appId === 'studio') {
-        expect(view.getByRole('region', { name: 'Resume Studio' })).toBeVisible()
+        expect(await view.findByRole('region', { name: 'Resume Studio' })).toBeVisible()
       } else if (appId === 'jobs') {
-        expect(view.getByRole('heading', { name: 'Job overview' })).toBeVisible()
+        expect(await view.findByRole('heading', { name: 'Job overview' })).toBeVisible()
       } else if (appId === 'agent' || appId === 'jd-match') {
-        expect(view.getByRole('heading', { name: 'Create a resume draft first' })).toBeVisible()
+        expect(await view.findByRole('heading', { name: 'Create a resume draft first' })).toBeVisible()
         expect(view.getByRole('link', { name: 'Open Resume Studio' })).toBeVisible()
       } else if (appId === 'classic') {
-        expect(view.getByRole('heading', { name: 'Import a verified resume to review' })).toBeVisible()
+        expect(await view.findByRole('heading', { name: 'Import a verified resume to review' })).toBeVisible()
         expect(view.getByRole('link', { name: 'Open Resume Studio' })).toBeVisible()
       } else if (appId === 'projects') {
-        expect(view.getByRole('region', { name: 'Project Explorer' })).toBeVisible()
+        expect(await view.findByRole('region', { name: 'Project Explorer' })).toBeVisible()
       } else if (appId === 'timeline') {
-        expect(view.getByRole('region', { name: 'Career Timeline' })).toBeVisible()
+        expect(await view.findByRole('region', { name: 'Career Timeline' })).toBeVisible()
       } else if (appId === 'terminal') {
-        expect(view.getByRole('region', { name: 'Resume terminal' })).toBeVisible()
+        expect(await view.findByRole('region', { name: 'Resume terminal' })).toBeVisible()
       } else if (appId === 'book') {
-        expect(view.getByRole('region', { name: 'Resume Book' })).toBeVisible()
+        expect(await view.findByRole('region', { name: 'Resume Book' })).toBeVisible()
       } else if (appId === 'resume-3d') {
-        expect(view.getByRole('status', { name: 'Loading Resume 3D' })).toBeVisible()
+        expect(await view.findByRole('status', { name: 'Loading Resume 3D' })).toBeVisible()
       } else if (appId === 'settings') {
-        expect(view.getByRole('heading', { name: 'Settings' })).toBeVisible()
+        expect(await view.findByRole('heading', { name: 'Settings' })).toBeVisible()
       } else {
-        expect(view.getByText('Application is ready.')).toBeVisible()
+        expect(await view.findByText('Application is ready.')).toBeVisible()
       }
       view.unmount()
     }

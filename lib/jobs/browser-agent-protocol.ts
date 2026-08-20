@@ -19,7 +19,9 @@ export const browserBossJobSchema = z.object({
   title: z.string().trim().min(1).max(300),
   company: z.string().trim().min(1).max(300),
   summary: z.string().trim().min(1).max(20_000),
-  location: z.string().trim().min(1).max(500).optional()
+  location: z.string().trim().min(1).max(500).optional(),
+  minimumMonthlySalary: z.number().int().nonnegative().max(1_000_000).optional(),
+  maximumMonthlySalary: z.number().int().positive().max(1_000_000).optional()
 }).strict()
 
 export type BrowserBossJob = z.infer<typeof browserBossJobSchema>

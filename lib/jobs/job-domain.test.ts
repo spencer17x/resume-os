@@ -128,6 +128,22 @@ describe('job domain schemas', () => {
       platforms: ['greenhouse', 'lever', 'boss'],
       preferredCompanies: ['Example']
     })).toMatchObject({ platforms: ['greenhouse', 'lever', 'boss'], preferredCompanies: ['Example'] })
+    expect(jobSearchProfileSchema.parse({
+      ...profile,
+      blockedCompanies: ['Blocked Co'],
+      experienceLevels: ['3-5 years'],
+      educationLevels: ['Bachelor'],
+      industries: ['Internet'],
+      companySizes: ['100-499'],
+      financingStages: ['Series B'],
+      minimumMonthlySalary: 25_000,
+      maximumMonthlySalary: 45_000
+    })).toMatchObject({ minimumMonthlySalary: 25_000, maximumMonthlySalary: 45_000 })
+    expect(jobSearchProfileSchema.safeParse({
+      ...profile,
+      minimumMonthlySalary: 50_000,
+      maximumMonthlySalary: 30_000
+    }).success).toBe(false)
   })
 
   it('requires HTTPS job URLs without embedded credentials', () => {

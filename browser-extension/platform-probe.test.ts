@@ -20,6 +20,30 @@ describe('BOSS page send adapter', () => {
     })
   })
 
+  it('collects structured salary boundaries from a visible BOSS job card', async () => {
+    document.body.innerHTML = `<article class="job-card"><a href="/job_detail/job-1.html" title="平台工程师">平台工程师</a><span class="company-name">示例公司</span><span class="job-area">上海</span><span>25-45K·14薪 3-5年 本科</span></article>`
+    let listener: ((message: unknown, sender: unknown, respond: (value: unknown) => void) => boolean) | undefined
+    const chrome = {
+      runtime: {
+        onMessage: { addListener: (value: typeof listener) => { listener = value } },
+        sendMessage: async () => undefined
+      }
+    }
+    runInNewContext(readFileSync('browser-extension/platform-probe.js', 'utf8'), {
+      chrome, document, location: new URL('https://www.zhipin.com/web/geek/job'), URL,
+      Element, HTMLTextAreaElement, HTMLInputElement, InputEvent, Event, TextEncoder, BigInt, Date, Promise,
+      setTimeout, clearTimeout
+    })
+    const response = await new Promise<{ jobs: Array<Record<string, unknown>> }>((resolve) => {
+      listener?.({ action: 'collect-boss-jobs' }, {}, (value) => resolve(value as { jobs: Array<Record<string, unknown>> }))
+    })
+    expect(response.jobs).toEqual([expect.objectContaining({
+      externalId: 'job-1',
+      minimumMonthlySalary: 25_000,
+      maximumMonthlySalary: 45_000
+    })])
+  })
+
   it('sends only the exact approved body to the exact verified recipient and returns a receipt', async () => {
     let listener: ((message: unknown, sender: unknown, respond: (value: unknown) => void) => boolean) | undefined
     const chrome = {

@@ -12,34 +12,39 @@ rules, user intent, and a complete action history.
 
 ## Primary workflow
 
-1. The user imports a trusted resume and confirms job goals, locations, compensation,
-   exclusions, and communication preferences.
-2. Model configuration and BOSS connection do not start the agent. The user must save
-   a trusted resume and explicit target-job requirements, then select Start. Per-platform
+1. The user selects Start setup, uploads or pastes a trusted resume, and waits for the
+   structured resume analysis to finish.
+2. The Agent proposes resume-grounded target roles and skills. The user then confirms
+   titles, locations, salary, experience, education, workplace/employment type,
+   industries, company preferences/blocks, company size/stage, posting age, and terms.
+3. The user confirms delegation rules: minimum match score, daily contact limit,
+   automation level, and whether a verified recruiter resume request may send the
+   job-specific PDF automatically. Only the final explicit Start enables execution.
+4. Model configuration and BOSS connection alone do not start the agent. Per-platform
    API configuration and platform selection are not part of the primary flow.
-3. After explicit activation, the local Browser Agent detects platform sessions already
+5. After explicit activation, the local Browser Agent detects platform sessions already
    available in Chrome and starts recurring discovery. A missing or expired session opens the relevant
    login page; login, QR code, SMS, 2FA, and CAPTCHA completion remain user actions.
    After the first successful login, the local browser session is reused without
    exporting cookies or credentials to Resume OS.
-4. The agent continuously discovers and deduplicates roles, explains its ranking,
+6. The agent continuously discovers and deduplicates roles, explains its ranking,
    and rejects roles outside hard constraints.
-5. For a selected role, the agent maps requirements to saved evidence, creates a
+7. For a selected role, the agent maps requirements to saved evidence, creates a
    job-specific resume variant, and prepares an evidence-grounded opening message.
-6. A conversation inbox groups recruiter messages, follow-ups, interview scheduling,
+8. A conversation inbox groups recruiter messages, follow-ups, interview scheduling,
    and negotiation by job. Each outbound action records its source, approval policy,
    final content, timestamp, and provider receipt when available.
-7. The user records or confirms outcomes. The agent improves targeting, timing, and
+9. The user records or confirms outcomes. The agent improves targeting, timing, and
    message strategy while keeping learned strategy separate from career facts.
-8. Interview rounds retain user-provided questions, answers, notes, and explicit
+10. Interview rounds retain user-provided questions, answers, notes, and explicit
    outcomes. The agent may generate review suggestions and an advisory pass estimate,
    but it never records pass/fail without the user's confirmation.
-9. A recruiter resume request selects only the application-linked job-specific
+11. A recruiter resume request selects only the application-linked job-specific
    variant. The browser generates a text-selectable PDF locally by default, with
    DOCX only as a verified compatibility fallback, and records `resume-sent` only
    after recipient, conversation, artifact fingerprint, filename, and platform
    attachment receipt all match.
-10. De-identified recruiter events create at most one fixed-template reply proposal.
+12. De-identified recruiter events create at most one fixed-template reply proposal.
     Waiting threads may create a follow-up after 72 hours, capped at two. Autopilot
     still requires immutable recipient/conversation re-verification and an exact
     platform message receipt; otherwise the proposal remains reviewable.
@@ -55,6 +60,10 @@ Its persistent navigation separates overview, opportunities, resume tasks,
 conversations, applications, activity, and preferences. The overview emphasizes agent
 state, the next actions requiring human attention, recent activity, and application
 progress; opportunity review uses a list-detail layout.
+Internal Job Agent navigation updates browser history without an RSC round trip so the
+local store/controller remains mounted. Heavy profile, optimization, target-job,
+settings, interview, and document-rendering modules load only when their section or
+action is first used.
 
 ## Platform capability model
 

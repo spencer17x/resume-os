@@ -11,7 +11,7 @@ import { apiErrorResponse, type ApiErrorCode } from '@/lib/server/request-guard'
 export const DEFAULT_MAX_OUTPUT_TOKENS = 5_000
 export const AI_REQUEST_TIMEOUT_MS = 60_000
 
-const DEFAULT_ALLOWED_AI_HOSTS = ['api.openai.com']
+const DEFAULT_ALLOWED_AI_HOSTS = ['api.openai.com', 'openrouter.ai']
 const MAX_API_KEY_LENGTH = 4_096
 const MAX_BASE_URL_LENGTH = 2_048
 const MAX_MODEL_LENGTH = 256
@@ -241,5 +241,29 @@ function classifyAgentError(error: unknown): { code: ApiErrorCode; status: numbe
     return { code: 'REQUEST_ABORTED', status: 499 }
   }
 
+  if (isNamedError(error, 'AI_NoSuchModelError')) {
+    return { code: 'AI_MODEL_NOT_FOUND', status: 404 }
+  }
+
+  const providerStatus = readProviderStatusCode(error)
+  if (providerStatus === 400 || providerStatus === 422) {
+    return { code: 'AI_PROVIDER_REQUEST_REJECTED', status: 400 }
+  }
+  if (providerStatus === 401) return { code: 'AI_PROVIDER_UNAUTHORIZED', status: 401 }
+  if (providerStatus === 402) return { code: 'AI_PROVIDER_PAYMENT_REQUIRED', status: 402 }
+  if (providerStatus === 403) return { code: 'AI_PROVIDER_FORBIDDEN', status: 403 }
+  if (providerStatus === 404) return { code: 'AI_MODEL_NOT_FOUND', status: 404 }
+  if (providerStatus === 429) return { code: 'RATE_LIMITED', status: 429 }
+
   return { code: 'AI_UNAVAILABLE', status: 502 }
+}
+
+function readProviderStatusCode(error: unknown): number | undefined {
+  if (typeof error !== 'object' || error === null || !('statusCode' in error)) return undefined
+  const statusCode = (error as { statusCode?: unknown }).statusCode
+  return typeof statusCode === 'number' && Number.isInteger(statusCode) ? statusCode : undefined
+}
+
+function isNamedError(error: unknown, name: string) {
+  return typeof error === 'object' && error !== null && 'name' in error && error.name === name
 }

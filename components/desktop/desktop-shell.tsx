@@ -1,38 +1,30 @@
 'use client'
 
+import dynamic from 'next/dynamic'
 import type { ReactNode } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { usePathname } from '@/i18n/navigation'
 import { appIdFromPath } from '@/lib/desktop/app-registry'
 import { ThemePreferenceProvider } from '@/components/theme-preference'
-import { DesktopSurface } from './desktop-surface'
-import { Dock } from './dock'
-import { MenuBar } from './menu-bar'
-import { MobileAppFrame } from './mobile-app-frame'
-import { MobileHome } from './mobile-home'
 import { MotionPreferenceProvider } from './motion-preference'
 import { MOBILE_MEDIA_QUERY, useMediaQuery } from './use-media-query'
-import { WindowManager } from './window-manager'
 import { AppLoader } from './app-loader'
 
-function DesktopLayout({ children }: { children: ReactNode }) {
-  const t = useTranslations('desktop')
+const LazyDesktopLayout = dynamic(
+  () => import('./desktop-layout').then((module) => module.DesktopLayout),
+  { loading: ShellLoading }
+)
+const LazyMobileAppFrame = dynamic(
+  () => import('./mobile-app-frame').then((module) => module.MobileAppFrame),
+  { loading: ShellLoading }
+)
+const LazyMobileHome = dynamic(
+  () => import('./mobile-home').then((module) => module.MobileHome),
+  { loading: ShellLoading }
+)
 
-  return (
-    <div
-      className="desktop-shell"
-      data-design-system="macos-tahoe"
-      data-testid="desktop-shell"
-      aria-label={t('landmark')}
-      role="main"
-    >
-      <MenuBar />
-      <DesktopSurface />
-      <WindowManager />
-      <Dock />
-      <div className="desktop-route-descriptors" aria-hidden="true">{children}</div>
-    </div>
-  )
+function ShellLoading() {
+  return <div className="desktop-shell desktop-shell--pending" data-testid="desktop-shell-pending" aria-busy="true" />
 }
 
 export function DesktopShell({ children }: { children: ReactNode }) {
@@ -57,10 +49,10 @@ export function DesktopShell({ children }: { children: ReactNode }) {
         </div>
       ) : isMobile ? (
         <>
-          {mobileRoot ? <MobileHome /> : appId ? <MobileAppFrame appId={appId} /> : null}
+          {mobileRoot ? <LazyMobileHome /> : appId ? <LazyMobileAppFrame appId={appId} /> : null}
           <div className="desktop-route-descriptors" aria-hidden="true">{children}</div>
         </>
-        ) : <DesktopLayout>{children}</DesktopLayout>}
+        ) : <LazyDesktopLayout>{children}</LazyDesktopLayout>}
       </MotionPreferenceProvider>
     </ThemePreferenceProvider>
   )

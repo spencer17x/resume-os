@@ -85,4 +85,17 @@ describe('scoreJobRecommendation', () => {
       profile, sourceDraftId: 'draft-1', facts, now
     }).reasons[0].code).toBe('posting-too-old')
   })
+
+  it('enforces blocked companies and known salary boundaries', () => {
+    expect(scoreJobRecommendation({
+      posting,
+      profile: { ...profile, blockedCompanies: ['Example'] },
+      sourceDraftId: 'draft-1', facts, now
+    }).reasons[0].code).toBe('blocked-company')
+    expect(scoreJobRecommendation({
+      posting: { ...posting, compensation: { minimum: 15_000, maximum: 20_000, currency: 'CNY', period: 'month' } },
+      profile: { ...profile, minimumMonthlySalary: 25_000 },
+      sourceDraftId: 'draft-1', facts, now
+    }).reasons[0].code).toBe('salary-below-minimum')
+  })
 })

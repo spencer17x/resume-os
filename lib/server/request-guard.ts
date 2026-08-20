@@ -22,6 +22,11 @@ export type ApiErrorCode =
   | 'EXTRACTION_LIMIT'
   | 'EXTRACTION_FAILED'
   | 'AI_NOT_CONFIGURED'
+  | 'AI_PROVIDER_REQUEST_REJECTED'
+  | 'AI_PROVIDER_UNAUTHORIZED'
+  | 'AI_PROVIDER_PAYMENT_REQUIRED'
+  | 'AI_PROVIDER_FORBIDDEN'
+  | 'AI_MODEL_NOT_FOUND'
   | 'AI_UNAVAILABLE'
   | 'AI_OUTPUT_INVALID'
   | 'AI_OUTPUT_TOO_LARGE'
@@ -47,6 +52,11 @@ const apiErrorMessages: Record<ApiErrorCode, string> = {
   EXTRACTION_LIMIT: 'Resume file exceeds extraction limits.',
   EXTRACTION_FAILED: 'Unable to extract resume text.',
   AI_NOT_CONFIGURED: 'AI service is not configured.',
+  AI_PROVIDER_REQUEST_REJECTED: 'AI provider rejected the request configuration.',
+  AI_PROVIDER_UNAUTHORIZED: 'AI provider rejected the API key.',
+  AI_PROVIDER_PAYMENT_REQUIRED: 'AI provider account has insufficient credits.',
+  AI_PROVIDER_FORBIDDEN: 'AI provider denied access to this model or request.',
+  AI_MODEL_NOT_FOUND: 'AI provider could not find the configured model.',
   AI_UNAVAILABLE: 'AI service is temporarily unavailable.',
   AI_OUTPUT_INVALID: 'AI service returned an invalid response.',
   AI_OUTPUT_TOO_LARGE: 'AI service response exceeded the allowed size.',

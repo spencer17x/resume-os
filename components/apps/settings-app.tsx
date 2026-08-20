@@ -142,6 +142,9 @@ function SettingsContent() {
         model: aiConfig.model.trim()
       }
       saveBrowserAiConfig(next)
+      const nextPreference = { mode: 'openai-compatible' as const, allowCloudFallback: false }
+      saveAiProviderPreference(nextPreference)
+      setProviderPreference(nextPreference)
       setAiConfig(next)
       setAiConfigMessage(t(next.rememberApiKey ? 'aiConfigSavedDevice' : 'aiConfigSavedSession'))
       setDiagnosticMessage('')

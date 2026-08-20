@@ -55,6 +55,29 @@ test('exposes only BOSS Zhipin', async ({ page }, testInfo) => {
   expect(discoveryRequests).toBe(0)
 })
 
+test('switches backend sections without an RSC navigation request', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'Desktop shallow-navigation coverage')
+  await page.goto('/en/jobs')
+  const requests: string[] = []
+  page.on('request', (request) => requests.push(request.url()))
+
+  await page.getByRole('link', { name: 'Opportunities', exact: true }).click()
+  await expect(page).toHaveURL(/\/en\/jobs\/opportunities$/u)
+  await expect(page.getByRole('heading', { name: 'Opportunity inbox', level: 1 })).toBeVisible()
+  expect(requests.filter((url) => url.includes('_rsc=') || url.includes('.rsc'))).toEqual([])
+})
+
+test('starts with resume upload instead of running before setup', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'Desktop first-run setup coverage')
+  await page.goto('/en/jobs')
+  await page.getByRole('link', { name: 'Start setup' }).click()
+
+  await expect(page).toHaveURL(/\/en\/jobs\/setup$/u)
+  await expect(page.getByRole('heading', { name: 'Upload a trusted resume' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Continue to analysis' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Pause' })).toHaveCount(0)
+})
+
 test('derives a resume search for BOSS Zhipin', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'Desktop market-search workflow')
   await createTrustedDraft(page)

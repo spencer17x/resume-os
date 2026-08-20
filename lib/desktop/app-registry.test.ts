@@ -30,7 +30,7 @@ describe('app registry', () => {
   })
 
   it('keeps nested Job Agent routes inside the jobs application', () => {
-    for (const section of ['opportunities', 'resumes', 'conversations', 'applications', 'interviews', 'activity', 'preferences', 'profile', 'target-job', 'settings']) {
+    for (const section of ['opportunities', 'resumes', 'conversations', 'applications', 'interviews', 'activity', 'preferences', 'profile', 'target-job', 'settings', 'setup']) {
       expect(appIdFromPath(`/zh/jobs/${section}`)).toBe('jobs')
       expect(appIdFromPath(`/en/jobs/${section}/`)).toBe('jobs')
     }

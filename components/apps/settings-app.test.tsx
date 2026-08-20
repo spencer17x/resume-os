@@ -261,6 +261,10 @@ describe('SettingsApp', () => {
       model: 'deepseek-chat',
       rememberApiKey: false
     })
+    expect(readAiProviderPreference()).toEqual({
+      mode: 'openai-compatible',
+      allowCloudFallback: false
+    })
 
     fireEvent.click(screen.getByRole('button', { name: 'Check selected AI' }))
     await waitFor(() => expect(fetch).toHaveBeenCalled())

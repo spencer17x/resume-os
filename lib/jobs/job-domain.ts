@@ -115,10 +115,29 @@ export const jobSearchProfileSchema = z.object({
   preferredTerms: uniqueTermsSchema(100),
   excludedTerms: uniqueTermsSchema(100),
   preferredCompanies: uniqueTermsSchema(50).optional(),
+  blockedCompanies: uniqueTermsSchema(100).optional(),
+  experienceLevels: uniqueTermsSchema(20).optional(),
+  educationLevels: uniqueTermsSchema(20).optional(),
+  industries: uniqueTermsSchema(50).optional(),
+  companySizes: uniqueTermsSchema(20).optional(),
+  financingStages: uniqueTermsSchema(20).optional(),
+  minimumMonthlySalary: z.number().finite().nonnegative().max(1_000_000).optional(),
+  maximumMonthlySalary: z.number().finite().positive().max(1_000_000).optional(),
   maximumAgeDays: z.number().int().min(1).max(365),
   createdAt: timestampSchema,
   updatedAt: timestampSchema
 }).strict().superRefine((profile, context) => {
+  if (
+    profile.minimumMonthlySalary !== undefined
+    && profile.maximumMonthlySalary !== undefined
+    && profile.maximumMonthlySalary < profile.minimumMonthlySalary
+  ) {
+    context.addIssue({
+      code: 'custom',
+      path: ['maximumMonthlySalary'],
+      message: 'Maximum salary cannot be lower than minimum salary'
+    })
+  }
   addTimestampIssues(profile, context)
   addSerializedSizeIssue(profile, context)
 })

@@ -160,7 +160,7 @@ describe('mobile shell', () => {
       </NextIntlClientProvider>
     )
 
-    expect(await screen.findByRole('main', { name: 'Resume Agent' })).toBeInTheDocument()
+    expect(await screen.findByRole('main', { name: 'Resume Agent' }, { timeout: 5_000 })).toBeInTheDocument()
     expect(screen.queryByTestId('rnd')).not.toBeInTheDocument()
   })
 

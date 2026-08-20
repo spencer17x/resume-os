@@ -81,7 +81,7 @@ Chrome owns model eligibility and download lifecycle. Availability can vary by b
 
 ### OpenAI-compatible BYOK
 
-The browser sends the configured Base URL, model, and API key only to approved same-origin Next.js AI routes. The route uses them for that invocation and forwards the request to the selected provider without persisting or echoing the key. Provider URLs must use HTTPS in public deployments, redirects are rejected, and browser-selected hosts must match the built-in exact-host allowlist or `RESUME_OS_ALLOWED_AI_HOSTS`.
+The browser sends the configured Base URL, model, and API key only to approved same-origin Next.js AI routes. The route uses them for that invocation and forwards the request to the selected provider without persisting or echoing the key. Provider URLs must use HTTPS in public deployments, redirects are rejected, and browser-selected hosts must match the built-in exact-host allowlist (`api.openai.com` and `openrouter.ai`) or `RESUME_OS_ALLOWED_AI_HOSTS`.
 
 Public browser requests require a complete BYOK configuration. `OPENAI_API_KEY` on the Vercel project is not a shared fallback for browser UI traffic. The `OPENAI_*` variables are used for loopback/local-only operation or authenticated server-to-server calls.
 

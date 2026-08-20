@@ -51,6 +51,14 @@ export async function upsertBossBrowserJobs(input: {
         description: job.summary,
         locale: 'zh',
         ...(job.location ? { location: job.location } : {}),
+        ...(job.minimumMonthlySalary !== undefined || job.maximumMonthlySalary !== undefined ? {
+          compensation: {
+            ...(job.minimumMonthlySalary !== undefined ? { minimum: job.minimumMonthlySalary } : {}),
+            ...(job.maximumMonthlySalary !== undefined ? { maximum: job.maximumMonthlySalary } : {}),
+            currency: 'CNY',
+            period: 'month'
+          }
+        } : {}),
         firstSeenAt: existing?.firstSeenAt ?? input.now,
         lastCheckedAt: input.now,
         status: 'open',
@@ -58,7 +66,9 @@ export async function upsertBossBrowserJobs(input: {
           title: job.title,
           company: job.company,
           summary: job.summary,
-          location: job.location
+          location: job.location,
+          minimumMonthlySalary: job.minimumMonthlySalary,
+          maximumMonthlySalary: job.maximumMonthlySalary
         })
       })
       await transaction.put('jobPostings', posting)
