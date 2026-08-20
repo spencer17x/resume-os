@@ -43,6 +43,7 @@ function EffectCleanupSentinel({ label }: { label: string }) {
 }
 
 vi.mock('@/i18n/navigation', () => ({
+  Link: ({ href, children, ...props }: PropsWithChildren<{ href: string }>) => <a href={href} {...props}>{children}</a>,
   usePathname: () => '/',
   useRouter: () => ({ replace: vi.fn() })
 }))
@@ -209,7 +210,7 @@ describe('DesktopShell', () => {
     const layout = readFileSync('app/[locale]/layout.tsx', 'utf8')
 
     expect(layout).toMatch(/<DesktopProvider locale={locale}>\s*<ResumeDraftProvider locale={locale}>\s*<DesktopShell>/)
-    expect(layout).toContain("title: 'Resume OS — Evidence-Grounded Resume Agent'")
+    expect(layout).toContain("title: 'Resume OS — Automated Job Agent'")
     expect(layout).not.toContain("title: 'Resume Agent OS'")
   })
 
@@ -688,7 +689,7 @@ describe('DesktopShell', () => {
       if (appId === 'studio') {
         expect(view.getByRole('region', { name: 'Resume Studio' })).toBeVisible()
       } else if (appId === 'jobs') {
-        expect(view.getByRole('heading', { name: 'Job Agent' })).toBeVisible()
+        expect(view.getByRole('heading', { name: 'Job overview' })).toBeVisible()
       } else if (appId === 'agent' || appId === 'jd-match') {
         expect(view.getByRole('heading', { name: 'Create a resume draft first' })).toBeVisible()
         expect(view.getByRole('link', { name: 'Open Resume Studio' })).toBeVisible()

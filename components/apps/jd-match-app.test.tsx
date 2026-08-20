@@ -179,13 +179,54 @@ describe('JDMatchApp', () => {
     expect(screen.getByText(/Job Agent application is linked locally/)).toBeVisible()
   })
 
+  it('loads a queued BOSS analysis without repeating model extraction and reuses its run identity', async () => {
+    const user = userEvent.setup()
+    const intent = {
+      postingId: 'posting-queued', recommendationId: 'recommendation-queued', sourceDraftId: 'ada',
+      postingContentHash: 'hash:queued', recommendationFingerprint: 'fingerprint:queued',
+      createdAt: '2026-08-01T08:00:00.000Z'
+    }
+    const queuedAnalysis = buildJDRequirementAnalysis({
+      report: sections,
+      jobDescription: 'Queued BOSS platform role',
+      locale: 'en', resume, timestamp: '2026-08-01T08:00:00.000Z', targetIdentity: 'posting-queued'
+    })
+    const promotionLoader = vi.fn<JDMatchPromotionLoader>().mockResolvedValue({
+      intent,
+      posting: {
+        id: 'posting-queued', sourceId: 'source-boss', externalId: 'queued',
+        canonicalUrl: 'https://www.zhipin.com/job_detail/queued.html',
+        applyUrl: 'https://www.zhipin.com/job_detail/queued.html',
+        title: 'Platform Engineer', company: 'Example Co', description: 'Queued BOSS platform role',
+        locale: 'en', firstSeenAt: '2026-08-01T08:00:00.000Z', lastCheckedAt: '2026-08-01T08:00:00.000Z',
+        status: 'open', contentHash: 'hash:queued'
+      },
+      closed: false,
+      analysis: queuedAnalysis,
+      optimizationRunId: 'optimization-run-queued'
+    })
+    const workflowPersistence = vi.fn<JDMatchWorkflowPersistence>().mockResolvedValue({
+      targetJobId: queuedAnalysis.targetJob.id,
+      optimizationRunId: 'optimization-run-queued'
+    })
+
+    renderMatch(true, workflowPersistence, undefined, undefined, undefined, 'paste', promotionLoader, vi.fn())
+    expect(await screen.findByRole('heading', { name: 'TypeScript ownership' })).toBeVisible()
+    expect(fetchMock).not.toHaveBeenCalled()
+    await reviewAllRequirements(user)
+    await waitFor(() => expect(workflowPersistence).toHaveBeenCalledWith(expect.objectContaining({
+      runId: 'optimization-run-queued',
+      sourceDraftId: 'ada'
+    })))
+  })
+
   it('warns that sandbox resumes cannot become verified career evidence', async () => {
     renderMatch(true, undefined, undefined, undefined, undefined, 'sample')
 
     expect(await screen.findByText('This is fictional sandbox data')).toBeVisible()
     expect(screen.getByRole('link', {
       name: 'Open Studio to paste or upload a trusted resume'
-    })).toHaveAttribute('href', '/en/studio')
+    })).toHaveAttribute('href', '/en/jobs/profile')
   })
 
   it('keeps the inset JD textarea within its application column', () => {
@@ -656,6 +697,6 @@ describe('JDMatchApp', () => {
   it('directs users without an active draft to Studio', () => {
     renderMatch(false)
     expect(screen.getByRole('heading', { name: 'Create a resume draft first' })).toBeVisible()
-    expect(screen.getByRole('link', { name: 'Open Resume Studio' })).toHaveAttribute('href', '/en/studio')
+    expect(screen.getByRole('link', { name: 'Open Resume Studio' })).toHaveAttribute('href', '/en/jobs/profile')
   })
 })

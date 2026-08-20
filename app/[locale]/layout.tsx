@@ -11,8 +11,8 @@ import { routing } from '@/i18n/routing'
 import '../globals.css'
 
 export const metadata: Metadata = {
-  title: 'Resume OS — Evidence-Grounded Resume Agent',
-  description: 'A local-first agent for tailoring resumes with traceable career evidence.'
+  title: 'Resume OS — Automated Job Agent',
+  description: 'A local-first Job Agent for discovering roles, tailoring evidence-grounded resumes, and tracking recruiter conversations.'
 }
 
 export function generateStaticParams() {

@@ -1,5 +1,6 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import type { ReactNode } from 'react'
 import { IDBFactory } from 'fake-indexeddb'
 import { NextIntlClientProvider } from 'next-intl'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -10,11 +11,16 @@ import { scoreJobRecommendation } from '@/lib/jobs/job-recommendation'
 import type { JobSourceAdapter } from '@/lib/jobs/sources'
 import { createResumeDraft, normalizeResumeData } from '@/lib/resume-model'
 import { writeDraftState } from '@/lib/resume-store'
+import { createBossConversationThread, createBossMessageDraft } from '@/lib/jobs/boss-conversation'
+import { BROWSER_AGENT_REQUEST_EVENT, BROWSER_AGENT_RESPONSE_EVENT } from '@/lib/jobs/browser-agent-protocol'
 import en from '@/messages/en.json'
-import { JobRadarApp } from './job-radar-app'
+import { BossConversationQueue, JobRadarApp } from './job-radar-app'
+
+let mockPathname = '/jobs'
 
 vi.mock('@/i18n/navigation', () => ({
-  usePathname: () => '/',
+  Link: ({ href, children, ...props }: { href: string; children: ReactNode }) => <a href={href} {...props}>{children}</a>,
+  usePathname: () => mockPathname,
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() })
 }))
 
@@ -87,21 +93,24 @@ function renderRadar(options: {
 
 afterEach(async () => {
   cleanup()
+  mockPathname = '/jobs'
   await Promise.all(stores.splice(0).map((store) => store.close()))
 })
 
 describe('JobRadarApp', () => {
   it('shows the local-first empty state with only BOSS Zhipin', async () => {
+    mockPathname = '/jobs/opportunities'
     const store = createStore()
     renderRadar({ store })
 
     expect(await screen.findByText('Import or paste a trusted resume before matching jobs.')).toBeVisible()
-    expect(screen.getByRole('list', { name: 'Agent work platforms' }).children).toHaveLength(1)
+    expect(screen.getByRole('navigation', { name: 'Job workspace navigation' })).toBeVisible()
     expect(screen.queryByText('Greenhouse')).not.toBeInTheDocument()
     expect(screen.queryByText('Lever')).not.toBeInTheDocument()
   })
 
-  it('derives the initial search and opens BOSS Zhipin search', async () => {
+  it('derives the initial BOSS search preferences from the resume', async () => {
+    mockPathname = '/jobs/preferences'
     const user = userEvent.setup()
     const store = createStore()
     const createAdapter = (kind: 'greenhouse' | 'lever'): JobSourceAdapter => ({
@@ -129,13 +138,8 @@ describe('JobRadarApp', () => {
     renderRadar({ store, storage: trustedStorage(), createAdapter })
 
     expect(await screen.findByDisplayValue('Platform Engineer')).toBeVisible()
-    expect(screen.getByRole('link', { name: 'Search BOSS Zhipin' })).toHaveAttribute(
-      'href',
-      expect.stringContaining('query=Platform+Engineer')
-    )
-    await user.click(screen.getByRole('button', { name: 'Run Agent now' }))
-
-    expect(await screen.findByText('The selected platforms require official search or partner access. Open their official searches below.')).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Save profile' }))
+    expect(await screen.findByText('Search profile saved and current jobs rescored.')).toBeVisible()
     expect(await store.list('jobSources')).toHaveLength(0)
     expect(await store.list('jobPostings')).toHaveLength(0)
     expect((await store.list('jobSearchProfiles'))[0]).toMatchObject({
@@ -148,17 +152,74 @@ describe('JobRadarApp', () => {
     const store = createStore()
     renderRadar({ store, storage: trustedStorage() })
 
-    expect(await screen.findByRole('heading', { name: 'Job automation controls' })).toBeVisible()
-    expect(screen.getByText('Automatic on BOSS Zhipin')).toBeVisible()
-    expect(screen.getByRole('list', { name: 'Agent work platforms' }).children).toHaveLength(1)
-    expect(screen.getByText(/Platforms without an authorized connector produce reviewable drafts only/)).toBeVisible()
-    expect(screen.getByRole('button', { name: 'Run Agent now' })).toBeDisabled()
+    expect(await screen.findByRole('heading', { name: 'Agent is ready' })).toBeVisible()
+    expect(screen.getByRole('navigation', { name: 'Job workspace navigation' }).querySelectorAll('a')).toHaveLength(7)
+    expect(screen.getByRole('link', { name: /Review pending tasks/ })).toBeVisible()
+  })
 
-    expect(await screen.findByDisplayValue('Platform Engineer')).toBeVisible()
-    expect(screen.getByRole('button', { name: 'Run Agent now' })).toBeEnabled()
+  it('shows content-free BOSS adapter diagnostics in preferences', async () => {
+    mockPathname = '/jobs/preferences'
+    const store = createStore()
+    const respond = (event: Event) => {
+      const request = (event as CustomEvent<{ requestId: string; action: string }>).detail
+      window.dispatchEvent(new CustomEvent(BROWSER_AGENT_RESPONSE_EVENT, { detail: {
+        requestId: request.requestId,
+        ok: true,
+        ...(request.action === 'detect-platforms'
+          ? { sessions: [{ platform: 'boss', state: 'available' }] }
+          : request.action === 'diagnose-boss-adapter'
+            ? { diagnostics: [{
+                pageKind: 'chat', frameId: 0, sessionState: 'available',
+                counts: { jobLinks: 0, editors: 1, sendControls: 1, recipientIdentities: 1, conversationIdentities: 1, recipientNames: 1, docxInputs: 1, pdfInputs: 1, messageReceipts: 2, attachmentReceipts: 1, incomingMessages: 2 },
+                ready: { discovery: false, conversation: true, messageSend: true, resumeUpload: true }
+              }] }
+            : request.action === 'collect-boss-conversation-signals'
+              ? { conversationSignals: [] }
+              : { jobs: [] })
+      } }))
+    }
+    window.addEventListener(BROWSER_AGENT_REQUEST_EVENT, respond)
+    try {
+      renderRadar({ store, storage: trustedStorage() })
+      expect(await screen.findByRole('heading', { name: 'BOSS adapter diagnostics' })).toBeVisible()
+      expect(await screen.findByText('Conversation page')).toBeVisible()
+      expect(screen.getByText('PDF resume upload selectors')).toBeVisible()
+      expect(screen.getByText(/DOCX inputs 1/)).toBeVisible()
+    } finally {
+      window.removeEventListener(BROWSER_AGENT_REQUEST_EVENT, respond)
+    }
+  })
+
+  it('automatically searches the first three configured BOSS title types', async () => {
+    const store = createStore()
+    await store.put('jobSearchProfiles', {
+      ...profile,
+      platforms: ['boss'],
+      titles: ['Platform Engineer', 'Backend Engineer', 'AI Engineer', 'Fourth Role']
+    })
+    const queries: string[] = []
+    const respond = (event: Event) => {
+      const request = (event as CustomEvent<{ requestId: string; action: string; payload?: { query?: string } }>).detail
+      if (request.action === 'search-boss-jobs' && request.payload?.query) queries.push(request.payload.query)
+      window.dispatchEvent(new CustomEvent(BROWSER_AGENT_RESPONSE_EVENT, { detail: {
+        requestId: request.requestId,
+        ok: true,
+        ...(request.action === 'detect-platforms' ? { sessions: [{ platform: 'boss', state: 'available' }] } : { jobs: [] })
+      } }))
+    }
+    window.addEventListener(BROWSER_AGENT_REQUEST_EVENT, respond)
+    try {
+      renderRadar({ store, storage: trustedStorage() })
+      await waitFor(() => expect(queries).toEqual([
+        'Platform Engineer', 'Backend Engineer', 'AI Engineer'
+      ]), { timeout: 5_000 })
+    } finally {
+      window.removeEventListener(BROWSER_AGENT_REQUEST_EVENT, respond)
+    }
   })
 
   it('shows scored jobs and preserves a saved application when ignored later', async () => {
+    mockPathname = '/jobs/opportunities'
     const user = userEvent.setup()
     const store = createStore()
     await store.put('jobSources', source)
@@ -174,7 +235,7 @@ describe('JobRadarApp', () => {
     renderRadar({ store, storage: trustedStorage() })
 
     expect(await screen.findByRole('heading', { name: 'Platform Engineer' })).toBeVisible()
-    expect(screen.getByLabelText(/Preliminary relevance score/)).toBeVisible()
+    expect(screen.getAllByText(/\d+%/).length).toBeGreaterThan(0)
 
     await user.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(async () => expect((await store.list('applicationRecords'))[0]?.status).toBe('saved'))
@@ -183,4 +244,40 @@ describe('JobRadarApp', () => {
     expect(await store.list('applicationRecords')).toHaveLength(1)
   })
 
+})
+
+describe('BossConversationQueue', () => {
+  it('renders evidence-linked drafts and surfaces review edits', async () => {
+    const user = userEvent.setup()
+    const onRevise = vi.fn()
+    const onVerify = vi.fn()
+    const onSend = vi.fn()
+    const thread = createBossConversationThread({ applicationId: 'application-1', now })
+    const message = createBossMessageDraft({
+      threadId: thread.id, kind: 'opener', body: 'Hello BOSS', evidenceFactIds: ['fact-1'], now
+    })
+    render(<NextIntlClientProvider locale="en" messages={en}>
+      <BossConversationQueue
+        threads={[thread]}
+        messages={[message]}
+        applications={[{
+          id: 'application-1', postingId: posting.id, sourceDraftId: 'ada-draft', status: 'ready-to-apply',
+          targetJobId: 'target-1', resumeVariantId: 'variant-1', notes: '', createdAt: now, updatedAt: now
+        }]}
+        postings={[posting]}
+        onRevise={onRevise}
+        onVerify={onVerify}
+        onSend={onSend}
+      />
+    </NextIntlClientProvider>)
+    expect(screen.getByText('Waiting for browser verification of the BOSS recipient')).toBeVisible()
+    expect(screen.getByText('Linked career evidence: 1')).toBeVisible()
+    const editor = screen.getByRole('textbox', { name: 'Outbound message' })
+    await user.clear(editor)
+    await user.type(editor, 'Revised opener')
+    await user.tab()
+    expect(onRevise).toHaveBeenCalledWith(message.id, 'Revised opener')
+    await user.click(screen.getByRole('button', { name: 'Verify recipient and approve' }))
+    expect(onVerify).toHaveBeenCalledWith(message.id)
+  })
 })

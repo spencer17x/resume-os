@@ -104,6 +104,19 @@ describe('POST /api/jd-match', () => {
     expect(agentMocks.generateAgentText).not.toHaveBeenCalled()
   })
 
+  it('binds otherwise identical analyses to a bounded posting identity', async () => {
+    const makeRequest = (targetIdentity: string) => new Request('http://localhost/api/jd-match', {
+      method: 'POST', body: JSON.stringify({ locale: 'en', jd: 'Platform role', targetIdentity })
+    })
+    const first = await (await post(makeRequest('boss-posting-a'))).json()
+    const second = await (await post(makeRequest('boss-posting-b'))).json()
+    expect(first.targetJob.id).not.toBe(second.targetJob.id)
+
+    const invalid = await post(makeRequest('x'.repeat(161)))
+    expect(invalid.status).toBe(400)
+    expect(agentMocks.generateAgentText).toHaveBeenCalledTimes(2)
+  })
+
   it('rejects cross-origin requests before provider work', async () => {
     const response = await post(new Request('http://localhost/api/jd-match', {
       method: 'POST',

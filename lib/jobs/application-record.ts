@@ -11,6 +11,8 @@ import {
 } from './job-domain'
 import type { OptimizationRun } from '@/lib/agent/optimization-run'
 import type { ResumeVariant } from '@/lib/agent/domain-store'
+import { ensureBossOpeningDraft } from './boss-conversation'
+import { detectMarketplaceFromJobUrl } from './job-marketplace'
 
 export const APPLICATION_PACKET_CHECKS = [
   'posting-current',
@@ -237,4 +239,44 @@ export async function markApplicationApplied(input: {
     await transaction.put('applicationRecords', applied)
     return applied
   })
+}
+
+export async function prepareReadyBossApplicationPackets(input: {
+  store: IndexedDbDomainStore
+  sourceDraftId: string
+  resume: ResumeData
+  now: () => string
+}) {
+  const applications = (await input.store.list('applicationRecords'))
+    .filter((application) => application.sourceDraftId === input.sourceDraftId)
+  const results = await Promise.allSettled(applications.map((application) => (
+    loadApplicationPacket({ store: input.store, recordId: application.id, resume: input.resume })
+  )))
+  const packets = results.flatMap((result) => result.status === 'fulfilled' ? [result.value] : [])
+  const prepared = [] as ApplicationPacket[]
+  for (const packet of packets) {
+    if (
+      !packet.ready
+      || detectMarketplaceFromJobUrl(packet.posting.canonicalUrl) !== 'boss'
+    ) continue
+    const now = input.now()
+    const next = packet.record.status === 'ready-to-apply'
+      ? packet
+      : ['saved', 'analyzing', 'preparing'].includes(packet.record.status)
+        ? await prepareApplicationPacket({
+            store: input.store,
+            recordId: packet.record.id,
+            resume: input.resume,
+            now
+          })
+        : null
+    if (!next) continue
+    const conversation = await ensureBossOpeningDraft({ store: input.store, applicationId: packet.record.id, now })
+    if (packet.record.status !== 'ready-to-apply' || conversation.created) prepared.push(next)
+  }
+  const preparedById = new Map(prepared.map((packet) => [packet.record.id, packet]))
+  return {
+    packets: packets.map((packet) => preparedById.get(packet.record.id) ?? packet),
+    preparedIds: prepared.map((packet) => packet.record.id)
+  }
 }

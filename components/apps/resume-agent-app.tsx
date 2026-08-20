@@ -769,7 +769,7 @@ function QuestionList({ questions, label }: { questions: string[]; label: string
 }
 
 function EmptyDraft({ locale, title, description, action }: { locale: string; title: string; description: string; action: string }) {
-  return <div className="resume-app-empty-state"><Sparkles size={24} /><h2>{title}</h2><p>{description}</p><a href={`/${locale}/studio`}>{action}</a></div>
+  return <div className="resume-app-empty-state"><Sparkles size={24} /><h2>{title}</h2><p>{description}</p><a href={`/${locale}/jobs/profile`}>{action}</a></div>
 }
 
 class AgentUiError extends Error {

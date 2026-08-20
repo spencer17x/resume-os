@@ -4,7 +4,7 @@
 
 Resume OS is a local-first, evidence-grounded job-search agent. It turns a trusted resume and explicit job preferences into cross-platform discovery, qualification, job-specific materials, and recruiter-conversation drafts. Users choose the platforms and automation level. The agent improves search and communication strategy from user corrections, replies, interviews, and outcomes without changing the user's career facts.
 
-The current MVP runs while the browser is open and is scoped only to BOSS Zhipin. The bundled Manifest V3 Browser Agent detects the BOSS tab and local login state without reading cookies; its send adapter remains disabled until recipient, final-content, and receipt checks are implemented. The target product requirements are documented in [docs/product-requirements.md](docs/product-requirements.md).
+The current MVP runs while the browser is open and is scoped only to BOSS Zhipin. The bundled Manifest V3 Browser Agent detects the BOSS session without reading cookies and provides a fail-closed, approval-bound send adapter. Live BOSS selector verification is still required before treating the adapter as production-ready. The target product requirements are documented in [docs/product-requirements.md](docs/product-requirements.md).
 
 The product is built around four principles:
 
@@ -54,9 +54,19 @@ There is currently no embedding pipeline, vector database, document chunk index,
 ## Routes
 
 ```text
-/{locale}                 Desktop or mobile workflow home
+/{locale}                 Redirects directly to the Job Agent backend
 /{locale}/studio          Resume import, drafts, and Demo / Sandbox generation
-/{locale}/jobs            Job Agent controls, sources, conversations, recommendations, and applications
+/{locale}/jobs            Job Agent overview
+/{locale}/jobs/opportunities  BOSS opportunity inbox and match detail
+/{locale}/jobs/resumes        Job-specific resume tasks
+/{locale}/jobs/conversations  BOSS conversation drafts and receipts
+/{locale}/jobs/applications   Application progress
+/{locale}/jobs/interviews     Interview rounds, Q&A, review, and outcomes
+/{locale}/jobs/activity       Agent activity log
+/{locale}/jobs/preferences    Search and import preferences
+/{locale}/jobs/profile        Resume import and career profile inside the backend
+/{locale}/jobs/target-job     Target-job analysis inside the backend
+/{locale}/jobs/settings       Model, key, privacy, theme, and motion settings
 /{locale}/agent           Evidence-grounded Resume Agent
 /{locale}/jd-match        Target-job evidence and gap analysis
 /{locale}/3d              Three.js resume scene
@@ -111,7 +121,7 @@ Resume OS does not require a server-side database, account system, or cloud-sync
 | Data | Storage | Sent off-device? |
 | --- | --- | --- |
 | Structured resume drafts and snapshots | `localStorage` | Only when required by an explicitly selected cloud AI task |
-| Career evidence, public postings, recommendations, application records, target jobs, requirements, mappings, variants, agent runs | IndexedDB | Job-source refresh sends only the configured public board identifier; career context leaves the device only for an explicitly selected cloud AI task |
+| Career evidence, postings, recommendations, application records, target jobs, requirements, mappings, variants, agent runs, BOSS conversations, interview rounds, Q&A, and reviews | IndexedDB | Job discovery stays in the local browser bridge; career context leaves the device only for an explicitly selected cloud AI task |
 | Provider choice, theme, motion, desktop layout | `localStorage` | No |
 | OpenAI-compatible Base URL and model | `localStorage` | Included with same-origin AI requests |
 | BYOK API key | `sessionStorage` by default; `localStorage` only after explicit “remember” consent | Relayed through the same-origin route to the configured provider; never persisted by Resume OS server code |
@@ -123,7 +133,20 @@ Uploaded PDF/DOCX/TXT bytes are processed transiently by the same-origin extract
 Job Agent starts from the resume rather than a required target company. Its first release supports only BOSS Zhipin. Platform availability never implies that the browser send adapter is enabled:
 
 - BOSS Zhipin opens a fixed-host official search carrying the primary target title.
-- BOSS Zhipin session detection has been verified; its send adapter remains disabled until recipient, content, and receipt checks are stable.
+- BOSS Zhipin session detection and the approval-bound send protocol are implemented. The adapter refuses to send unless recipient, editor, exact body, send control, platform message ID, and receipt status all verify.
+- When the local Browser Agent is present on a BOSS search-results tab, it imports at most 50 bounded visible job cards, validates their hosts, scores them locally, and automatically queues eligible roles scoring at least 70. Queuing means “prepare for analysis,” never “submitted.”
+- When no BOSS search tab is open, the extension constructs a fixed-host search from the primary configured title, opens it in an inactive temporary tab, collects the bounded results, and closes the tab. Resume OS never passes an arbitrary URL to the extension.
+- While enabled, the extension retains only a small schedule preference and wakes an already-open Resume OS tab every 15 minutes. Results and career data remain in the Resume OS origin; cookies and private inbox content are not persisted by the extension.
+- Each queued role receives a posting-bound Target Job and stable draft OptimizationRun. Up to three roles per Agent cycle are analyzed sequentially through the configured model. Opening a queued role reuses that analysis for requirement review, and confirming it advances the same run into evidence mapping instead of creating a duplicate workflow.
+- Once a validated job-specific resume reaches `ready-to-apply`, Resume OS creates one evidence-linked BOSS opening draft. Editing it invalidates any prior approval. Message state is persisted separately as draft, awaiting approval, approved, sending, sent, delivered, read, or failed; external states require a matching recipient, body fingerprint, and platform receipt.
+- Verified incoming BOSS message nodes are reduced inside the extension to bounded event types such as recruiter reply, resume request, interview invitation, offer, or rejection. Raw inbox text is not returned to the Resume OS page or persisted. These events advance the local recruitment stage without allowing older or repeated events to regress it.
+- Each new event may create one idempotent, job-bound reply draft from a fixed safe template. Resume requests are acknowledged only after the attachment receipt is verified. While a thread is waiting for a reply, the Agent may prepare a follow-up after 72 hours, with at most two follow-ups per thread and never while another outbound draft is pending.
+- In Autopilot mode, a generated reply or follow-up is sent only when the extension can re-verify that the currently active BOSS conversation is the same immutable recipient and conversation already bound to the thread. A different active chat cannot rebind the thread; the message remains in the review queue instead.
+- Job Preferences includes a content-free adapter diagnostic. It reports only selector counts and readiness for discovery, conversation identity, message sending, and PDF/DOCX upload across open BOSS frames. It never returns job descriptions, recipient names, or private message text, and zero/ambiguous matches remain not ready.
+- When a verified recruiter thread requests a resume, Resume OS renders the application-linked `ResumeVariant` into a local, text-selectable PDF without a server round trip. PDF is the default; DOCX is used only when the current verified input has no unique PDF capability and exactly one DOCX capability. Upload is accepted only when the extension re-verifies the recipient and conversation, the file input uniquely accepts the selected MIME type, the exact byte fingerprint matches, and BOSS exposes a matching attachment ID and filename. Otherwise the thread remains `resume-requested`.
+- Applied optimization runs are detected automatically. When every packet check passes, the application advances to `ready-to-apply` and its single BOSS conversation thread/opening draft is created idempotently; users do not need to click a separate “prepare materials” step.
+- Recipient approval probes all BOSS child frames and succeeds only when a single frame exposes one recipient identity, conversation identity, editor, and send control. This probe is read-only; typing is available only to an exact approved message after the same checks pass again.
+- In Autopilot mode, a successful recipient approval hands the exact approved body to the extension. The extension revalidates identity and body, writes the editor, verifies its rendered value, clicks the unique send control, and returns only a message node carrying an exact body match, platform message ID, and sent/delivered/read status. Missing or mismatched receipts are persisted as failed attempts, never successful sends.
 - Other marketplace and public-board parsers remain internal for backward compatibility with existing local data, but are not shown in the first-release Job Agent catalog.
 
 For a role selected on BOSS Zhipin, the user may paste its official HTTPS
@@ -146,9 +169,11 @@ The automatic source classes remain:
 
 The bundled catalog is a versioned source seed, not a server-side job database. A market search refreshes at most ten selected automatic sources. The browser calls only the same-origin `/api/jobs/discover` route with a strict provider enum and a bounded public board identifier. The route constructs the upstream URL itself, uses HTTPS GET without cookies or credentials, rejects redirects, limits the request to 1 KiB, limits an upstream response to 2 MiB and 500 postings, applies a 15-second timeout and per-process rate limit, and returns normalized records. It does not accept arbitrary URLs, headers, authorization data, or resume/career content.
 
-Refresh is manual and runs only while the browser request is active; Resume OS does not promise background discovery after the browser closes. Partial source responses are shown as warnings and do not close missing postings. Matching and application state stay in IndexedDB. Demo/Sandbox resumes cannot enter the real application flow.
+Public-source refresh is manual. BOSS discovery may repeat while Chrome and a Resume OS tab remain open, but Resume OS does not promise discovery after the browser closes. Partial source responses are shown as warnings and do not close missing postings. Matching and application state stay in IndexedDB. Demo/Sandbox resumes cannot enter the real application flow.
 
 Resume OS prepares a checked local packet and opens the original employer application URL in a new tab. Opening that page never changes the application status. Only the separate user action “I submitted this application” records `applied` and `submittedAt`. Authenticated marketplace scraping, cookie reuse, CAPTCHA bypass, screening-answer invention, browser form submission, and unattended or bulk applications are outside the product boundary.
+
+After confirmed submission, an interview invitation can move the application to `interviewing`. Each round stores its schedule, user notes, questions, and answers locally. AI review provides a summary, gaps, suggestions, and an explicitly advisory pass estimate based only on the supplied interview record. Durable `passed` and `failed` outcomes always require an explicit user report.
 
 ## AI providers and no-silent-fallback policy
 

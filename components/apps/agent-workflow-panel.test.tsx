@@ -107,7 +107,7 @@ describe('AgentWorkflowPanel', () => {
 
     expect(await screen.findByRole('heading', { name: 'No active target-job run' })).toBeVisible()
     expect(screen.getByRole('link', { name: 'Add a target job' }))
-      .toHaveAttribute('href', '/en/jd-match')
+      .toHaveAttribute('href', '/en/jobs/target-job')
   })
 
   it('ranks likely career facts deterministically without treating them as confirmed', () => {

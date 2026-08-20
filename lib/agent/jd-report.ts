@@ -138,10 +138,17 @@ export function buildJDRequirementAnalysis(input: {
   locale: ResumeLocale
   resume: ResumeData
   timestamp?: string
+  targetIdentity?: string
 }): JDRequirementAnalysis {
   const report = jdMatchReportSchema.parse(input.report)
   const timestamp = input.timestamp ?? new Date().toISOString()
-  const targetJobId = `job-${stableTextHash(`${input.locale}\u0000${input.jobDescription}`)}`
+  const targetJobId = `job-${stableTextHash([
+    input.locale,
+    report.jobTitle,
+    report.company,
+    input.targetIdentity ?? '',
+    input.jobDescription
+  ].join('\u0000'))}`
   const inputFingerprint = `fnv1a:${stableTextHash(JSON.stringify({
     jobDescription: input.jobDescription,
     locale: input.locale,

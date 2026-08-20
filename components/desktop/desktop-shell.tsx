@@ -13,6 +13,7 @@ import { MobileHome } from './mobile-home'
 import { MotionPreferenceProvider } from './motion-preference'
 import { MOBILE_MEDIA_QUERY, useMediaQuery } from './use-media-query'
 import { WindowManager } from './window-manager'
+import { AppLoader } from './app-loader'
 
 function DesktopLayout({ children }: { children: ReactNode }) {
   const t = useTranslations('desktop')
@@ -36,6 +37,7 @@ function DesktopLayout({ children }: { children: ReactNode }) {
 
 export function DesktopShell({ children }: { children: ReactNode }) {
   const locale = useLocale()
+  const desktop = useTranslations('desktop')
   const pathname = usePathname()
   const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY)
   const mobileRoot = pathname === '/' || pathname === `/${locale}`
@@ -44,7 +46,12 @@ export function DesktopShell({ children }: { children: ReactNode }) {
   return (
     <ThemePreferenceProvider>
       <MotionPreferenceProvider>
-        {isMobile === null ? (
+        {appId === 'jobs' ? (
+        <main className="job-standalone-frame" role="application" aria-label={desktop('apps.jobs')}>
+          <AppLoader appId="jobs" />
+          <div className="desktop-route-descriptors" aria-hidden="true">{children}</div>
+        </main>
+        ) : isMobile === null ? (
         <div className="desktop-shell desktop-shell--pending" data-testid="desktop-shell-pending" aria-busy="true">
           <div className="desktop-route-descriptors" aria-hidden="true">{children}</div>
         </div>

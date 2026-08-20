@@ -166,6 +166,7 @@ export function appIdFromPath(pathname: string): AppId | null {
   }
 
   if (segments.length === 3) {
+    if (segments[1] === 'jobs' && Boolean(segments[2])) return 'jobs'
     return segments[1] === 'projects' && Boolean(segments[2]) ? 'projects' : null
   }
 

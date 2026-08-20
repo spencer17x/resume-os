@@ -48,8 +48,9 @@ import {
   loadBrowserJobPromotion,
   type JobPromotionIntent
 } from '@/lib/jobs/job-promotion'
-import type { JobPosting } from '@/lib/jobs/job-domain'
-import { createResumeId } from '@/lib/resume-model'
+import { loadBossCandidateAnalysis } from '@/lib/jobs/boss-agent'
+import { createStableJobDomainId, type JobPosting } from '@/lib/jobs/job-domain'
+import { createResumeId, type ResumeData } from '@/lib/resume-model'
 import {
   ChromeBuiltInAiError,
   ChromeBuiltInAiProvider,
@@ -66,6 +67,7 @@ type ReportState = {
   model: string
   context: string
   workflowPreference?: ActiveWorkflowPreference
+  queuedRunId?: string
 }
 
 type ProviderMatchResult = {
@@ -78,6 +80,7 @@ export type JDMatchWorkflowPersistence = (input: {
   sourceDraftId: string
   locale: 'zh' | 'en'
   now: string
+  runId?: string
 }) => Promise<{ targetJobId: string; optimizationRunId: string }>
 
 export type JDMatchRequirementPersistence = (input: {
@@ -94,10 +97,12 @@ export type JDMatchStalePersistence = (input: {
 }) => Promise<void>
 
 export type JDMatchWorkflowSummaryLoader = () => Promise<ActiveWorkflowSummary | null>
-export type JDMatchPromotionLoader = (activeDraft: { id: string; source: string }) => Promise<{
+export type JDMatchPromotionLoader = (activeDraft: { id: string; source: string; data: ResumeData }) => Promise<{
   intent: JobPromotionIntent
   posting: JobPosting
   closed: boolean
+  analysis?: JDRequirementAnalysis
+  optimizationRunId?: string
 } | null>
 export type JDMatchPromotionCompletion = (input: {
   intent: JobPromotionIntent
@@ -229,6 +234,28 @@ export function JDMatchApp({
       if (!active || sequence !== promotionLoadRef.current || !value) return
       setPromotion(value)
       setJd(value.posting.description)
+      if (value.analysis) {
+        setReportState({
+          sections: {
+            jobTitle: value.analysis.targetJob.title,
+            company: value.analysis.targetJob.company ?? value.posting.company,
+            requirements: value.analysis.matrix.requirements.map((requirement) => ({
+              text: requirement.text,
+              category: requirement.category,
+              priority: requirement.priority,
+              weight: requirement.weight,
+              keywords: requirement.keywords
+            })),
+            resumeEmphasis: [],
+            interviewPrep: []
+          },
+          analysis: value.analysis,
+          provider: 'BOSS Job Agent',
+          model: 'queued-analysis',
+          context: matchContext(value.posting.description, activeDraft),
+          queuedRunId: value.optimizationRunId
+        })
+      }
       setPersistenceMessage(value.closed ? t('promotionClosed') : t('promotionLoaded', {
         title: value.posting.title,
         company: value.posting.company
@@ -243,7 +270,7 @@ export function JDMatchApp({
     return (
       <div className="resume-app-empty-state">
         <BriefcaseBusiness size={24} /><h2>{t('createFirst')}</h2><p>{t('createFirstDescription')}</p>
-        <a href={`/${locale}/studio`}>{t('openStudio')}</a>
+        <a href={`/${locale}/jobs/profile`}>{t('openStudio')}</a>
       </div>
     )
   }
@@ -287,7 +314,8 @@ export function JDMatchApp({
               report: parsed.data,
               jobDescription,
               locale,
-              resume: draft.data
+              resume: draft.data,
+              targetIdentity: promotion?.posting.id
             })
           }
         },
@@ -304,6 +332,7 @@ export function JDMatchApp({
           jobDescription,
           locale,
           resume: draft.data,
+          targetIdentity: promotion?.posting.id,
           signal: controller.signal,
           onCooldown: setCooldown
         })
@@ -391,7 +420,8 @@ export function JDMatchApp({
         analysis,
         sourceDraftId: draft.id,
         locale,
-        now: new Date().toISOString()
+        now: new Date().toISOString(),
+        runId: current.queuedRunId
       })
       const latest = activeRef.current
       if (!latest || latest.id !== draft.id || matchContext(jd, latest) !== context) {
@@ -444,7 +474,7 @@ export function JDMatchApp({
             <div>
               <strong>{t('sandboxWarningTitle')}</strong>
               <p>{t('sandboxWarningDescription')}</p>
-              <a href={`/${locale}/studio`}>{t('sandboxWarningAction')}</a>
+              <a href={`/${locale}/jobs/profile`}>{t('sandboxWarningAction')}</a>
             </div>
           </aside>
         ) : null}
@@ -521,7 +551,7 @@ export function JDMatchApp({
 
 async function persistWorkflow(input: Parameters<JDMatchWorkflowPersistence>[0]) {
   const store = createDomainStore()
-  const optimizationRunId = createResumeId('run')
+  const optimizationRunId = input.runId ?? createResumeId('run')
   try {
     const result = await persistAnalysisAsOptimizationRun({
       store,
@@ -540,8 +570,20 @@ async function persistWorkflow(input: Parameters<JDMatchWorkflowPersistence>[0])
   }
 }
 
-async function loadPromotion(activeDraft: { id: string; source: string }) {
-  return loadBrowserJobPromotion({ activeDraft })
+async function loadPromotion(activeDraft: { id: string; source: string; data: ResumeData }) {
+  const store = createDomainStore()
+  try {
+    const promotion = await loadBrowserJobPromotion({ activeDraft, store })
+    if (!promotion) return null
+    const applicationId = createStableJobDomainId('application', [promotion.posting.id, activeDraft.id])
+    const queued = await loadBossCandidateAnalysis({ store, applicationId, resume: activeDraft.data })
+    return {
+      ...promotion,
+      ...(queued ? { analysis: queued.analysis, optimizationRunId: queued.optimizationRunId } : {})
+    }
+  } finally {
+    await store.close()
+  }
 }
 
 async function persistPromotionCompletion(input: Parameters<JDMatchPromotionCompletion>[0]) {
@@ -813,6 +855,7 @@ async function requestCloudAnalysis(input: {
   jobDescription: string
   locale: 'zh' | 'en'
   resume: NonNullable<ReturnType<typeof useResumeDraft>['activeDraft']>['data']
+  targetIdentity?: string
   signal: AbortSignal
   onCooldown: (seconds: number) => void
 }) {
@@ -822,7 +865,8 @@ async function requestCloudAnalysis(input: {
     body: JSON.stringify({
       jd: input.jobDescription,
       locale: input.locale,
-      resume: input.resume
+      resume: input.resume,
+      targetIdentity: input.targetIdentity
     }),
     signal: input.signal
   })
@@ -861,17 +905,28 @@ async function requestCloudAnalysis(input: {
       jobDescription: input.jobDescription,
       locale: input.locale,
       resume: input.resume,
+      targetIdentity: input.targetIdentity,
       timestamp: parsedAnalysis.data.targetJob.createdAt
     })
+    const legacyAnalysis = input.targetIdentity ? buildJDRequirementAnalysis({
+      report: parsed.data,
+      jobDescription: input.jobDescription,
+      locale: input.locale,
+      resume: input.resume,
+      timestamp: parsedAnalysis.data.targetJob.createdAt
+    }) : expectedAnalysis
+    const serverAnalysisMatches = [expectedAnalysis, legacyAnalysis].some((expected) => (
+      JSON.stringify(parsedAnalysis.data.targetJob) === JSON.stringify(expected.targetJob)
+      && JSON.stringify(parsedAnalysis.data.matrix) === JSON.stringify(expected.matrix)
+      && JSON.stringify(parsedAnalysis.data.score) === JSON.stringify(expected.score)
+    ))
     if (
-      JSON.stringify(parsedAnalysis.data.targetJob) !== JSON.stringify(expectedAnalysis.targetJob)
-      || JSON.stringify(parsedAnalysis.data.matrix) !== JSON.stringify(expectedAnalysis.matrix)
-      || JSON.stringify(parsedAnalysis.data.score) !== JSON.stringify(expectedAnalysis.score)
+      !serverAnalysisMatches
       || JSON.stringify(parsedAnalysis.data.structureScore) !== JSON.stringify(scoreResumeStructure(input.resume))
     ) {
       throw new MatchError('AI_OUTPUT_INVALID')
     }
-    analysis = parsedAnalysis.data
+    analysis = expectedAnalysis
   }
 
   return {

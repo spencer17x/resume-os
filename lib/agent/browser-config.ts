@@ -40,6 +40,7 @@ type StorageRead = {
 const ALLOWED_AI_PATHS = new Set([
   '/api/chat',
   '/api/jd-match',
+  '/api/interview/review',
   '/api/resume/generate',
   '/api/resume/parse',
   '/api/resume/plan',

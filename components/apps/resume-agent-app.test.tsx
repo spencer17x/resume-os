@@ -276,7 +276,7 @@ describe('ResumeAgentApp', () => {
   it('directs users without an active draft to Studio and does not modify sample data', () => {
     renderAgent(false)
     expect(screen.getByRole('heading', { name: 'Create a resume draft first' })).toBeVisible()
-    expect(screen.getByRole('link', { name: 'Open Resume Studio' })).toHaveAttribute('href', '/en/studio')
+    expect(screen.getByRole('link', { name: 'Open Resume Studio' })).toHaveAttribute('href', '/en/jobs/profile')
     expect(fetchMock).not.toHaveBeenCalled()
   })
 

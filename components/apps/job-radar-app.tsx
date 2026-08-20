@@ -1,15 +1,41 @@
 'use client'
 
-import { Bot, BrainCircuit, ClipboardPaste, ExternalLink, MessageSquareText, Radar, Save, ShieldCheck, X } from 'lucide-react'
+import {
+  Activity,
+  Bot,
+  BriefcaseBusiness,
+  CheckCircle2,
+  ChevronRight,
+  ClipboardPaste,
+  ExternalLink,
+  FileText,
+  CalendarClock,
+  LayoutDashboard,
+  MessageSquareText,
+  Pause,
+  Play,
+  Radar,
+  Save,
+  Send,
+  Settings2,
+  SlidersHorizontal,
+  X
+} from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link, usePathname, useRouter } from '@/i18n/navigation'
 import { useResumeDraft } from '@/components/resume-draft-provider'
-import { useOptionalDesktop } from '@/components/desktop/desktop-provider'
 import { ApplicationPipeline } from '@/components/apps/application-pipeline'
+import { InterviewWorkspace } from '@/components/apps/interview-workspace'
+import { JDMatchApp } from '@/components/apps/jd-match-app'
+import { ResumeStudioApp } from '@/components/apps/resume-studio-app'
+import { ResumeAgentApp } from '@/components/apps/resume-agent-app'
+import { SettingsApp } from '@/components/apps/settings-app'
 import { careerEvidenceSourceId } from '@/lib/agent/career-evidence'
 import { ACTIVE_WORKFLOW_CHANGED_EVENT } from '@/lib/agent/workflow-persistence'
 import { createDomainStore, type IndexedDbDomainStore } from '@/lib/agent/domain-store'
 import {
+  createJobInputFingerprint,
   createStableJobDomainId,
   jobSearchProfileSchema,
   jobSourceSchema,
@@ -20,13 +46,40 @@ import {
   type JobSource
 } from '@/lib/jobs/job-domain'
 import { scoreJobRecommendation } from '@/lib/jobs/job-recommendation'
+import { analyzeBossCandidateQueue, queueBossCandidates, upsertBossBrowserJobs } from '@/lib/jobs/boss-agent'
+import { requestBossCandidateAnalysis } from '@/lib/jobs/boss-analysis-client'
+import {
+  approveBossConversationMessage,
+  syncBossConversationSignals,
+  ensureBossOpeningDraft,
+  ensureBossFollowUpDrafts,
+  ensureBossResumeReceiptReplyDraft,
+  ensureBossSignalReplyDrafts,
+  executeBossResumeAttachment,
+  executeApprovedBossMessage,
+  reviseBossMessageDraft,
+  verifyBossConversationRecipient,
+  type BossConversationMessage,
+  type BossConversationThread
+} from '@/lib/jobs/boss-conversation'
 import { createJobPromotionIntent, saveJobPromotionIntent } from '@/lib/jobs/job-promotion'
 import { refreshJobSource } from '@/lib/jobs/job-refresh'
 import { refreshSelectedJobMarket } from '@/lib/jobs/job-market-search'
 import { importMarketplaceJob } from '@/lib/jobs/manual-job-import'
 import { parseJobClipboardText } from '@/lib/jobs/job-clipboard-import'
 import {
+  collectBossBrowserJobs,
+  collectBossConversationSignals,
+  configureBrowserJobAgent,
   detectBrowserAgentSessions,
+  diagnoseBossBrowserAdapter,
+  inspectBossBrowserConversation,
+  searchBossBrowserJobs,
+  sendBossBrowserMessage,
+  sendBossResumeAttachment,
+  JOB_AGENT_WAKE_EVENT,
+  type BrowserBossJob,
+  type BrowserBossAdapterDiagnostic,
   type BrowserPlatformSession
 } from '@/lib/jobs/browser-agent-protocol'
 import {
@@ -46,17 +99,20 @@ import {
 } from '@/lib/jobs/job-marketplace'
 import {
   ApplicationRecordError,
-  loadApplicationPacket,
   markApplicationApplied,
   prepareApplicationPacket,
+  prepareReadyBossApplicationPackets,
   type ApplicationPacket
 } from '@/lib/jobs/application-record'
 import { createSameOriginJobSourceAdapter, JobSourceError } from '@/lib/jobs/sources'
 import type { JobSourceAdapter } from '@/lib/jobs/sources'
 import type { AppId } from '@/lib/desktop/types'
+import { renderResumeDocx, resumeDocxFileName } from '@/lib/resume-docx'
+import { renderResumePdf, resumePdfFileName } from '@/lib/resume-pdf'
 
 type SourceKind = Extract<JobSource['kind'], 'greenhouse' | 'lever'>
 type Filter = 'all' | 'new' | 'saved' | 'needs-analysis' | 'ready' | 'applied' | 'ignored' | 'closed'
+type JobWorkspaceSection = 'overview' | 'opportunities' | 'resumes' | 'conversations' | 'applications' | 'interviews' | 'activity' | 'preferences' | 'profile' | 'target-job' | 'settings'
 
 export type JobRadarAppProps = {
   appId?: AppId
@@ -66,8 +122,11 @@ export type JobRadarAppProps = {
 
 export function JobRadarApp({ store: storeOverride, createAdapter = createSameOriginJobSourceAdapter }: JobRadarAppProps = {}) {
   const t = useTranslations('jobRadar')
+  const desktopT = useTranslations('desktop')
   const locale = useLocale()
-  const desktop = useOptionalDesktop()
+  const pathname = usePathname()
+  const router = useRouter()
+  const workspaceSection = jobWorkspaceSection(pathname)
   const { activeDraft } = useResumeDraft()
   const trustedDraft = Boolean(activeDraft && ['paste', 'upload'].includes(activeDraft.source))
   const [store] = useState(() => storeOverride ?? createDomainStore())
@@ -77,13 +136,19 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
   const [recommendations, setRecommendations] = useState<JobRecommendation[]>([])
   const [applications, setApplications] = useState<ApplicationRecord[]>([])
   const [packets, setPackets] = useState<ApplicationPacket[]>([])
+  const [conversationThreads, setConversationThreads] = useState<BossConversationThread[]>([])
+  const [conversationMessages, setConversationMessages] = useState<BossConversationMessage[]>([])
   const [busyApplicationId, setBusyApplicationId] = useState('')
+  const [busyConversationMessageId, setBusyConversationMessageId] = useState('')
+  const [busyResumeThreadId, setBusyResumeThreadId] = useState('')
   const [sourceKind, setSourceKind] = useState<SourceKind>('greenhouse')
   const [sourceKey, setSourceKey] = useState('')
   const [selectedPlatforms, setSelectedPlatforms] = useState<JobMarketplaceId[]>([...DEFAULT_JOB_MARKETPLACES])
   const [agentPreferences, setAgentPreferences] = useState<JobAgentPreferences>(DEFAULT_JOB_AGENT_PREFERENCES)
   const [browserSessions, setBrowserSessions] = useState<BrowserPlatformSession[]>([])
   const [browserAgentAvailable, setBrowserAgentAvailable] = useState(false)
+  const [adapterDiagnostics, setAdapterDiagnostics] = useState<BrowserBossAdapterDiagnostic[]>([])
+  const [diagnosingAdapter, setDiagnosingAdapter] = useState(false)
   const [profileName, setProfileName] = useState('')
   const [titles, setTitles] = useState('')
   const [locations, setLocations] = useState('')
@@ -99,6 +164,7 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
   const [importLocation, setImportLocation] = useState('')
   const [importDescription, setImportDescription] = useState('')
   const [filter, setFilter] = useState<Filter>('all')
+  const [selectedPostingId, setSelectedPostingId] = useState('')
   const [busySourceId, setBusySourceId] = useState('')
   const [marketProgress, setMarketProgress] = useState('')
   const [loaded, setLoaded] = useState(false)
@@ -112,28 +178,41 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
   const browserAutoRunRef = useRef(false)
 
   const load = useCallback(async () => {
-    const [nextSources, nextProfiles, nextPostings, nextRecommendations, nextApplications] = await Promise.all([
+    const [nextSources, nextProfiles, nextPostings, nextRecommendations, nextApplications, nextThreads, nextMessages] = await Promise.all([
       store.list('jobSources'),
       store.list('jobSearchProfiles'),
       store.list('jobPostings'),
       store.list('jobRecommendations'),
-      store.list('applicationRecords')
+      store.list('applicationRecords'),
+      store.list('bossConversationThreads'),
+      store.list('bossConversationMessages')
     ])
     setSources(nextSources.sort(byUpdatedAt))
     setProfiles(nextProfiles.sort(byUpdatedAt))
     setPostings(nextPostings.sort((left, right) => right.lastCheckedAt.localeCompare(left.lastCheckedAt)))
     setRecommendations(nextRecommendations)
     setApplications(nextApplications)
+    setConversationThreads(nextThreads.sort(byUpdatedAt))
+    setConversationMessages(nextMessages.sort(byUpdatedAt))
     setLoaded(true)
     if (activeDraft && ['paste', 'upload'].includes(activeDraft.source)) {
-      const results = await Promise.allSettled(nextApplications
-        .filter((application) => application.sourceDraftId === activeDraft.id)
-        .map((application) => loadApplicationPacket({
-          store,
-          recordId: application.id,
-          resume: activeDraft.data
-        })))
-      setPackets(results.flatMap((result) => result.status === 'fulfilled' ? [result.value] : []))
+      const automatic = await prepareReadyBossApplicationPackets({
+        store,
+        sourceDraftId: activeDraft.id,
+        resume: activeDraft.data,
+        now: () => new Date().toISOString()
+      })
+      if (automatic.preparedIds.length > 0) {
+        const [latestApplications, latestThreads, latestMessages] = await Promise.all([
+          store.list('applicationRecords'),
+          store.list('bossConversationThreads'),
+          store.list('bossConversationMessages')
+        ])
+        setApplications(latestApplications)
+        setConversationThreads(latestThreads.sort(byUpdatedAt))
+        setConversationMessages(latestMessages.sort(byUpdatedAt))
+      }
+      setPackets(automatic.packets)
     } else {
       setPackets([])
     }
@@ -161,6 +240,10 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
       if (!active) return
       setBrowserAgentAvailable(response.ok)
       setBrowserSessions(response.sessions ?? [])
+      if (response.ok) {
+        void syncConversationSignals()
+        void runBossAdapterDiagnostics()
+      }
     })
     return () => { active = false }
   }, [])
@@ -200,6 +283,7 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
   useEffect(() => {
     if (
       !browserAgentAvailable
+      || !agentPreferences.enabled
       || browserAutoRunRef.current
       || !loaded
       || !trustedDraft
@@ -208,7 +292,161 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
     ) return
     browserAutoRunRef.current = true
     void searchMarket()
-  }, [browserAgentAvailable, busySourceId, loaded, titles, trustedDraft])
+  }, [agentPreferences.enabled, browserAgentAvailable, busySourceId, loaded, titles, trustedDraft])
+  useEffect(() => {
+    if (!browserAgentAvailable) return
+    void configureBrowserJobAgent({ window, enabled: agentPreferences.enabled, intervalMinutes: 15 })
+  }, [agentPreferences.enabled, browserAgentAvailable])
+  useEffect(() => {
+    const wake = () => {
+      if (!agentPreferences.enabled || !trustedDraft || !titles.trim() || busySourceId) return
+      void Promise.all([searchMarket(), syncConversationSignals()])
+    }
+    window.addEventListener(JOB_AGENT_WAKE_EVENT, wake)
+    return () => window.removeEventListener(JOB_AGENT_WAKE_EVENT, wake)
+  }, [agentPreferences.enabled, busySourceId, titles, trustedDraft])
+
+  function toggleJobAgent() {
+    setAgentPreferences((current) => {
+      const enabled = !current.enabled
+      if (!enabled) controllerRef.current?.abort()
+      else browserAutoRunRef.current = false
+      return { ...current, enabled }
+    })
+  }
+
+  async function syncConversationSignals() {
+    const response = await collectBossConversationSignals({ window })
+    const now = new Date().toISOString()
+    const signals = response.ok ? response.conversationSignals ?? [] : []
+    const updated = signals.length > 0
+      ? await syncBossConversationSignals({ store, signals, now })
+      : []
+    const signalDrafts = signals.length > 0
+      ? await ensureBossSignalReplyDrafts({ store, signals, now })
+      : []
+    const followUps = await ensureBossFollowUpDrafts({ store, now })
+    if (updated.length > 0 || signalDrafts.length > 0 || followUps.length > 0) {
+      await load()
+      if (agentPreferences.autonomy === 'autopilot') {
+        for (const thread of updated.filter((item) => item.recruitmentStage === 'resume-requested')) {
+          await sendRequestedResume(thread)
+        }
+        for (const message of [...signalDrafts, ...followUps]) await tryAutopilotMessage(message)
+      }
+    }
+  }
+
+  async function runBossAdapterDiagnostics() {
+    setDiagnosingAdapter(true)
+    try {
+      const response = await diagnoseBossBrowserAdapter({ window })
+      setAdapterDiagnostics(response.ok ? response.diagnostics ?? [] : [])
+    } finally {
+      setDiagnosingAdapter(false)
+    }
+  }
+
+  async function tryAutopilotMessage(message: BossConversationMessage) {
+    try {
+      const thread = await store.get('bossConversationThreads', message.threadId)
+      if (!thread) return
+      const response = await inspectBossBrowserConversation({ window, timeoutMs: 3_000 })
+      if (!response.ok || !response.recipient) return
+      const verified = verifyBossConversationRecipient({
+        thread,
+        ...response.recipient,
+        now: new Date().toISOString()
+      })
+      await store.put('bossConversationThreads', verified)
+      const approved = await approveBossConversationMessage({
+        store,
+        threadId: verified.id,
+        messageId: message.id,
+        now: new Date().toISOString()
+      })
+      await sendApprovedConversationMessage(message.id, approved, verified)
+    } catch {
+      // The draft remains reviewable when the exact BOSS conversation is not active.
+    }
+  }
+
+  async function sendRequestedResume(preparedThread: BossConversationThread) {
+    if (
+      !preparedThread.recipientFingerprint
+      || !preparedThread.platformRecipientId
+      || !preparedThread.conversationId
+      || !preparedThread.recipientName
+    ) return
+    setBusyResumeThreadId(preparedThread.id)
+    setError('')
+    try {
+      const application = await store.get('applicationRecords', preparedThread.applicationId)
+      const variant = application?.resumeVariantId
+        ? await store.get('resumeVariants', application.resumeVariantId)
+        : undefined
+      if (!variant) throw new TypeError('Job-specific resume variant unavailable')
+      const diagnosticResponse = await diagnoseBossBrowserAdapter({ window })
+      const conversationFingerprint = createJobInputFingerprint(preparedThread.conversationId)
+      const chatDiagnostic = diagnosticResponse.diagnostics?.find((item) => (
+        item.pageKind === 'chat'
+        && item.ready.conversation
+        && item.conversationFingerprint === conversationFingerprint
+      ))
+      const usePdf = chatDiagnostic?.counts.pdfInputs === 1
+      const useDocx = !usePdf && chatDiagnostic?.counts.docxInputs === 1
+      if (!usePdf && !useDocx) throw new TypeError('No unique supported BOSS resume input is available')
+      const mimeType = usePdf
+        ? 'application/pdf' as const
+        : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' as const
+      const bytes = usePdf ? renderResumePdf(variant.data) : renderResumeDocx(variant.data)
+      const bytesBase64 = bytesToBase64(bytes)
+      const fileName = usePdf
+        ? resumePdfFileName(variant.data, variant.name)
+        : resumeDocxFileName(variant.data, variant.name)
+      const contentFingerprint = createJobInputFingerprint(bytesBase64)
+      const sentThread = await executeBossResumeAttachment({
+        store,
+        thread: preparedThread,
+        fileName,
+        bytesBase64,
+        byteLength: bytes.byteLength,
+        mimeType,
+        contentFingerprint,
+        now: () => new Date().toISOString(),
+        send: async () => {
+          const response = await sendBossResumeAttachment({
+            window,
+            fileName,
+            bytesBase64,
+            byteLength: bytes.byteLength,
+            mimeType,
+            contentFingerprint,
+            recipient: {
+              platformRecipientId: preparedThread.platformRecipientId!,
+              conversationId: preparedThread.conversationId!,
+              recipientName: preparedThread.recipientName!,
+              ...(preparedThread.recipientTitle ? { recipientTitle: preparedThread.recipientTitle } : {})
+            }
+          })
+          if (!response.ok || !response.resumeReceipt) throw new TypeError('BOSS resume receipt unavailable')
+          return response.resumeReceipt
+        }
+      })
+      const acknowledgement = await ensureBossResumeReceiptReplyDraft({
+        store,
+        threadId: sentThread.id,
+        now: new Date().toISOString()
+      })
+      if (agentPreferences.autonomy === 'autopilot') await tryAutopilotMessage(acknowledgement.message)
+      setNotice(t('jobAgent.resumeSent', { format: usePdf ? 'PDF' : 'DOCX' }))
+      await load()
+    } catch {
+      setError(t('jobAgent.resumeSendFailed'))
+    } finally {
+      setBusyResumeThreadId('')
+    }
+  }
 
   async function addSource() {
     setError('')
@@ -288,6 +526,26 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
     try {
       const profile = await saveProfile(false)
       if (!profile || controller.signal.aborted || refreshGenerationRef.current !== generation) return
+      let discoveredBossJobs = 0
+      if (browserAgentAvailable) {
+        const jobsByExternalId = new Map<string, BrowserBossJob>()
+        for (const title of profile.titles.slice(0, 3)) {
+          const searchResult = await searchBossBrowserJobs({ window, query: title, timeoutMs: 15_000 })
+          for (const job of searchResult.jobs ?? []) jobsByExternalId.set(job.externalId, job)
+          if (controller.signal.aborted || refreshGenerationRef.current !== generation) return
+        }
+        if (jobsByExternalId.size === 0) {
+          const existingResult = await collectBossBrowserJobs({ window, timeoutMs: 3_000 })
+          for (const job of existingResult.jobs ?? []) jobsByExternalId.set(job.externalId, job)
+        }
+        if (jobsByExternalId.size > 0) {
+          discoveredBossJobs = (await upsertBossBrowserJobs({
+            store,
+            jobs: [...jobsByExternalId.values()].slice(0, 100),
+            now: new Date().toISOString()
+          })).length
+        }
+      }
       const result = await refreshSelectedJobMarket({
         platforms: selectedPlatforms,
         existingSources: sources,
@@ -301,14 +559,38 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
       })
       if (refreshGenerationRef.current !== generation) return
       await scoreCurrentPostings(profile, activeDraft.id)
+      const queueResult = await queueBossCandidates({
+        store,
+        sourceDraftId: activeDraft.id,
+        now: new Date().toISOString()
+      })
+      const analysisResult = await analyzeBossCandidateQueue({
+        store,
+        sourceDraftId: activeDraft.id,
+        maximumCandidates: 3,
+        signal: controller.signal,
+        now: () => new Date().toISOString(),
+        runAnalysis: (posting, signal) => requestBossCandidateAnalysis({
+          posting,
+          resume: activeDraft.data,
+          locale: locale === 'zh' ? 'zh' : 'en',
+          signal
+        })
+      })
       const totals = result.summaries.reduce((summary, source) => ({
         added: summary.added + source.newCount,
         updated: summary.updated + source.updatedCount,
         closed: summary.closed + source.closedCount,
         warnings: summary.warnings + source.warningCount
       }), { added: 0, updated: 0, closed: 0, warnings: 0 })
-      setNotice(result.sourceCount === 0
-        ? t('marketManualOnly')
+      setNotice(analysisResult.prepared.length > 0
+        ? t('jobAgent.preparedCandidates', { count: analysisResult.prepared.length })
+        : queueResult.queued.length > 0
+          ? t('jobAgent.queuedCandidates', { count: queueResult.queued.length })
+        : discoveredBossJobs > 0
+          ? t('jobAgent.discoveredCandidates', { count: discoveredBossJobs })
+        : result.sourceCount === 0
+          ? t('marketManualOnly')
         : t('marketComplete', {
           sources: result.sourceCount,
           added: totals.added,
@@ -437,8 +719,7 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
         sourceDraftId: activeDraft.id
       }))
       await decide(recommendation, 'saved')
-      if (desktop) desktop.openApp('jd-match')
-      else window.location.assign(`/${locale}/jd-match`)
+      router.push('/jobs/target-job')
     } catch {
       setError(t('errors.promotion'))
     }
@@ -480,8 +761,7 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
       setImportCompany('')
       setImportLocation('')
       setImportDescription('')
-      if (desktop) desktop.openApp('jd-match')
-      else window.location.assign(`/${locale}/jd-match`)
+      router.push('/jobs/target-job')
     } catch {
       setError(t('errors.importJob'))
     }
@@ -511,7 +791,9 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
     setBusyApplicationId(recordId)
     setError('')
     try {
-      await prepareApplicationPacket({ store, recordId, resume: activeDraft.data, now: new Date().toISOString() })
+      const now = new Date().toISOString()
+      await prepareApplicationPacket({ store, recordId, resume: activeDraft.data, now })
+      await ensureBossOpeningDraft({ store, applicationId: recordId, now })
     } catch (caught) {
       setError(caught instanceof ApplicationRecordError && caught.code === 'PACKET_NOT_READY'
         ? t('errors.packet')
@@ -548,6 +830,105 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
     }
   }
 
+  async function reviseConversationMessage(messageId: string, body: string) {
+    const message = conversationMessages.find((item) => item.id === messageId)
+    if (!message || message.body === body.trim()) return
+    try {
+      await store.put('bossConversationMessages', reviseBossMessageDraft({
+        message,
+        body,
+        now: new Date().toISOString()
+      }))
+      setNotice(t('jobAgent.messageRevised'))
+      await load()
+    } catch {
+      setError(t('errors.applicationSave'))
+    }
+  }
+
+  async function verifyAndApproveConversationMessage(messageId: string) {
+    const message = conversationMessages.find((item) => item.id === messageId)
+    const thread = message ? conversationThreads.find((item) => item.id === message.threadId) : undefined
+    if (!message || !thread) return
+    setBusyConversationMessageId(messageId)
+    setError('')
+    try {
+      const response = await inspectBossBrowserConversation({ window, timeoutMs: 3_000 })
+      if (!response.ok || !response.recipient) throw new TypeError('BOSS recipient unavailable')
+      const verified = verifyBossConversationRecipient({
+        thread,
+        ...response.recipient,
+        now: new Date().toISOString()
+      })
+      await store.put('bossConversationThreads', verified)
+      const approved = await approveBossConversationMessage({
+        store,
+        threadId: verified.id,
+        messageId,
+        now: new Date().toISOString()
+      })
+      if (agentPreferences.autonomy === 'autopilot') {
+        await sendApprovedConversationMessage(messageId, approved, verified)
+      } else {
+        setNotice(t('jobAgent.messageApproved', { name: response.recipient.recipientName }))
+        await load()
+      }
+    } catch {
+      setError(t('jobAgent.messageVerificationFailed'))
+    } finally {
+      setBusyConversationMessageId('')
+    }
+  }
+
+  async function sendApprovedConversationMessage(
+    messageId: string,
+    preparedMessage?: BossConversationMessage,
+    preparedThread?: BossConversationThread
+  ) {
+    const message = preparedMessage ?? conversationMessages.find((item) => item.id === messageId)
+    const thread = preparedThread ?? (message ? conversationThreads.find((item) => item.id === message.threadId) : undefined)
+    if (
+      !message
+      || !thread?.recipientFingerprint
+      || !thread.platformRecipientId
+      || !thread.conversationId
+      || !thread.recipientName
+    ) return
+    setBusyConversationMessageId(messageId)
+    setError('')
+    try {
+      const persisted = await executeApprovedBossMessage({
+        store,
+        thread,
+        message,
+        now: () => new Date().toISOString(),
+        send: async ({ message: approved, thread: verified }) => {
+          const response = await sendBossBrowserMessage({
+            window,
+            messageId: approved.id,
+            body: approved.body,
+            bodyFingerprint: approved.bodyFingerprint,
+            recipient: {
+              platformRecipientId: verified.platformRecipientId!,
+              conversationId: verified.conversationId!,
+              recipientName: verified.recipientName!,
+              ...(verified.recipientTitle ? { recipientTitle: verified.recipientTitle } : {})
+            },
+            timeoutMs: 10_000
+          })
+          if (!response.ok || !response.sendReceipt) throw new TypeError('BOSS send receipt unavailable')
+          return response.sendReceipt
+        }
+      })
+      setNotice(t('jobAgent.messageSent', { status: t(`jobAgent.messageStatus.${persisted.status}`) }))
+    } catch {
+      setError(t('jobAgent.messageSendFailed'))
+    } finally {
+      setBusyConversationMessageId('')
+      await load()
+    }
+  }
+
   const recommendationByPosting = new Map(recommendations.map((item) => [item.postingId, item]))
   const applicationByPosting = new Map(applications.map((item) => [item.postingId, item]))
   const visible = postings.filter((posting) => {
@@ -570,89 +951,174 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
   const primaryTitle = splitTerms(titles)[0]
   const primaryLocation = splitTerms(locations)[0]
 
-  return <main className="job-radar-app" aria-label={t('title')}>
-    <header className="job-radar-app__header">
-      <div><span><Radar size={14} aria-hidden="true" />{t('eyebrow')}</span><h1>{t('title')}</h1><p>{t('description')}</p></div>
-      {busySourceId ? <button type="button" onClick={() => controllerRef.current?.abort()}><X size={14} />{t('cancel')}</button> : null}
-    </header>
-    {error ? <p className="job-radar-app__error" role="alert">{error}</p> : null}
-    {notice ? <p className="job-radar-app__notice" role="status">{notice}</p> : null}
-    <div className="job-radar-app__layout">
-      <aside>
-        <section className="job-radar-app__agent-control">
-          <div className="job-radar-app__agent-heading"><Bot size={16} aria-hidden="true" /><div><h2>{t('jobAgent.title')}</h2><p>{t('jobAgent.description')}</p></div></div>
-          <div className="job-radar-app__agent-enabled"><ShieldCheck size={14} aria-hidden="true" /><span><strong>{t('jobAgent.zeroConfig')}</strong><small>{t('jobAgent.zeroConfigHelp')}</small></span></div>
-          <p className="job-radar-app__section-help" aria-live="polite">{browserAgentAvailable ? t('jobAgent.browserReady') : t('jobAgent.browserMissing')}</p>
-          <div className="job-radar-app__agent-platforms" role="list" aria-label={t('jobAgent.platformLegend')}>{JOB_AGENT_PLATFORM_IDS.map((platform) => {
-            const session = browserSessions.find((item) => item.platform === platform)
-            const state = session?.state ?? 'unknown'
-            return <div key={platform} role="listitem" data-session={state}>
-              <span><strong>{t(`jobAgent.platform.${platform}`)}</strong><small>{t(`jobAgent.session.${state}`)}</small></span>
-            </div>
-          })}</div>
-          <div className="job-radar-app__learning"><BrainCircuit size={14} aria-hidden="true" /><div><strong>{t('jobAgent.learning')}</strong><p>{t('jobAgent.learningHelp')}</p></div></div>
-          <p className="job-radar-app__section-help">{t('jobAgent.learnReplies')} · {t('jobAgent.learnOutcomes')}</p>
-          <button className="job-radar-app__market-search" type="button" onClick={() => void searchMarket()} disabled={Boolean(busySourceId) || !trustedDraft || selectedPlatforms.length === 0 || !titles.trim()}><Bot size={14} />{t('jobAgent.runNow')}</button>
-          {marketProgress ? <p className="job-radar-app__progress" role="status">{marketProgress}</p> : null}
-          {officialSearchPlatforms.length > 0 ? <div className="job-radar-app__official-searches"><h3>{t('officialSearches')}</h3><p>{t('officialSearchHelp')}</p><ul>{officialSearchPlatforms.map((platform) => <li key={platform}><a href={buildOfficialMarketplaceSearchUrl({ platform, title: primaryTitle, location: primaryLocation })} target="_blank" rel="noopener noreferrer"><ExternalLink size={12} />{t('openMarketplace', { platform: t(`marketplace.${platform}.name`) })}</a><small>{t(`marketplace.${platform}.note`)}</small></li>)}</ul></div> : null}
-          <p className="job-radar-app__section-help">{t('jobAgent.runtimeBoundary')}</p>
-        </section>
-        <section><h2>{t('profile')}</h2>
-          <label>{t('profileName')}<input value={profileName} onChange={(event) => setProfileName(event.target.value)} /></label>
-          <label>{t('titles')}<input value={titles} onChange={(event) => setTitles(event.target.value)} /></label>
-          <label>{t('locations')}<input value={locations} onChange={(event) => setLocations(event.target.value)} /></label>
-          <label>{t('preferredCompanies')}<input value={preferredCompanies} onChange={(event) => setPreferredCompanies(event.target.value)} placeholder={t('preferredCompaniesPlaceholder')} /></label>
-          <label>{t('requiredTerms')}<input value={requiredTerms} onChange={(event) => setRequiredTerms(event.target.value)} /></label>
-          <label>{t('preferredTerms')}<input value={preferredTerms} onChange={(event) => setPreferredTerms(event.target.value)} /></label>
-          <label>{t('excludedTerms')}<input value={excludedTerms} onChange={(event) => setExcludedTerms(event.target.value)} /></label>
-          <button type="button" onClick={() => void saveProfile()} disabled={!profileName.trim() || !titles.trim() || selectedPlatforms.length === 0}><Save size={14} />{t('saveProfile')}</button>
-        </section>
-        <section><h2>{t('importJob')}</h2>
-          <p className="job-radar-app__section-help">{t('importJobHelp')}</p>
-          <label>{t('clipboardJob')}<textarea value={clipboardJobText} onChange={(event) => setClipboardJobText(event.target.value)} rows={6} placeholder={t('clipboardJobPlaceholder')} /></label>
-          <button type="button" onClick={prefillFromClipboard} disabled={!clipboardJobText.trim()}><ClipboardPaste size={14} />{t('parseClipboardJob')}</button>
-          <label>{t('importPlatform')}<select value={importPlatform} onChange={(event) => setImportPlatform(event.target.value as JobMarketplaceId)}>{PRIMARY_JOB_MARKETPLACE_IDS.map((platform) => <option key={platform} value={platform}>{t(`marketplace.${platform}.name`)}</option>)}</select></label>
-          <label>{t('importUrl')}<input type="url" value={importUrl} onChange={(event) => setImportUrl(event.target.value)} placeholder="https://…" /></label>
-          <label>{t('importTitle')}<input value={importTitle} onChange={(event) => setImportTitle(event.target.value)} /></label>
-          <label>{t('importCompany')}<input value={importCompany} onChange={(event) => setImportCompany(event.target.value)} /></label>
-          <label>{t('importLocation')}<input value={importLocation} onChange={(event) => setImportLocation(event.target.value)} /></label>
-          <label>{t('importDescription')}<textarea value={importDescription} onChange={(event) => setImportDescription(event.target.value)} rows={7} /></label>
-          <button type="button" onClick={() => void importAndAnalyze()} disabled={!trustedDraft || !importUrl.trim() || !importTitle.trim() || !importCompany.trim() || !importDescription.trim() || !profileName.trim() || !titles.trim()}><ClipboardPaste size={14} />{t('importAndAnalyze')}</button>
-        </section>
-      </aside>
-      <section className="job-radar-app__inbox">
-        <section className="job-radar-app__communication" aria-label={t('jobAgent.communicationTitle')}>
-          <div><MessageSquareText size={17} aria-hidden="true" /><span><strong>{t('jobAgent.communicationTitle')}</strong><small>{t('jobAgent.communicationHelp')}</small></span></div>
-          <ol><li data-ready="true">{t('jobAgent.stage.discover')}</li><li>{t('jobAgent.stage.qualify')}</li><li>{t('jobAgent.stage.tailor')}</li><li>{t('jobAgent.stage.chat')}</li><li>{t('jobAgent.stage.learn')}</li></ol>
-          <p>{t('jobAgent.connectorBoundary')}</p>
-        </section>
-        <div className="job-radar-app__toolbar"><h2>{t('inbox')}</h2><div role="group" aria-label={t('filters')}>{(['all', 'new', 'saved', 'needs-analysis', 'ready', 'applied', 'ignored', 'closed'] as const).map((value) => <button key={value} type="button" aria-pressed={filter === value} onClick={() => setFilter(value)}>{t(`filter.${value}`)}</button>)}</div></div>
-        {!trustedDraft ? <p className="job-radar-app__empty">{t('resumeRequired')}</p> : visible.length === 0 ? <p className="job-radar-app__empty">{t('empty')}</p> : <ul className="job-radar-app__jobs">{visible.map((posting) => {
-          const recommendation = recommendationByPosting.get(posting.id)
-          return <li key={posting.id} data-status={posting.status}>
-            <article><header><div><span>{posting.company}</span><h3>{posting.title}</h3><p>{[posting.location, posting.workplaceType, posting.employmentType].filter(Boolean).join(' · ') || t('unknown')}</p></div>{recommendation?.preliminaryScore !== undefined ? <strong aria-label={t('scoreLabel', { score: recommendation.preliminaryScore })}>{Math.round(recommendation.preliminaryScore)}</strong> : null}</header>
-              <p>{posting.description.slice(0, 240)}</p><small>{t('sourceStatus', { source: sources.find((item) => item.id === posting.sourceId)?.kind ?? 'manual', status: posting.status })}</small>
-              {recommendation ? <details><summary>{t('whyRecommended')}</summary><ul>{recommendation.reasons.map((reason) => <li key={reason.code}>{t('reason', { code: reason.code, contribution: reason.contribution })}</li>)}</ul></details> : <p>{t('unknownRecommendation')}</p>}
-              <footer>{recommendation ? <><button type="button" onClick={() => void decide(recommendation, 'saved')}><Save size={13} />{t('save')}</button><button type="button" onClick={() => void decide(recommendation, 'ignored')}>{t('ignore')}</button><button type="button" onClick={() => void analyzePosting(posting, recommendation)}>{t('analyze')}</button></> : null}<a href={posting.canonicalUrl} target="_blank" rel="noopener noreferrer"><ExternalLink size={13} />{t('openOriginal')}</a></footer>
-            </article>
-          </li>
-        })}</ul>}
-        <ApplicationPipeline
-          packets={packets}
-          pendingId={busyApplicationId}
-          onPrepare={(id) => void prepareApplication(id)}
-          onMarkApplied={(id) => void confirmApplied(id)}
-          onNotesChange={(id, notes) => void saveApplicationNotes(id, notes)}
-        />
-      </section>
-    </div>
+  const selectedPosting = visible.find((posting) => posting.id === selectedPostingId) ?? visible[0] ?? null
+  const selectedRecommendation = selectedPosting ? recommendationByPosting.get(selectedPosting.id) : undefined
+  const pendingRequirements = applications.filter((item) => ['saved', 'analyzing', 'preparing'].includes(item.status)).length
+  const readyApplications = applications.filter((item) => item.status === 'ready-to-apply').length
+  const pendingMessages = conversationMessages.filter((item) => ['awaiting-approval', 'approved', 'failed'].includes(item.status)).length
+  const applicationCounts = {
+    applied: applications.filter((item) => ['applied', 'interviewing', 'offered', 'rejected'].includes(item.status)).length,
+    viewed: applications.filter((item) => item.status !== 'saved').length,
+    conversations: conversationThreads.filter((item) => item.status === 'active').length,
+    interviews: applications.filter((item) => item.status === 'interviewing').length,
+    offers: applications.filter((item) => item.status === 'offered').length
+  }
+  const navItems: Array<{ id: JobWorkspaceSection; href: string; icon: typeof LayoutDashboard }> = [
+    { id: 'overview', href: '/jobs', icon: LayoutDashboard },
+    { id: 'opportunities', href: '/jobs/opportunities', icon: BriefcaseBusiness },
+    { id: 'resumes', href: '/jobs/resumes', icon: FileText },
+    { id: 'conversations', href: '/jobs/conversations', icon: MessageSquareText },
+    { id: 'applications', href: '/jobs/applications', icon: Send },
+    { id: 'interviews', href: '/jobs/interviews', icon: CalendarClock },
+    { id: 'activity', href: '/jobs/activity', icon: Activity }
+  ]
+
+  return <main className="job-workspace" aria-label={t('title')}>
+    <aside className="job-workspace__sidebar">
+      <div className="job-workspace__brand"><span><Bot size={19} aria-hidden="true" /></span><strong>{t('workspace.brand')}</strong></div>
+      <nav aria-label={t('workspace.navigation')}>{navItems.map(({ id, href, icon: Icon }) => <Link key={id} href={href} data-active={workspaceSection === id}><Icon size={17} aria-hidden="true" /><span>{t(`workspace.nav.${id}`)}</span></Link>)}</nav>
+      <div className="job-workspace__sidebar-footer"><Link href="/jobs/preferences" data-active={workspaceSection === 'preferences'}><SlidersHorizontal size={17} aria-hidden="true" /><span>{t('workspace.nav.preferences')}</span></Link><Link href="/jobs/profile" data-active={workspaceSection === 'profile'} aria-label={activeDraft?.data.profile.name || t('workspace.candidate')}><span>{activeDraft?.data.profile.name?.slice(0, 1) || 'R'}</span><strong>{activeDraft?.data.profile.name || t('workspace.candidate')}</strong></Link></div>
+    </aside>
+    <section className="job-workspace__main">
+      <header className="job-workspace__topbar"><h1>{t(`workspace.pageTitle.${workspaceSection}`)}</h1><div><span data-connected={browserAgentAvailable}><i />{browserAgentAvailable ? t('workspace.connected') : t('workspace.disconnected')}</span><Link href="/jobs/settings" aria-label={t('workspace.settings')}><Settings2 size={18} /></Link></div></header>
+      {error ? <p className="job-workspace__alert" data-tone="error" role="alert">{error}</p> : null}
+      {notice ? <p className="job-workspace__alert" data-tone="success" role="status">{notice}</p> : null}
+
+      {workspaceSection === 'overview' ? <div className="job-overview">
+        <section className="job-overview__agent"><div><span data-running={agentPreferences.enabled && browserAgentAvailable} /><div><h2>{!agentPreferences.enabled ? t('workspace.agentPaused') : browserAgentAvailable ? t('workspace.agentRunning') : t('workspace.agentReady')}</h2><p>{t('workspace.targetSummary', { titles: splitTerms(titles).slice(0, 2).join('、') || t('unknown'), location: splitTerms(locations)[0] || t('unknown') })}</p></div></div><div><button type="button" className="job-button job-button--secondary" onClick={toggleJobAgent}>{agentPreferences.enabled ? <Pause size={15} /> : <Play size={15} />}{agentPreferences.enabled ? t('workspace.pauseAgent') : t('workspace.resumeAgent')}</button><Link className="job-button job-button--primary" href={pendingRequirements > 0 ? '/jobs/resumes' : pendingMessages > 0 ? '/jobs/conversations' : '/jobs/opportunities'}>{t('workspace.reviewTasks')}<ChevronRight size={16} /></Link></div></section>
+        <div className="job-overview__columns">
+          <section><h2>{t('workspace.todayActivity')}</h2><div className="job-overview__timeline">
+            <Link href="/jobs/opportunities"><time>{formatActivityTime(postings[0]?.lastCheckedAt, locale)}</time><span><BriefcaseBusiness size={17} /></span><div><strong>{t('workspace.activityFound', { count: postings.length })}</strong><p>{t('workspace.activityFoundHelp')}</p></div><ChevronRight size={17} /></Link>
+            <Link href="/jobs/resumes"><time>{formatActivityTime(applications[0]?.updatedAt, locale)}</time><span><FileText size={17} /></span><div><strong>{t('workspace.activityResume', { count: packets.length })}</strong><p>{t('workspace.activityResumeHelp')}</p></div><ChevronRight size={17} /></Link>
+            <Link href="/jobs/conversations"><time>{formatActivityTime(conversationMessages[0]?.updatedAt, locale)}</time><span><MessageSquareText size={17} /></span><div><strong>{t('workspace.activityMessages', { count: conversationMessages.length })}</strong><p>{t('workspace.activityMessagesHelp')}</p></div><ChevronRight size={17} /></Link>
+            <Link href="/jobs/applications"><time>{formatActivityTime(applications.at(-1)?.updatedAt, locale)}</time><span><Send size={17} /></span><div><strong>{t('workspace.activityApplications', { count: applications.length })}</strong><p>{t('workspace.activityApplicationsHelp')}</p></div><ChevronRight size={17} /></Link>
+          </div></section>
+          <section><h2>{t('workspace.needsAttention')}</h2><div className="job-overview__tasks">
+            <Link href="/jobs/opportunities"><span data-tone="blue"><BriefcaseBusiness size={16} /></span><div><strong>{t('workspace.taskReviewJobs')}</strong><p>{t('workspace.taskCount', { count: recommendations.filter((item) => (item.decision ?? 'new') === 'new').length })}</p></div><ChevronRight size={17} /></Link>
+            <Link href="/jobs/resumes"><span data-tone="amber"><FileText size={16} /></span><div><strong>{t('workspace.taskResume')}</strong><p>{t('workspace.taskCount', { count: pendingRequirements })}</p></div><ChevronRight size={17} /></Link>
+            <Link href="/jobs/conversations"><span data-tone="red"><MessageSquareText size={16} /></span><div><strong>{t('workspace.taskMessages')}</strong><p>{t('workspace.taskCount', { count: pendingMessages })}</p></div><ChevronRight size={17} /></Link>
+          </div></section>
+        </div>
+        <section className="job-overview__progress"><h2>{t('workspace.applicationProgress')}</h2><div>{(['applied', 'viewed', 'conversations', 'interviews', 'offers'] as const).map((key) => <article key={key}><strong>{applicationCounts[key]}</strong><span>{t(`workspace.progress.${key}`)}</span></article>)}</div></section>
+      </div> : null}
+
+      {workspaceSection === 'opportunities' ? <div className="job-opportunities">
+        <section className="job-opportunities__list"><header><div><h2>{t('inbox')}</h2><p>{t('workspace.opportunityHelp')}</p></div><button type="button" className="job-button job-button--primary" onClick={() => void searchMarket()} disabled={Boolean(busySourceId) || !trustedDraft || !titles.trim()}><Radar size={15} />{busySourceId ? t('marketStarting') : t('jobAgent.runNow')}</button></header><div className="job-opportunities__filters" role="group" aria-label={t('filters')}>{(['all', 'new', 'saved', 'needs-analysis', 'ready', 'applied'] as const).map((value) => <button key={value} type="button" aria-pressed={filter === value} onClick={() => setFilter(value)}>{t(`filter.${value}`)}</button>)}</div>{!trustedDraft ? <p className="job-workspace__empty">{t('resumeRequired')}</p> : visible.length === 0 ? <p className="job-workspace__empty">{t('empty')}</p> : <ul>{visible.map((posting) => { const recommendation = recommendationByPosting.get(posting.id); const application = applicationByPosting.get(posting.id); return <li key={posting.id}><button type="button" data-selected={selectedPosting?.id === posting.id} onClick={() => setSelectedPostingId(posting.id)}><div><strong>{posting.title}</strong><span>{posting.company}</span></div><span>{posting.compensation ? `${posting.compensation.minimum ?? ''}–${posting.compensation.maximum ?? ''}` : posting.location || t('unknown')}</span><b>{recommendation?.preliminaryScore !== undefined ? `${Math.round(recommendation.preliminaryScore)}%` : '—'}</b><small>{application ? t(`application.status.${application.status}`) : t(`filter.${recommendation?.decision ?? 'new'}`)}</small></button></li>})}</ul>}</section>
+        <section className="job-opportunities__detail">{selectedPosting ? <><header><span>{selectedPosting.company}</span><h2>{selectedPosting.title}</h2><p>{[selectedPosting.location, selectedPosting.workplaceType, selectedPosting.employmentType].filter(Boolean).join(' · ') || t('unknown')}</p></header><div className="job-opportunities__score"><span>{t('workspace.matchScore')}</span><strong>{selectedRecommendation?.preliminaryScore !== undefined ? `${Math.round(selectedRecommendation.preliminaryScore)}%` : '—'}</strong></div><section><h3>{t('whyRecommended')}</h3>{selectedRecommendation?.reasons.length ? <ol>{selectedRecommendation.reasons.slice(0, 3).map((reason) => <li key={reason.code}><CheckCircle2 size={15} />{t('reason', { code: reason.code, contribution: reason.contribution })}</li>)}</ol> : <p>{t('unknownRecommendation')}</p>}</section><p className="job-opportunities__description">{selectedPosting.description.slice(0, 520)}</p><footer>{selectedRecommendation ? <><button type="button" className="job-button job-button--primary" onClick={() => void analyzePosting(selectedPosting, selectedRecommendation)}>{t('workspace.confirmInterest')}</button><button type="button" className="job-button job-button--secondary" onClick={() => void decide(selectedRecommendation, 'saved')}><Save size={14} />{t('save')}</button><button type="button" className="job-button job-button--secondary" onClick={() => void decide(selectedRecommendation, 'ignored')}>{t('ignore')}</button></> : null}<a href={selectedPosting.canonicalUrl} target="_blank" rel="noopener noreferrer"><ExternalLink size={15} />{t('openOriginal')}</a></footer></> : <p className="job-workspace__empty">{t('workspace.selectOpportunity')}</p>}</section>
+      </div> : null}
+
+      {workspaceSection === 'resumes' ? <div className="job-workspace__content"><section className="job-section-heading"><div><h2>{t('workspace.resumeTasksTitle')}</h2><p>{t('workspace.resumeTasksHelp')}</p></div><span>{pendingRequirements + readyApplications}</span></section><div className="job-resume-agent"><ResumeAgentApp appId="agent" /></div><ApplicationPipeline packets={packets} pendingId={busyApplicationId} onPrepare={(id) => void prepareApplication(id)} onMarkApplied={(id) => void confirmApplied(id)} onNotesChange={(id, notes) => void saveApplicationNotes(id, notes)} /></div> : null}
+
+      {workspaceSection === 'conversations' ? <div className="job-workspace__content"><section className="job-section-heading"><div><h2>{t('jobAgent.messageQueueTitle')}</h2><p>{t('jobAgent.messageQueueHelp')}</p></div><span>{conversationMessages.length}</span></section><BossConversationQueue threads={conversationThreads} messages={conversationMessages} applications={applications} postings={postings} pendingMessageId={busyConversationMessageId} pendingResumeThreadId={busyResumeThreadId} onRevise={(messageId, body) => void reviseConversationMessage(messageId, body)} onVerify={(messageId) => void verifyAndApproveConversationMessage(messageId)} onSend={(messageId) => void sendApprovedConversationMessage(messageId)} onSendResume={(thread) => void sendRequestedResume(thread)} /></div> : null}
+
+      {workspaceSection === 'applications' ? <div className="job-workspace__content"><section className="job-section-heading"><div><h2>{t('application.title')}</h2><p>{t('application.description')}</p></div><span>{applications.length}</span></section><ApplicationPipeline packets={packets} pendingId={busyApplicationId} onPrepare={(id) => void prepareApplication(id)} onMarkApplied={(id) => void confirmApplied(id)} onNotesChange={(id, notes) => void saveApplicationNotes(id, notes)} /></div> : null}
+
+      {workspaceSection === 'interviews' ? <InterviewWorkspace store={store} applications={applications} postings={postings} locale={locale} onChanged={load} /> : null}
+
+      {workspaceSection === 'profile' ? <div className="job-workspace__embedded" role="application" aria-label={desktopT('apps.studio')}><ResumeStudioApp appId="studio" /></div> : null}
+
+      {workspaceSection === 'target-job' ? <div className="job-workspace__embedded" role="application" aria-label={desktopT('apps.jd-match')}><JDMatchApp appId="jd-match" /></div> : null}
+
+      {workspaceSection === 'settings' ? <div className="job-workspace__embedded" role="application" aria-label={desktopT('apps.settings')}><SettingsApp appId="settings" /></div> : null}
+
+      {workspaceSection === 'activity' ? <div className="job-workspace__content"><section className="job-section-heading"><div><h2>{t('workspace.activityTitle')}</h2><p>{t('workspace.activityHelp')}</p></div></section><div className="job-activity-list">{postings.slice(0, 12).map((posting) => <article key={posting.id}><span><BriefcaseBusiness size={16} /></span><div><strong>{t('workspace.activityPosting', { title: posting.title })}</strong><p>{posting.company} · {posting.lastCheckedAt.slice(0, 10)}</p></div></article>)}{postings.length === 0 ? <p className="job-workspace__empty">{t('workspace.noActivity')}</p> : null}</div></div> : null}
+
+      {workspaceSection === 'preferences' ? <div className="job-preferences"><section><header><h2>{t('workspace.preferencesTitle')}</h2><p>{t('workspace.preferencesHelp')}</p></header><div className="job-preferences__grid"><label>{t('profileName')}<input value={profileName} onChange={(event) => setProfileName(event.target.value)} /></label><label>{t('titles')}<input value={titles} onChange={(event) => setTitles(event.target.value)} /></label><label>{t('locations')}<input value={locations} onChange={(event) => setLocations(event.target.value)} /></label><label>{t('preferredCompanies')}<input value={preferredCompanies} onChange={(event) => setPreferredCompanies(event.target.value)} placeholder={t('preferredCompaniesPlaceholder')} /></label><label>{t('requiredTerms')}<input value={requiredTerms} onChange={(event) => setRequiredTerms(event.target.value)} /></label><label>{t('preferredTerms')}<input value={preferredTerms} onChange={(event) => setPreferredTerms(event.target.value)} /></label><label>{t('excludedTerms')}<input value={excludedTerms} onChange={(event) => setExcludedTerms(event.target.value)} /></label></div><button type="button" className="job-button job-button--primary" onClick={() => void saveProfile()} disabled={!profileName.trim() || !titles.trim()}><Save size={15} />{t('saveProfile')}</button></section><section className="job-adapter-diagnostics"><header><div><h2>{t('jobAgent.diagnosticsTitle')}</h2><p>{t('jobAgent.diagnosticsHelp')}</p></div><button type="button" className="job-button job-button--secondary" onClick={() => void runBossAdapterDiagnostics()} disabled={diagnosingAdapter}>{t('jobAgent.runDiagnostics')}</button></header>{adapterDiagnostics.length === 0 ? <div className="job-adapter-diagnostics__empty"><p>{t('jobAgent.diagnosticsEmpty')}</p><a href="https://www.zhipin.com/web/geek/chat" target="_blank" rel="noopener noreferrer">{t('jobAgent.openBossChat')}</a></div> : <div className="job-adapter-diagnostics__list">{adapterDiagnostics.map((diagnostic, index) => <article key={`${diagnostic.pageKind}-${diagnostic.frameId}-${index}`}><header><strong>{t(`jobAgent.diagnosticPage.${diagnostic.pageKind}`)}</strong><span>{t(`jobAgent.session.${diagnostic.sessionState}`)}</span></header><div>{(['discovery', 'conversation', 'messageSend', 'resumeUpload'] as const).map((key) => <p key={key} data-ready={diagnostic.ready[key]}><CheckCircle2 size={14} />{t(`jobAgent.diagnosticReady.${key}`)}</p>)}</div><small>{t('jobAgent.diagnosticCounts', { jobs: diagnostic.counts.jobLinks, editors: diagnostic.counts.editors, send: diagnostic.counts.sendControls, identities: diagnostic.counts.recipientIdentities, conversations: diagnostic.counts.conversationIdentities, names: diagnostic.counts.recipientNames, docx: diagnostic.counts.docxInputs })}</small></article>)}</div>}</section><details><summary>{t('importJob')}</summary><p>{t('importJobHelp')}</p><label>{t('clipboardJob')}<textarea value={clipboardJobText} onChange={(event) => setClipboardJobText(event.target.value)} rows={5} placeholder={t('clipboardJobPlaceholder')} /></label><button type="button" className="job-button job-button--secondary" onClick={prefillFromClipboard} disabled={!clipboardJobText.trim()}><ClipboardPaste size={14} />{t('parseClipboardJob')}</button><div className="job-preferences__grid"><label>{t('importUrl')}<input type="url" value={importUrl} onChange={(event) => setImportUrl(event.target.value)} /></label><label>{t('importTitle')}<input value={importTitle} onChange={(event) => setImportTitle(event.target.value)} /></label><label>{t('importCompany')}<input value={importCompany} onChange={(event) => setImportCompany(event.target.value)} /></label><label>{t('importLocation')}<input value={importLocation} onChange={(event) => setImportLocation(event.target.value)} /></label></div><label>{t('importDescription')}<textarea value={importDescription} onChange={(event) => setImportDescription(event.target.value)} rows={6} /></label><button type="button" className="job-button job-button--primary" onClick={() => void importAndAnalyze()} disabled={!trustedDraft || !importUrl.trim() || !importTitle.trim() || !importCompany.trim() || !importDescription.trim()}>{t('importAndAnalyze')}</button></details></div> : null}
+    </section>
   </main>
+}
+
+export function BossConversationQueue({
+  threads,
+  messages,
+  applications,
+  postings,
+  pendingMessageId,
+  pendingResumeThreadId,
+  onRevise,
+  onVerify,
+  onSend,
+  onSendResume
+}: {
+  threads: BossConversationThread[]
+  messages: BossConversationMessage[]
+  applications: ApplicationRecord[]
+  postings: JobPosting[]
+  pendingMessageId?: string
+  pendingResumeThreadId?: string
+  onRevise: (messageId: string, body: string) => void
+  onVerify: (messageId: string) => void
+  onSend: (messageId: string) => void
+  onSendResume?: (thread: BossConversationThread) => void
+}) {
+  const t = useTranslations('jobRadar.jobAgent')
+  const applicationById = new Map(applications.map((application) => [application.id, application]))
+  const postingById = new Map(postings.map((posting) => [posting.id, posting]))
+  const visible = messages.flatMap((message) => {
+    const thread = threads.find((item) => item.id === message.threadId)
+    const application = thread ? applicationById.get(thread.applicationId) : undefined
+    const posting = application ? postingById.get(application.postingId) : undefined
+    return thread && application && posting ? [{ message, thread, posting }] : []
+  })
+  if (visible.length === 0) return null
+  return <section className="boss-conversation-queue" aria-labelledby="boss-conversation-title">
+    <header><div><MessageSquareText size={15} aria-hidden="true" /><span><strong id="boss-conversation-title">{t('messageQueueTitle')}</strong><small>{t('messageQueueHelp')}</small></span></div></header>
+    <ul>{visible.map(({ message, thread, posting }) => <li key={message.id}>
+      <article>
+        <header><div><strong>{posting.title}</strong><span>{posting.company}</span></div><b>{t(`messageStatus.${message.status}`)}</b></header>
+        <p>{thread.recipientName
+          ? t('messageRecipient', { name: thread.recipientName })
+          : t('messageRecipientPending')}</p>
+        <p>{t('recruitmentStage', { stage: t(`stage.${thread.recruitmentStage}`) })}</p>
+        <label>{t('messageDraft')}<textarea defaultValue={message.body} maxLength={5_000} onBlur={(event) => onRevise(message.id, event.target.value)} /></label>
+        <small>{t('messageEvidence', { count: message.evidenceFactIds.length })}</small>
+        {message.status === 'awaiting-approval' ? <button type="button" disabled={pendingMessageId === message.id} onClick={() => onVerify(message.id)}>{t('messageVerifyAndApprove')}</button> : null}
+        {message.status === 'approved' ? <button type="button" disabled={pendingMessageId === message.id} onClick={() => onSend(message.id)}>{t('messageSendApproved')}</button> : null}
+        {thread.recruitmentStage === 'resume-requested' && onSendResume ? <button type="button" disabled={pendingResumeThreadId === thread.id} onClick={() => onSendResume(thread)}>{t('sendRequestedResume')}</button> : null}
+      </article>
+    </li>)}</ul>
+  </section>
 }
 
 function splitTerms(value: string) {
   return [...new Set(value.split(/[,，\n]/u).map((term) => term.trim()).filter(Boolean))]
 }
 
+function bytesToBase64(bytes: Uint8Array) {
+  let binary = ''
+  const chunkSize = 0x8000
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize))
+  }
+  return window.btoa(binary)
+}
+
+function jobWorkspaceSection(pathname: string): JobWorkspaceSection {
+  const normalized = pathname.replace(/^\/(?:zh|en)(?=\/)/u, '').replace(/\/+$/u, '')
+  const section = normalized.split('/')[2]
+  return section === 'opportunities'
+    || section === 'resumes'
+    || section === 'conversations'
+    || section === 'applications'
+    || section === 'interviews'
+    || section === 'activity'
+    || section === 'preferences'
+    || section === 'profile'
+    || section === 'target-job'
+    || section === 'settings'
+    ? section
+    : 'overview'
+}
+
 function byUpdatedAt(left: { updatedAt: string }, right: { updatedAt: string }) {
   return right.updatedAt.localeCompare(left.updatedAt)
+}
+
+function formatActivityTime(value: string | undefined, locale: string) {
+  if (!value || Number.isNaN(Date.parse(value))) return '—'
+  return new Intl.DateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).format(new Date(value))
 }

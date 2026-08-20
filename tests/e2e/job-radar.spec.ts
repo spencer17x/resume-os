@@ -29,6 +29,14 @@ async function createTrustedDraft(page: Page) {
   await expect(studio.getByRole('heading', { name: 'Ada Candidate' })).toBeVisible()
 }
 
+test('uses the Job Agent backend as the localized product root', async ({ page }) => {
+  await page.goto('/zh')
+  await expect(page).toHaveURL(/\/zh\/jobs$/u)
+  await expect(page.getByRole('application', { name: '求职 Agent' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '求职概览', level: 1 })).toBeVisible()
+  await expect(page.locator('.desktop-shell, .mobile-home, .desktop-dock')).toHaveCount(0)
+})
+
 test('exposes only BOSS Zhipin', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'Desktop platform-scope workflow')
   await createTrustedDraft(page)
@@ -37,9 +45,8 @@ test('exposes only BOSS Zhipin', async ({ page }, testInfo) => {
 
   await page.goto('/en/jobs')
   const radar = page.getByRole('application', { name: 'Job Agent' })
-  const platforms = radar.getByRole('list', { name: 'Agent work platforms' })
-  await expect(platforms.getByRole('listitem')).toHaveCount(1)
-  await expect(platforms).toContainText('BOSS Zhipin')
+  await expect(radar.getByRole('navigation', { name: 'Job workspace navigation' }).getByRole('link')).toHaveCount(7)
+  await expect(radar.getByText(/BOSS Zhipin/)).toBeVisible()
   await expect(radar.getByText('Greenhouse')).toHaveCount(0)
   await expect(radar.getByText('Lever')).toHaveCount(0)
   expect(discoveryRequests).toBe(0)
@@ -51,12 +58,12 @@ test('derives a resume search for BOSS Zhipin', async ({ page }, testInfo) => {
   let discoveryRequests = 0
   await page.route('**/api/jobs/discover', async (route) => { discoveryRequests += 1; await route.abort() })
 
-  await page.goto('/en/jobs')
+  await page.goto('/en/jobs/preferences')
   const radar = page.getByRole('application', { name: 'Job Agent' })
   await expect(radar.getByRole('textbox', { name: 'Target titles' })).toHaveValue('Platform Engineer')
-  await expect(radar.getByRole('list', { name: 'Agent work platforms' }).getByRole('listitem')).toHaveCount(1)
-  await expect(radar.getByRole('link', { name: 'Search BOSS Zhipin' })).toHaveAttribute('href', /query=Platform\+Engineer/)
-
+  await radar.getByRole('button', { name: 'Save profile' }).click()
+  await expect(radar.getByText('Search profile saved and current jobs rescored.')).toBeVisible()
+  await radar.getByRole('link', { name: 'Opportunities', exact: true }).click()
   await radar.getByRole('button', { name: 'Run Agent now' }).click()
   await expect(radar.getByText('The selected platforms require official search or partner access. Open their official searches below.')).toBeVisible()
   expect(discoveryRequests).toBe(0)
@@ -71,9 +78,10 @@ test('brings a user-selected platform job into Target Job without fetching the p
     await route.abort()
   })
 
-  await page.goto('/en/jobs')
+  await page.goto('/en/jobs/preferences')
   const radar = page.getByRole('application', { name: 'Job Agent' })
   await expect(radar.getByRole('textbox', { name: 'Target titles' })).toHaveValue('Platform Engineer')
+  await radar.getByText('Bring back a job', { exact: true }).click()
   await radar.getByRole('textbox', { name: 'Quick paste' }).fill(`
 Job title: Senior Platform Engineer
 Company: Example China
@@ -82,7 +90,6 @@ URL: https://www.zhipin.com/job_detail/example.html
 Job description: Build TypeScript developer platforms and improve delivery reliability.
   `)
   await radar.getByRole('button', { name: 'Parse and prefill' }).click()
-  await expect(radar.getByRole('combobox', { name: 'Source platform' })).toHaveValue('boss')
   await expect(radar.getByRole('textbox', { name: 'Official job URL' })).toHaveValue(
     'https://www.zhipin.com/job_detail/example.html'
   )
@@ -101,8 +108,9 @@ Job description: Build TypeScript developer platforms and improve delivery relia
 test('keeps the bilingual Job Agent route usable without horizontal overflow on mobile', async ({ page }, testInfo) => {
   test.skip(!testInfo.project.name.startsWith('mobile'), 'Mobile Job Agent coverage')
   await page.goto('/zh/jobs')
-  await expect(page.getByRole('heading', { name: '求职 Agent', level: 1 })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '求职概览', level: 1 })).toBeVisible()
+  await expect(page.getByRole('navigation', { name: '求职工作区导航' })).toBeVisible()
+  await page.getByRole('link', { name: '岗位', exact: true }).click()
   await expect(page.getByText('请先导入或粘贴可信简历，再进行岗位匹配。')).toBeVisible()
-  await expect(page.getByRole('group', { name: '筛选岗位' })).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()?.width ?? 0)
 })

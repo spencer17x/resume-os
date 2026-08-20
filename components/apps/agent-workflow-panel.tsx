@@ -293,7 +293,7 @@ export function AgentWorkflowPanel({
       <header><CircleHelp size={16} aria-hidden="true" /><h3>{t('noRun')}</h3></header>
       <p>{t('noRunDescription')}</p>
       <WorkflowSteps current={0} />
-      <a className="agent-workflow-panel__next" href={`/${locale}/jd-match`}>
+      <a className="agent-workflow-panel__next" href={`/${locale}/jobs/target-job`}>
         {t('openTargetJob')}<ArrowRight size={14} aria-hidden="true" />
       </a>
     </section>
@@ -302,7 +302,7 @@ export function AgentWorkflowPanel({
     return <section className="agent-workflow-panel" aria-label={t('title')}>
       <header><TriangleAlert size={16} aria-hidden="true" /><h3>{t('differentDraft')}</h3></header>
       <p>{t('differentDraftDescription')}</p>
-      <a className="agent-workflow-panel__next" href={`/${locale}/jd-match`}>
+      <a className="agent-workflow-panel__next" href={`/${locale}/jobs/target-job`}>
         {t('analyzeCurrentDraft')}<ArrowRight size={14} aria-hidden="true" />
       </a>
     </section>
@@ -386,7 +386,7 @@ export function AgentWorkflowPanel({
           {downloadProgress !== null ? <div className="resume-app-download" role="status">
             <span>{t('localModelDownload', { percentage: Math.round(downloadProgress * 100) })}</span>
             <progress aria-label={t('localModelDownloadLabel')} value={downloadProgress} max={1} />
-            <a href={`/${locale}/settings`}>
+            <a href={`/${locale}/jobs/settings`}>
               <Settings2 size={13} aria-hidden="true" />{t('openSettings')}
             </a>
           </div> : null}

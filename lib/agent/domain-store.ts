@@ -24,8 +24,23 @@ import {
   type JobSource
 } from '@/lib/jobs/job-domain'
 import { resumeDataSchema, type ResumeData } from '@/lib/resume-model'
+import {
+  bossConversationMessageSchema,
+  bossConversationThreadSchema,
+  type BossConversationMessage,
+  type BossConversationThread
+} from '@/lib/jobs/boss-conversation'
+import {
+  interviewQuestionSchema,
+  interviewReviewSchema,
+  interviewSessionSchema,
+  type InterviewQuestion,
+  type InterviewReview,
+  type InterviewSession
+} from '@/lib/jobs/interview-domain'
+export type { BossConversationMessage, BossConversationThread } from '@/lib/jobs/boss-conversation'
 
-export const DOMAIN_STORE_SCHEMA_VERSION = 2 as const
+export const DOMAIN_STORE_SCHEMA_VERSION = 4 as const
 export const DEFAULT_DOMAIN_DATABASE_NAME = 'resume-os-domain'
 
 export const DOMAIN_STORE_NAMES = [
@@ -40,7 +55,12 @@ export const DOMAIN_STORE_NAMES = [
   'jobSearchProfiles',
   'jobPostings',
   'jobRecommendations',
-  'applicationRecords'
+  'applicationRecords',
+  'bossConversationThreads',
+  'bossConversationMessages',
+  'interviewSessions',
+  'interviewQuestions',
+  'interviewReviews'
 ] as const
 
 const stableIdSchema = z.string()
@@ -137,6 +157,11 @@ export type DomainEntityMap = {
   jobPostings: JobPosting
   jobRecommendations: JobRecommendation
   applicationRecords: ApplicationRecord
+  bossConversationThreads: BossConversationThread
+  bossConversationMessages: BossConversationMessage
+  interviewSessions: InterviewSession
+  interviewQuestions: InterviewQuestion
+  interviewReviews: InterviewReview
 }
 
 export type DomainStoreName = keyof DomainEntityMap
@@ -431,6 +456,36 @@ class IndexedDbTransaction implements DomainStoreTransaction<DomainStoreName> {
       case 'applicationRecords':
         await this.assertApplicationRecordRelationships(value as ApplicationRecord)
         return
+      case 'bossConversationThreads':
+        await this.requireReferences('applicationRecords', [(value as BossConversationThread).applicationId])
+        return
+      case 'bossConversationMessages': {
+        const message = value as BossConversationMessage
+        await this.requireReferences('bossConversationThreads', [message.threadId])
+        await this.requireReferences('careerFacts', message.evidenceFactIds)
+        if (message.sourceMessageId) {
+          const [source] = await this.requireReferences('bossConversationMessages', [message.sourceMessageId])
+          if (source.threadId !== message.threadId) {
+            throw new DomainStoreError('REFERENTIAL_INTEGRITY', `BOSS follow-up ${message.id} references another conversation`)
+          }
+        }
+        return
+      }
+      case 'interviewSessions': {
+        const session = value as InterviewSession
+        const [application] = await this.requireReferences('applicationRecords', [session.applicationId])
+        await this.requireReferences('targetJobs', [session.targetJobId])
+        if (application.targetJobId !== session.targetJobId) {
+          throw new DomainStoreError('REFERENTIAL_INTEGRITY', `Interview ${session.id} does not belong to its application target job`)
+        }
+        return
+      }
+      case 'interviewQuestions':
+        await this.requireReferences('interviewSessions', [(value as InterviewQuestion).sessionId])
+        return
+      case 'interviewReviews':
+        await this.requireReferences('interviewSessions', [(value as InterviewReview).sessionId])
+        return
       default:
         return
     }
@@ -548,6 +603,9 @@ class IndexedDbTransaction implements DomainStoreTransaction<DomainStoreName> {
           || (await this.list('applicationRecords')).some(
             (application) => application.targetJobId === id
           )
+          || (await this.list('interviewSessions')).some(
+            (session) => session.targetJobId === id
+          )
         break
       case 'jobRequirements':
         referenced = Boolean(await this.get('requirementMatches', id))
@@ -573,6 +631,20 @@ class IndexedDbTransaction implements DomainStoreTransaction<DomainStoreName> {
         ) || (await this.list('applicationRecords')).some(
           (application) => application.postingId === id
         )
+        break
+      case 'bossConversationThreads':
+        referenced = (await this.list('bossConversationMessages')).some((message) => message.threadId === id)
+        break
+      case 'bossConversationMessages':
+        referenced = (await this.list('bossConversationMessages')).some((message) => message.sourceMessageId === id)
+        break
+      case 'applicationRecords':
+        referenced = (await this.list('bossConversationThreads')).some((thread) => thread.applicationId === id)
+          || (await this.list('interviewSessions')).some((session) => session.applicationId === id)
+        break
+      case 'interviewSessions':
+        referenced = (await this.list('interviewQuestions')).some((question) => question.sessionId === id)
+          || (await this.list('interviewReviews')).some((review) => review.sessionId === id)
         break
       default:
         break
@@ -645,7 +717,7 @@ function migrateDomainSchema(
 ) {
   if (
     newVersion !== DOMAIN_STORE_SCHEMA_VERSION
-    || (oldVersion !== 0 && oldVersion !== 1)
+    || (oldVersion !== 0 && oldVersion !== 1 && oldVersion !== 2 && oldVersion !== 3)
   ) {
     throw new DomainStoreError(
       'SCHEMA_MIGRATION_FAILED',
@@ -654,7 +726,9 @@ function migrateDomainSchema(
   }
 
   if (oldVersion === 0) createCoreDomainStores(database)
-  createJobDomainStores(database)
+  if (oldVersion <= 1) createJobDomainStores(database)
+  if (oldVersion <= 2) createBossConversationStores(database)
+  createInterviewStores(database)
 }
 
 function createCoreDomainStores(database: IDBDatabase) {
@@ -717,6 +791,35 @@ function createJobDomainStores(database: IDBDatabase) {
   applicationRecords.createIndex('byUpdatedAt', 'updatedAt')
 }
 
+function createBossConversationStores(database: IDBDatabase) {
+  const threads = database.createObjectStore('bossConversationThreads', { keyPath: 'id' })
+  threads.createIndex('byApplicationId', 'applicationId', { unique: true })
+  threads.createIndex('byStatus', 'status')
+  threads.createIndex('byUpdatedAt', 'updatedAt')
+
+  const messages = database.createObjectStore('bossConversationMessages', { keyPath: 'id' })
+  messages.createIndex('byThreadId', 'threadId')
+  messages.createIndex('byStatus', 'status')
+  messages.createIndex('byUpdatedAt', 'updatedAt')
+}
+
+function createInterviewStores(database: IDBDatabase) {
+  const sessions = database.createObjectStore('interviewSessions', { keyPath: 'id' })
+  sessions.createIndex('byApplicationId', 'applicationId')
+  sessions.createIndex('byTargetJobId', 'targetJobId')
+  sessions.createIndex('byStage', 'stage')
+  sessions.createIndex('byScheduledAt', 'scheduledAt')
+  sessions.createIndex('byUpdatedAt', 'updatedAt')
+
+  const questions = database.createObjectStore('interviewQuestions', { keyPath: 'id' })
+  questions.createIndex('bySessionId', 'sessionId')
+  questions.createIndex('byUpdatedAt', 'updatedAt')
+
+  const reviews = database.createObjectStore('interviewReviews', { keyPath: 'id' })
+  reviews.createIndex('bySessionId', 'sessionId')
+  reviews.createIndex('byUpdatedAt', 'updatedAt')
+}
+
 const entitySchemas: {
   [Store in DomainStoreName]: z.ZodType<DomainEntityMap[Store]>
 } = {
@@ -731,7 +834,12 @@ const entitySchemas: {
   jobSearchProfiles: jobSearchProfileSchema,
   jobPostings: jobPostingSchema,
   jobRecommendations: jobRecommendationSchema,
-  applicationRecords: applicationRecordSchema
+  applicationRecords: applicationRecordSchema,
+  bossConversationThreads: bossConversationThreadSchema,
+  bossConversationMessages: bossConversationMessageSchema,
+  interviewSessions: interviewSessionSchema,
+  interviewQuestions: interviewQuestionSchema,
+  interviewReviews: interviewReviewSchema
 }
 
 function parseEntity<Store extends DomainStoreName>(

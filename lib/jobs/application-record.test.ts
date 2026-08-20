@@ -7,15 +7,26 @@ import { fingerprintOptimizationInputs } from '@/lib/agent/workflow-persistence'
 import { normalizeResumeData } from '@/lib/resume-model'
 import type { ApplicationRecord } from './job-domain'
 import {
+  approveBossConversationMessage,
+  applyBossConversationSignal,
+  executeApprovedBossMessage,
+  executeBossResumeAttachment,
+  ensureBossFollowUpDrafts,
+  ensureBossSignalReplyDrafts,
+  verifyBossConversationRecipient
+} from './boss-conversation'
+import {
   ApplicationRecordError,
   loadApplicationPacket,
   markApplicationApplied,
   prepareApplicationPacket,
+  prepareReadyBossApplicationPackets,
   transitionApplicationRecord
 } from './application-record'
 
 const now = '2026-08-01T08:00:00.000Z'
 const later = '2026-08-01T09:00:00.000Z'
+const muchLater = '2026-08-05T09:00:00.000Z'
 const resume = normalizeResumeData({
   profile: { name: 'Ada', title: 'Engineer', summary: ['Builds systems.'], tags: [], links: [] },
   metadata: { source: 'paste', locale: 'en', updatedAt: now }
@@ -30,9 +41,9 @@ function baseRecord(): ApplicationRecord {
 
 async function readyHarness() {
   const store = createDomainStore({ databaseName: `application-${crypto.randomUUID()}`, indexedDB: new IDBFactory() })
-  const source = { id: 'source-1', kind: 'greenhouse' as const, label: 'Example', sourceKey: 'example', enabled: true, createdAt: now, updatedAt: now }
+  const source = { id: 'source-1', kind: 'manual' as const, label: 'BOSS', enabled: true, createdAt: now, updatedAt: now }
   const profile = { id: 'profile-1', name: 'Roles', titles: ['Engineer'], adjacentTitles: [], locations: [], excludedLocations: [], workplaceTypes: [], employmentTypes: [], requiredTerms: [], preferredTerms: [], excludedTerms: [], maximumAgeDays: 30, createdAt: now, updatedAt: now }
-  const posting = { id: 'posting-1', sourceId: source.id, externalId: '1', canonicalUrl: 'https://boards.greenhouse.io/example/jobs/1', applyUrl: 'https://boards.greenhouse.io/example/jobs/1', title: 'Engineer', company: 'Example', description: 'Build reliable systems.', locale: 'en' as const, firstSeenAt: now, lastCheckedAt: now, status: 'open' as const, contentHash: 'hash:posting' }
+  const posting = { id: 'posting-1', sourceId: source.id, externalId: '1', canonicalUrl: 'https://www.zhipin.com/job_detail/1.html', applyUrl: 'https://www.zhipin.com/job_detail/1.html', title: 'Engineer', company: 'Example', description: 'Build reliable systems.', locale: 'en' as const, firstSeenAt: now, lastCheckedAt: now, status: 'open' as const, contentHash: 'hash:posting' }
   const target = { id: 'target-1', title: posting.title, company: posting.company, description: posting.description, locale: 'en' as const, createdAt: now, updatedAt: now }
   const requirement = { id: 'requirement-1', jobId: target.id, text: 'Build reliable systems', category: 'experience' as const, priority: 'must' as const, weight: 5, keywords: ['reliable'], userConfirmed: true }
   const match = { requirementId: requirement.id, factIds: ['fact-1'], status: 'direct' as const, rationale: 'Verified experience.' }
@@ -77,9 +88,107 @@ describe('application records', () => {
 
   it('becomes ready only for a current posting, applied run, related variant, and current evidence inputs', async () => {
     const { store, application, workflowFingerprint } = await readyHarness()
-    const prepared = await prepareApplicationPacket({ store, recordId: application.id, resume, now: later })
+    const automatic = await prepareReadyBossApplicationPackets({
+      store, sourceDraftId: application.sourceDraftId, resume, now: () => later
+    })
+    const prepared = automatic.packets.find((packet) => packet.record.id === application.id)!
     expect(prepared.ready).toBe(true)
+    expect(automatic.preparedIds).toEqual([application.id])
     expect(prepared.record).toMatchObject({ status: 'ready-to-apply', resumeVariantId: 'variant-1', workflowInputFingerprint: workflowFingerprint })
+    const [conversationThread] = await store.list('bossConversationThreads')
+    const [conversationMessage] = await store.list('bossConversationMessages')
+    expect(conversationMessage).toMatchObject({
+      status: 'awaiting-approval', evidenceFactIds: ['fact-1']
+    })
+    expect(conversationMessage.body).toContain('Built reliable systems.')
+    const repeated = await prepareReadyBossApplicationPackets({
+      store, sourceDraftId: application.sourceDraftId, resume, now: () => later
+    })
+    expect(repeated.preparedIds).toEqual([])
+    expect(await store.list('bossConversationThreads')).toHaveLength(1)
+    expect(await store.list('bossConversationMessages')).toHaveLength(1)
+    const verifiedThread = verifyBossConversationRecipient({
+      thread: conversationThread,
+      platformRecipientId: 'boss-user-1',
+      conversationId: 'conversation-1',
+      recipientName: 'Recruiter',
+      now: later
+    })
+    await store.put('bossConversationThreads', verifiedThread)
+    const approved = await approveBossConversationMessage({
+      store, threadId: verifiedThread.id, messageId: conversationMessage.id, now: later
+    })
+    const delivered = await executeApprovedBossMessage({
+      store,
+      thread: verifiedThread,
+      message: approved,
+      now: () => later,
+      send: async ({ message, thread }) => ({
+        platformMessageId: 'platform-message-1',
+        conversationId: thread.conversationId!,
+        observedBody: message.body,
+        observedStatus: 'delivered',
+        observedRecipient: {
+          platformRecipientId: thread.platformRecipientId!,
+          conversationId: thread.conversationId!,
+          recipientName: thread.recipientName!
+        },
+        observedAt: later
+      })
+    })
+    expect(delivered).toMatchObject({ status: 'delivered', receipt: { messageId: 'platform-message-1' } })
+    const activeThread = (await store.get('bossConversationThreads', verifiedThread.id))!
+    const followUps = await ensureBossFollowUpDrafts({ store, now: muchLater })
+    expect(followUps).toHaveLength(1)
+    expect(followUps[0]).toMatchObject({ kind: 'follow-up', sourceMessageId: conversationMessage.id })
+    await expect(ensureBossFollowUpDrafts({ store, now: muchLater })).resolves.toEqual([])
+    await store.delete('bossConversationMessages', followUps[0].id)
+    const replySignal = {
+      signalId: 'fnv1a64:recruiter-reply', conversationId: 'conversation-1',
+      kind: 'recruiter-reply' as const, observedAt: later
+    }
+    const recruiterReplied = applyBossConversationSignal({ thread: activeThread, signal: replySignal, now: later })
+    await store.put('bossConversationThreads', recruiterReplied)
+    const replies = await ensureBossSignalReplyDrafts({ store, signals: [replySignal], now: later })
+    expect(replies).toHaveLength(1)
+    expect(replies[0]).toMatchObject({ kind: 'reply', sourcePlatformSignalId: replySignal.signalId })
+    await expect(ensureBossSignalReplyDrafts({ store, signals: [replySignal], now: later })).resolves.toEqual([])
+    await store.delete('bossConversationMessages', replies[0].id)
+    const resumeRequested = applyBossConversationSignal({
+      thread: recruiterReplied,
+      signal: {
+        signalId: 'fnv1a64:resume-request', conversationId: 'conversation-1',
+        kind: 'resume-request', observedAt: later
+      },
+      now: later
+    })
+    await store.put('bossConversationThreads', resumeRequested)
+    const resumeSent = await executeBossResumeAttachment({
+      store,
+      thread: resumeRequested,
+      fileName: 'ada-engineer.docx',
+      bytesBase64: 'ZG9jeA==',
+      byteLength: 4,
+      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      contentFingerprint: 'fnv1a64:docx',
+      now: () => later,
+      send: async () => ({
+        platformAttachmentId: 'attachment-1',
+        conversationId: 'conversation-1',
+        observedFileName: 'ada-engineer.docx',
+        observedMimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        observedByteLength: 4,
+        contentFingerprint: 'fnv1a64:docx',
+        observedRecipient: {
+          platformRecipientId: 'boss-user-1', conversationId: 'conversation-1', recipientName: 'Recruiter'
+        },
+        observedAt: later
+      })
+    })
+    expect(resumeSent).toMatchObject({
+      recruitmentStage: 'resume-sent',
+      resumeReceipt: { resumeVariantId: 'variant-1', platformAttachmentId: 'attachment-1' }
+    })
     const applied = await markApplicationApplied({ store, recordId: application.id, resume, now: later })
     expect(applied).toMatchObject({ status: 'applied', submittedAt: later })
   })

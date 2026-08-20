@@ -19,6 +19,12 @@ import {
   type TargetJob
 } from './domain-store'
 import { resumeDataSchema } from '@/lib/resume-model'
+import { createBossConversationThread, createBossMessageDraft } from '@/lib/jobs/boss-conversation'
+import {
+  createInterviewSession,
+  type InterviewQuestion,
+  type InterviewReview
+} from '@/lib/jobs/interview-domain'
 
 const now = '2026-07-16T08:00:00.000Z'
 
@@ -189,7 +195,7 @@ async function seedRelations(
 }
 
 describe('IndexedDbDomainStore', () => {
-  it('creates schema v2 with every required object store and relation index', async () => {
+  it('creates schema v4 with every required object store and relation index', async () => {
     const { factory, databaseName, store } = createTestStore()
     await store.list('evidenceSources')
 
@@ -209,6 +215,13 @@ describe('IndexedDbDomainStore', () => {
     expect([...transaction.objectStore('applicationRecords').indexNames]).toEqual(
       expect.arrayContaining(['byPostingId', 'bySourceDraftId', 'byStatus'])
     )
+    expect([...transaction.objectStore('bossConversationThreads').indexNames]).toContain('byApplicationId')
+    expect([...transaction.objectStore('bossConversationMessages').indexNames]).toContain('byThreadId')
+    expect([...transaction.objectStore('interviewSessions').indexNames]).toEqual(
+      expect.arrayContaining(['byApplicationId', 'byTargetJobId', 'byStage'])
+    )
+    expect([...transaction.objectStore('interviewQuestions').indexNames]).toContain('bySessionId')
+    expect([...transaction.objectStore('interviewReviews').indexNames]).toContain('bySessionId')
     database.close()
     await store.close()
   })
@@ -235,6 +248,53 @@ describe('IndexedDbDomainStore', () => {
     await store.put('jobPostings', jobPosting)
     await store.put('jobRecommendations', jobRecommendation)
     await store.put('applicationRecords', applicationRecord)
+    const thread = createBossConversationThread({ applicationId: applicationRecord.id, now })
+    const message = createBossMessageDraft({
+      threadId: thread.id, kind: 'opener', body: 'Hello', evidenceFactIds: [fact.id], now
+    })
+    await store.put('bossConversationThreads', thread)
+    await store.put('bossConversationMessages', message)
+    const session = createInterviewSession({
+      applicationId: applicationRecord.id,
+      targetJobId: targetJob.id,
+      round: 1,
+      format: 'video',
+      scheduledAt: '2026-07-18T08:00:00.000Z',
+      now
+    })
+    const question: InterviewQuestion = {
+      id: 'interview-question-1',
+      sessionId: session.id,
+      question: 'How did you measure the design system impact?',
+      userAnswer: 'We tracked adoption across five product teams.',
+      suggestedAnswer: '',
+      feedback: '',
+      tags: ['system-design'],
+      createdAt: now,
+      updatedAt: now
+    }
+    const review: InterviewReview = {
+      id: 'interview-review-1',
+      sessionId: session.id,
+      inputFingerprint: 'fnv1a64:interview-review-1',
+      summary: 'The answer used grounded evidence.',
+      strengths: ['Specific scope'],
+      gaps: ['Explain the baseline'],
+      suggestions: ['Add the before-and-after metric'],
+      prediction: {
+        outcome: 'uncertain',
+        passProbability: 0.55,
+        confidence: 0.4,
+        rationale: ['Only one answer was provided.'],
+        disclaimer: 'Advisory estimate only; the employer decides the outcome.'
+      },
+      model: 'test-model',
+      createdAt: now,
+      updatedAt: now
+    }
+    await store.put('interviewSessions', session)
+    await store.put('interviewQuestions', question)
+    await store.put('interviewReviews', review)
 
     expect(await store.get('evidenceSources', source.id)).toEqual(source)
     expect(await store.get('careerFacts', fact.id)).toEqual(fact)
@@ -248,8 +308,18 @@ describe('IndexedDbDomainStore', () => {
     expect(await store.get('jobPostings', jobPosting.id)).toEqual(jobPosting)
     expect(await store.get('jobRecommendations', jobRecommendation.id)).toEqual(jobRecommendation)
     expect(await store.get('applicationRecords', applicationRecord.id)).toEqual(applicationRecord)
+    expect(await store.get('bossConversationThreads', thread.id)).toEqual(thread)
+    expect(await store.get('bossConversationMessages', message.id)).toEqual(message)
+    expect(await store.get('interviewSessions', session.id)).toEqual(session)
+    expect(await store.get('interviewQuestions', question.id)).toEqual(question)
+    expect(await store.get('interviewReviews', review.id)).toEqual(review)
     expect(await store.list('careerFacts')).toEqual([fact])
 
+    await store.delete('interviewReviews', review.id)
+    await store.delete('interviewQuestions', question.id)
+    await store.delete('interviewSessions', session.id)
+    await store.delete('bossConversationMessages', message.id)
+    await store.delete('bossConversationThreads', thread.id)
     await store.delete('applicationRecords', applicationRecord.id)
     await store.delete('jobRecommendations', jobRecommendation.id)
     await store.delete('jobPostings', jobPosting.id)
@@ -420,7 +490,7 @@ describe('IndexedDbDomainStore', () => {
     await expectErrorCode(store.list('targetJobs'), 'OPEN_FAILED')
   })
 
-  it('migrates schema v1 records to v2 without clearing existing data', async () => {
+  it('migrates schema v1 records to v4 without clearing existing data', async () => {
     const factory = new IDBFactory()
     const databaseName = `resume-os-domain-v1-${crypto.randomUUID()}`
     const legacy = await createVersionOneDatabase(factory, databaseName)
@@ -435,6 +505,39 @@ describe('IndexedDbDomainStore', () => {
     await expect(store.list('targetJobs')).resolves.toEqual([targetJob])
     await expect(store.list('jobSources')).resolves.toEqual([])
 
+    const migrated = await openDatabase(factory, databaseName)
+    expect(migrated.version).toBe(DOMAIN_STORE_SCHEMA_VERSION)
+    expect([...migrated.objectStoreNames]).toEqual([...DOMAIN_STORE_NAMES].sort())
+    migrated.close()
+    await store.close()
+  })
+
+  it('adds BOSS conversation stores to schema v2 without clearing job data', async () => {
+    const factory = new IDBFactory()
+    const databaseName = `resume-os-domain-v2-${crypto.randomUUID()}`
+    const legacy = await createVersionTwoDatabase(factory, databaseName)
+    legacy.close()
+
+    const store = createDomainStore({ databaseName, indexedDB: factory })
+    await expect(store.list('bossConversationThreads')).resolves.toEqual([])
+    await expect(store.list('bossConversationMessages')).resolves.toEqual([])
+    const migrated = await openDatabase(factory, databaseName)
+    expect(migrated.version).toBe(DOMAIN_STORE_SCHEMA_VERSION)
+    expect([...migrated.objectStoreNames]).toEqual([...DOMAIN_STORE_NAMES].sort())
+    migrated.close()
+    await store.close()
+  })
+
+  it('adds interview stores to schema v3 without clearing conversations', async () => {
+    const factory = new IDBFactory()
+    const databaseName = `resume-os-domain-v3-${crypto.randomUUID()}`
+    const legacy = await createVersionThreeDatabase(factory, databaseName)
+    legacy.close()
+
+    const store = createDomainStore({ databaseName, indexedDB: factory })
+    await expect(store.list('interviewSessions')).resolves.toEqual([])
+    await expect(store.list('interviewQuestions')).resolves.toEqual([])
+    await expect(store.list('interviewReviews')).resolves.toEqual([])
     const migrated = await openDatabase(factory, databaseName)
     expect(migrated.version).toBe(DOMAIN_STORE_SCHEMA_VERSION)
     expect([...migrated.objectStoreNames]).toEqual([...DOMAIN_STORE_NAMES].sort())
@@ -488,6 +591,40 @@ function createVersionOneDatabase(factory: IDBFactory, name: string) {
       runs.createIndex('bySourceDraftId', 'sourceDraftId')
       runs.createIndex('byTargetJobId', 'targetJobId')
       runs.createIndex('byUpdatedAt', 'updatedAt')
+    }
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error)
+  })
+}
+
+function createVersionTwoDatabase(factory: IDBFactory, name: string) {
+  const legacyStores = DOMAIN_STORE_NAMES.filter((store) => (
+    !store.startsWith('bossConversation') && !store.startsWith('interview')
+  ))
+  return new Promise<IDBDatabase>((resolve, reject) => {
+    const request = factory.open(name, 2)
+    request.onupgradeneeded = () => {
+      for (const store of legacyStores) {
+        request.result.createObjectStore(store, {
+          keyPath: store === 'requirementMatches' ? 'requirementId' : 'id'
+        })
+      }
+    }
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error)
+  })
+}
+
+function createVersionThreeDatabase(factory: IDBFactory, name: string) {
+  const legacyStores = DOMAIN_STORE_NAMES.filter((store) => !store.startsWith('interview'))
+  return new Promise<IDBDatabase>((resolve, reject) => {
+    const request = factory.open(name, 3)
+    request.onupgradeneeded = () => {
+      for (const store of legacyStores) {
+        request.result.createObjectStore(store, {
+          keyPath: store === 'requirementMatches' ? 'requirementId' : 'id'
+        })
+      }
     }
     request.onsuccess = () => resolve(request.result)
     request.onerror = () => reject(request.error)

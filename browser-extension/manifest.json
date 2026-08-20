@@ -3,7 +3,7 @@
   "name": "Resume OS Browser Agent",
   "version": "0.1.0",
   "description": "Local browser bridge for Resume OS job-platform sessions.",
-  "permissions": ["tabs"],
+  "permissions": ["tabs", "alarms", "storage", "notifications"],
   "host_permissions": [
     "https://www.zhipin.com/*"
   ],
@@ -23,7 +23,9 @@
         "https://www.zhipin.com/*"
       ],
       "js": ["platform-probe.js"],
-      "run_at": "document_idle"
+      "run_at": "document_idle",
+      "all_frames": true,
+      "match_about_blank": true
     }
   ]
 }

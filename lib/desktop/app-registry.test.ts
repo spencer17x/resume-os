@@ -29,6 +29,14 @@ describe('app registry', () => {
     expect(appIdFromPath('/zh/projects//extra')).toBeNull()
   })
 
+  it('keeps nested Job Agent routes inside the jobs application', () => {
+    for (const section of ['opportunities', 'resumes', 'conversations', 'applications', 'interviews', 'activity', 'preferences', 'profile', 'target-job', 'settings']) {
+      expect(appIdFromPath(`/zh/jobs/${section}`)).toBe('jobs')
+      expect(appIdFromPath(`/en/jobs/${section}/`)).toBe('jobs')
+    }
+    expect(appIdFromPath('/zh/jobs/opportunities/extra')).toBeNull()
+  })
+
   it('defines valid window constraints for every app', () => {
     for (const app of Object.values(appRegistry)) {
       expect(app.defaultSize.width).toBeGreaterThanOrEqual(app.minSize.width)

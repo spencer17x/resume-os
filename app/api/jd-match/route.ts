@@ -28,7 +28,7 @@ export function createJdMatchRoute(dependencies: {
     })
     if (guard) return guard
 
-    let input: { jd?: unknown; locale?: unknown; resume?: unknown }
+    let input: { jd?: unknown; locale?: unknown; resume?: unknown; targetIdentity?: unknown }
     try {
       input = await readLimitedJson(request, MAX_JD_BODY_BYTES)
     } catch (error) {
@@ -40,6 +40,12 @@ export function createJdMatchRoute(dependencies: {
     }
 
     const locale = typeof input.locale === 'string' && isLocale(input.locale) ? input.locale : 'zh'
+    const targetIdentity = input.targetIdentity === undefined
+      ? undefined
+      : typeof input.targetIdentity === 'string' && input.targetIdentity.trim().length > 0 && input.targetIdentity.length <= 160
+        ? input.targetIdentity.trim()
+        : null
+    if (targetIdentity === null) return apiErrorResponse('INVALID_REQUEST', 400)
     let resume: ResumeData | undefined
     if (Object.hasOwn(input, 'resume')) {
       try {
@@ -67,7 +73,8 @@ export function createJdMatchRoute(dependencies: {
         report: sections,
         jobDescription: input.jd,
         locale,
-        resume: activeResume
+        resume: activeResume,
+        targetIdentity
       })
       return Response.json({ report, sections, locale, model, ...analysis })
     } catch (error) {
