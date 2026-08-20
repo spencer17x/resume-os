@@ -26,6 +26,14 @@ export const browserBossJobSchema = z.object({
 
 export type BrowserBossJob = z.infer<typeof browserBossJobSchema>
 
+export const browserBossJobDetailSchema = z.object({
+  externalId: z.string().trim().min(1).max(300),
+  url: z.url().max(2_000),
+  description: z.string().trim().min(40).max(50_000)
+}).strict()
+
+export type BrowserBossJobDetail = z.infer<typeof browserBossJobDetailSchema>
+
 export const browserBossRecipientSchema = z.object({
   platformRecipientId: z.string().trim().min(1).max(500),
   conversationId: z.string().trim().min(1).max(500),
@@ -111,6 +119,7 @@ export const browserAgentResponseSchema = z.object({
   extensionVersion: z.string().min(1).max(40).optional(),
   sessions: z.array(browserPlatformSessionSchema).max(JOB_AGENT_PLATFORM_IDS.length).optional(),
   jobs: z.array(browserBossJobSchema).max(50).optional(),
+  jobDetail: browserBossJobDetailSchema.optional(),
   recipient: browserBossRecipientSchema.optional(),
   sendReceipt: browserBossSendReceiptSchema.optional(),
   conversationSignals: z.array(browserBossConversationSignalSchema).max(100).optional(),
@@ -133,6 +142,24 @@ export async function collectBossBrowserJobs(input: {
   timeoutMs?: number
 }): Promise<BrowserAgentResponse> {
   return requestBrowserAgent({ ...input, action: 'collect-boss-jobs' })
+}
+
+export async function collectBossJobDetail(input: {
+  window: Pick<Window, 'addEventListener' | 'removeEventListener' | 'dispatchEvent'>
+  url: string
+  timeoutMs?: number
+}): Promise<BrowserAgentResponse> {
+  const url = new URL(input.url)
+  if (url.protocol !== 'https:' || url.hostname !== 'www.zhipin.com' || !/^\/job_detail\/[^/]+\.html$/u.test(url.pathname)) {
+    throw new TypeError('BOSS job detail URL is invalid')
+  }
+  url.hash = ''
+  return requestBrowserAgent({
+    window: input.window,
+    timeoutMs: input.timeoutMs ?? 15_000,
+    action: 'collect-boss-job-detail',
+    payload: { url: url.toString() }
+  })
 }
 
 export async function searchBossBrowserJobs(input: {
@@ -259,7 +286,7 @@ export async function configureBrowserJobAgent(input: {
 async function requestBrowserAgent(input: {
   window: Pick<Window, 'addEventListener' | 'removeEventListener' | 'dispatchEvent'>
   timeoutMs?: number
-  action: 'detect-platforms' | 'collect-boss-jobs' | 'search-boss-jobs' | 'inspect-boss-conversation' | 'collect-boss-conversation-signals' | 'diagnose-boss-adapter' | 'send-boss-message' | 'send-boss-resume-attachment' | 'configure-job-agent'
+  action: 'detect-platforms' | 'collect-boss-jobs' | 'collect-boss-job-detail' | 'search-boss-jobs' | 'inspect-boss-conversation' | 'collect-boss-conversation-signals' | 'diagnose-boss-adapter' | 'send-boss-message' | 'send-boss-resume-attachment' | 'configure-job-agent'
   payload?: Record<string, unknown>
 }): Promise<BrowserAgentResponse> {
   const requestId = crypto.randomUUID()

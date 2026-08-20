@@ -25,7 +25,11 @@ describe('job agent policy', () => {
   })
 
   it('starts paused with only BOSS Zhipin selected and no platform-specific setup', () => {
-    expect(DEFAULT_JOB_AGENT_PREFERENCES).toMatchObject({ enabled: false, autonomy: 'autopilot' })
+    expect(DEFAULT_JOB_AGENT_PREFERENCES).toMatchObject({
+      enabled: false,
+      autonomy: 'approval',
+      autoSendResume: false
+    })
     expect(DEFAULT_JOB_AGENT_PREFERENCES.platforms).toEqual(['boss'])
   })
 
@@ -43,5 +47,10 @@ describe('job agent policy', () => {
     expect(canExecuteJobAgentAction({ action: 'send-message', preferences })).toBe(false)
     expect(canExecuteJobAgentAction({ action: 'send-message', preferences, connectorAuthorized: true })).toBe(true)
     expect(canExecuteJobAgentAction({ action: 'submit-application', preferences })).toBe(false)
+    expect(canExecuteJobAgentAction({
+      action: 'submit-application',
+      preferences,
+      connectorAuthorized: true
+    })).toBe(false)
   })
 })

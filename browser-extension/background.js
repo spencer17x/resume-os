@@ -39,6 +39,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     })).catch(() => sendResponse({ requestId: message.requestId, ok: false, error: 'PROBE_FAILED' }))
     return true
   }
+  if (message.action === 'collect-boss-job-detail') {
+    const url = validBossJobDetailUrl(message.payload?.url)
+    if (!url) {
+      sendResponse({ requestId: message.requestId, ok: false, error: 'INVALID_REQUEST' })
+      return false
+    }
+    collectBossJobDetail(url).then((jobDetail) => sendResponse({
+      requestId: message.requestId,
+      ok: Boolean(jobDetail),
+      extensionVersion: chrome.runtime.getManifest().version,
+      ...(jobDetail ? { jobDetail } : { error: 'PROBE_FAILED' })
+    })).catch(() => sendResponse({ requestId: message.requestId, ok: false, error: 'PROBE_FAILED' }))
+    return true
+  }
   if (message.action === 'search-boss-jobs') {
     const query = typeof message.payload?.query === 'string' ? message.payload.query.normalize('NFKC').trim() : ''
     if (!query || query.length > 120) {
@@ -194,6 +208,40 @@ async function searchBossJobs(query) {
     await waitForTabComplete(tab.id, 12_000)
     await new Promise((resolve) => setTimeout(resolve, 800))
     return collectJobsFromTab(tab.id)
+  } finally {
+    bossFrameIds.delete(tab.id)
+    await chrome.tabs.remove(tab.id).catch(() => undefined)
+  }
+}
+
+function validBossJobDetailUrl(value) {
+  if (typeof value !== 'string' || value.length > 2_000) return null
+  try {
+    const url = new URL(value)
+    if (url.protocol !== 'https:' || url.hostname !== 'www.zhipin.com' || !/^\/job_detail\/[^/]+\.html$/u.test(url.pathname)) return null
+    url.hash = ''
+    return url.toString()
+  } catch {
+    return null
+  }
+}
+
+async function collectBossJobDetail(url) {
+  const tab = await chrome.tabs.create({ url, active: false })
+  if (!tab.id) return null
+  try {
+    await waitForTabComplete(tab.id, 12_000)
+    await new Promise((resolve) => setTimeout(resolve, 800))
+    const frameIds = [...new Set([0, ...(bossFrameIds.get(tab.id) ?? [])])]
+    for (const frameId of frameIds) {
+      try {
+        const response = await chrome.tabs.sendMessage(tab.id, { action: 'collect-boss-job-detail' }, { frameId })
+        if (response?.jobDetail) return response.jobDetail
+      } catch {
+        // Continue to the next registered frame.
+      }
+    }
+    return null
   } finally {
     bossFrameIds.delete(tab.id)
     await chrome.tabs.remove(tab.id).catch(() => undefined)

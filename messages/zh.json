@@ -592,6 +592,7 @@
     "confirmReset": "确认重置",
     "cancel": "取消",
     "providerPreference": "AI 模式",
+    "providerPreferenceLoading": "正在读取已保存的 AI 模式…",
     "providerPreferenceDescription": "选择使用本地 Chrome AI、你自己配置的 AI，或让系统按隐私偏好自动选择。",
     "providerPrivacyNote": "所有 AI 功能都统一使用这里已保存的选择。Chrome Built-in AI 会在此设备运行受支持的任务；云端任务使用已保存的 Base URL 和模型，并只发送该任务所需的上下文。",
     "providers": {
@@ -1057,6 +1058,7 @@
       "platformRequired": "请至少选择一个招聘平台。",
       "importJob": "请填写完整岗位信息，并确认 HTTPS 链接属于所选招聘平台。",
       "clipboardJob": "请粘贴不超过 100,000 个字符的岗位分享内容或职位描述。",
+      "jobDetail": "未能从 BOSS 读取完整岗位职责，已停止生成岗位简历。请保持登录后重试。",
       "promotion": "无法安全地把岗位交给目标岗位工作流，请刷新后重试。",
       "packet": "申请材料尚未就绪，请检查未通过的项目并刷新过期输入。",
       "applicationSave": "无法更新本地申请记录。",

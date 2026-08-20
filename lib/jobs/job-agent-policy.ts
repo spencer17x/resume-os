@@ -45,13 +45,13 @@ export type JobAgentPreferences = z.infer<typeof jobAgentPreferencesSchema>
 export const DEFAULT_JOB_AGENT_PREFERENCES: JobAgentPreferences = {
   version: 1,
   enabled: false,
-  autonomy: 'autopilot',
+  autonomy: 'approval',
   platforms: [...JOB_AGENT_PLATFORM_IDS],
   learnFromReplies: true,
   learnFromOutcomes: true,
   minimumMatchScore: 70,
   dailyContactLimit: 20,
-  autoSendResume: true
+  autoSendResume: false
 }
 
 export const JOB_AGENT_PREFERENCES_KEY = 'resume-os:job-agent-preferences:v1'
@@ -86,5 +86,6 @@ export function canExecuteJobAgentAction(input: {
   if (!input.preferences.enabled || input.preferences.platforms.length === 0) return false
   if (input.action === 'discover') return true
   if (input.action === 'draft-message') return input.preferences.autonomy !== 'copilot'
+  if (input.action === 'submit-application') return false
   return input.preferences.autonomy === 'autopilot' && input.connectorAuthorized === true
 }

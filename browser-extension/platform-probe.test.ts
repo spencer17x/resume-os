@@ -44,6 +44,56 @@ describe('BOSS page send adapter', () => {
     })])
   })
 
+  it('collects a bounded full description only from a BOSS detail page', async () => {
+    document.body.innerHTML = `<section class="job-sec"><h3>职位描述</h3><div class="job-sec-text">负责 AI Agent 产品的 TypeScript 全栈研发、工具调用编排、质量验证和线上稳定性建设。</div></section>`
+    let listener: ((message: unknown, sender: unknown, respond: (value: unknown) => void) => boolean) | undefined
+    const chrome = {
+      runtime: {
+        onMessage: { addListener: (value: typeof listener) => { listener = value } },
+        sendMessage: async () => undefined
+      }
+    }
+    runInNewContext(readFileSync('browser-extension/platform-probe.js', 'utf8'), {
+      chrome, document, location: new URL('https://www.zhipin.com/job_detail/job-1.html'), URL,
+      Element, HTMLTextAreaElement, HTMLInputElement, InputEvent, Event, TextEncoder, BigInt, Date, Promise,
+      setTimeout, clearTimeout
+    })
+    const response = await new Promise<{ jobDetail: Record<string, unknown> | null }>((resolve) => {
+      listener?.({ action: 'collect-boss-job-detail' }, {}, (value) => resolve(value as { jobDetail: Record<string, unknown> | null }))
+    })
+    expect(response.jobDetail).toEqual(expect.objectContaining({
+      externalId: 'job-1',
+      description: expect.stringContaining('TypeScript 全栈研发')
+    }))
+  })
+
+  it('derives a stable visible identity when the current BOSS chat omits legacy data ids', async () => {
+    document.body.innerHTML = `
+      <section class="chat-conversation">
+        <header><span>招聘经理</span><span>HR</span></header>
+        <div class="job-card">平台工程师 25-40K 上海</div>
+        <div class="message-controls"><div id="chat-input" contenteditable="true"></div><button>发送</button></div>
+      </section>`
+    let listener: ((message: unknown, sender: unknown, respond: (value: unknown) => void) => boolean) | undefined
+    const chrome = {
+      runtime: {
+        onMessage: { addListener: (value: typeof listener) => { listener = value } },
+        sendMessage: async () => undefined
+      }
+    }
+    runInNewContext(readFileSync('browser-extension/platform-probe.js', 'utf8'), {
+      chrome, document, location: new URL('https://www.zhipin.com/web/geek/chat'), URL,
+      Element, HTMLTextAreaElement, HTMLInputElement, InputEvent, Event, TextEncoder, BigInt, Date, Promise,
+      setTimeout, clearTimeout
+    })
+    const recipient = await new Promise<Record<string, string> | null>((resolve) => {
+      listener?.({ action: 'inspect-boss-conversation' }, {}, (value) => resolve((value as { recipient: Record<string, string> | null }).recipient))
+    })
+    expect(recipient).toMatchObject({ recipientName: '招聘经理', recipientTitle: 'HR' })
+    expect(recipient?.platformRecipientId).toMatch(/^visible:fnv1a64:/u)
+    expect(recipient?.conversationId).toMatch(/^visible:fnv1a64:/u)
+  })
+
   it('sends only the exact approved body to the exact verified recipient and returns a receipt', async () => {
     let listener: ((message: unknown, sender: unknown, respond: (value: unknown) => void) => boolean) | undefined
     const chrome = {

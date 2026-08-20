@@ -45,6 +45,34 @@ describe('browser agent protocol', () => {
     })
   })
 
+  it('requests a full BOSS detail using only an allowlisted canonical URL', async () => {
+    const target = new EventTarget()
+    target.addEventListener(BROWSER_AGENT_REQUEST_EVENT, (event) => {
+      const request = (event as CustomEvent<{ requestId: string; action: string; payload: { url: string } }>).detail
+      if (request.action !== 'collect-boss-job-detail') return
+      expect(request.payload.url).toBe('https://www.zhipin.com/job_detail/abc.html')
+      target.dispatchEvent(new CustomEvent(BROWSER_AGENT_RESPONSE_EVENT, { detail: {
+        requestId: request.requestId,
+        ok: true,
+        jobDetail: {
+          externalId: 'abc',
+          url: request.payload.url,
+          description: '负责 TypeScript AI Agent 平台研发、质量验证和线上稳定性建设。'
+        }
+      } }))
+    })
+    const { collectBossJobDetail } = await import('./browser-agent-protocol')
+    await expect(collectBossJobDetail({
+      window: target as Window,
+      url: 'https://www.zhipin.com/job_detail/abc.html#detail',
+      timeoutMs: 50
+    })).resolves.toMatchObject({ jobDetail: { externalId: 'abc' } })
+    await expect(collectBossJobDetail({
+      window: target as Window,
+      url: 'https://www.zhipin.com.evil.example/job_detail/abc.html'
+    })).rejects.toThrow()
+  })
+
   it('validates a BOSS recipient only when all platform identities are present', async () => {
     const target = new EventTarget()
     target.addEventListener(BROWSER_AGENT_REQUEST_EVENT, (event) => {

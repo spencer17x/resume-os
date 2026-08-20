@@ -592,6 +592,7 @@
     "confirmReset": "Confirm reset",
     "cancel": "Cancel",
     "providerPreference": "AI mode",
+    "providerPreferenceLoading": "Loading the saved AI mode…",
     "providerPreferenceDescription": "Choose local Chrome AI, your own configured AI, or automatic routing that follows your privacy preference.",
     "providerPrivacyNote": "All AI features use the saved selection. Chrome Built-in AI runs supported tasks on this device. Cloud tasks use the saved Base URL and model, and send only the context required for that task.",
     "providers": {
@@ -1057,6 +1058,7 @@
       "platformRequired": "Select at least one job platform.",
       "importJob": "Check that all required job fields are filled and the HTTPS URL belongs to the selected platform.",
       "clipboardJob": "Paste a non-empty job share or description no larger than 100,000 characters.",
+      "jobDetail": "The complete BOSS job description could not be read, so resume tailoring was stopped. Stay signed in and try again.",
       "promotion": "This job could not be handed to Target Job safely. Refresh and try again.",
       "packet": "The application packet is not ready. Review the failed checks and refresh stale inputs.",
       "applicationSave": "The local application record could not be updated.",

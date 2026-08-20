@@ -127,7 +127,7 @@ describe('SettingsApp', () => {
       allowCloudFallback: true
     })
 
-    fireEvent.click(screen.getByRole('radio', { name: /Local Chrome AI/ }))
+    fireEvent.click(await screen.findByRole('radio', { name: /Local Chrome AI/ }))
     expect(screen.queryByRole('checkbox', { name: /Allow explicit cloud fallback/ })).not.toBeInTheDocument()
     expect(screen.queryByLabelText('API Key')).not.toBeInTheDocument()
     expect(readAiProviderPreference()).toEqual({
@@ -140,6 +140,15 @@ describe('SettingsApp', () => {
       apiKey: 'existing-secret',
       rememberApiKey: false
     })
+  })
+
+  it('does not render a misleading default provider before stored preferences load', async () => {
+    saveAiProviderPreference({ mode: 'openai-compatible', allowCloudFallback: false })
+    renderSettings()
+
+    expect(screen.getByRole('status')).toHaveTextContent('Loading the saved AI mode')
+    expect(screen.queryByRole('radio', { name: /Local Chrome AI/ })).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('radio', { name: /Self-configured AI/ })).toBeChecked())
   })
 
   it('runs a real local prompt when Local Chrome AI is selected', async () => {
@@ -156,7 +165,7 @@ describe('SettingsApp', () => {
     vi.stubGlobal('LanguageModel', { availability, create })
     renderSettings()
 
-    fireEvent.click(screen.getByRole('radio', { name: /Local Chrome AI/ }))
+    fireEvent.click(await screen.findByRole('radio', { name: /Local Chrome AI/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Check selected AI' }))
 
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Local Chrome AI (Beta) · browser-managed'))
@@ -185,7 +194,7 @@ describe('SettingsApp', () => {
     vi.stubGlobal('LanguageModel', { availability, create })
     renderSettings('zh')
 
-    fireEvent.click(screen.getByRole('radio', { name: /本地 Chrome AI/ }))
+    fireEvent.click(await screen.findByRole('radio', { name: /本地 Chrome AI/ }))
     fireEvent.click(screen.getByRole('button', { name: '检查当前 AI' }))
 
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(
@@ -210,7 +219,7 @@ describe('SettingsApp', () => {
   it('distinguishes a missing Chrome Prompt API from language or model unavailability', async () => {
     renderSettings()
 
-    fireEvent.click(screen.getByRole('radio', { name: /Local Chrome AI/ }))
+    fireEvent.click(await screen.findByRole('radio', { name: /Local Chrome AI/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Check selected AI' }))
 
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(
@@ -242,7 +251,7 @@ describe('SettingsApp', () => {
     }))
     renderSettings()
 
-    fireEvent.click(screen.getByRole('radio', { name: /Self-configured AI/ }))
+    fireEvent.click(await screen.findByRole('radio', { name: /Self-configured AI/ }))
     fireEvent.change(screen.getByLabelText('API Base URL'), {
       target: { value: 'https://api.deepseek.com' }
     })

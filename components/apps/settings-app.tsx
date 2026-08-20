@@ -80,6 +80,7 @@ function SettingsContent() {
   const [providerPreference, setProviderPreference] = useState<AiProviderPreference>(
     DEFAULT_AI_PROVIDER_PREFERENCE
   )
+  const [providerPreferenceLoaded, setProviderPreferenceLoaded] = useState(false)
   const [diagnosticState, setDiagnosticState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [diagnosticMessage, setDiagnosticMessage] = useState('')
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null)
@@ -89,6 +90,7 @@ function SettingsContent() {
     const timeout = window.setTimeout(() => {
       setAiConfig(readBrowserAiConfig())
       setProviderPreference(readAiProviderPreference())
+      setProviderPreferenceLoaded(true)
     }, 0)
     return () => window.clearTimeout(timeout)
   }, [])
@@ -373,7 +375,8 @@ function SettingsContent() {
           <p>{t('providerPreferenceDescription')}</p>
           <p className="settings-app__privacy-note"><KeyRound size={12} aria-hidden="true" />{t('providerPrivacyNote')}</p>
         </div>
-        <div className="settings-app__provider-config">
+        <div className="settings-app__provider-config" aria-busy={!providerPreferenceLoaded}>
+          {!providerPreferenceLoaded ? <p role="status">{t('providerPreferenceLoading')}</p> : <>
           <div className="settings-app__provider-options" role="radiogroup" aria-label={t('providerPreference')}>
             {providerOptions.map((option) => <label key={option.mode} data-selected={providerPreference.mode === option.mode}>
               <input
@@ -403,10 +406,11 @@ function SettingsContent() {
           </label> : null}
 
           <p className="settings-app__provider-boundary">{t('chromeLanguageBoundary')}</p>
+          </>}
         </div>
       </section>
 
-      {providerPreference.mode !== 'chrome-built-in' ? <section className="settings-app__ai-section" aria-labelledby="settings-ai-provider">
+      {providerPreferenceLoaded && providerPreference.mode !== 'chrome-built-in' ? <section className="settings-app__ai-section" aria-labelledby="settings-ai-provider">
         <div className="settings-app__section-copy">
           <h2 id="settings-ai-provider">{t('aiProvider')}</h2>
           <p>{t('aiProviderDescription')}</p>

@@ -66,6 +66,7 @@ import { importMarketplaceJob } from '@/lib/jobs/manual-job-import'
 import { parseJobClipboardText } from '@/lib/jobs/job-clipboard-import'
 import {
   collectBossBrowserJobs,
+  collectBossJobDetail,
   collectBossConversationSignals,
   configureBrowserJobAgent,
   detectBrowserAgentSessions,
@@ -870,12 +871,60 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
       return
     }
     try {
+      let promotionPosting = posting
+      let promotionRecommendation = recommendation
+      if (posting.sourceId === 'job-source-boss-browser') {
+        const response = await collectBossJobDetail({ window, url: posting.canonicalUrl, timeoutMs: 15_000 })
+        const detail = response.jobDetail
+        if (!response.ok || !detail || detail.externalId !== posting.externalId) {
+          setError(t('errors.jobDetail'))
+          return
+        }
+        const now = new Date().toISOString()
+        promotionPosting = {
+          ...posting,
+          description: detail.description,
+          canonicalUrl: detail.url,
+          applyUrl: detail.url,
+          lastCheckedAt: now,
+          contentHash: createJobInputFingerprint({
+            title: posting.title,
+            company: posting.company,
+            description: detail.description,
+            location: posting.location,
+            compensation: posting.compensation
+          })
+        }
+        const profile = profiles[0]
+        if (!profile) {
+          setError(t('errors.invalidProfile'))
+          return
+        }
+        const facts = (await store.list('careerFacts')).filter((fact) => (
+          fact.evidenceRefs.includes(careerEvidenceSourceId(activeDraft.id))
+        ))
+        promotionRecommendation = {
+          ...scoreJobRecommendation({
+            posting: promotionPosting,
+            profile,
+            sourceDraftId: activeDraft.id,
+            facts,
+            now
+          }),
+          decision: recommendation.decision,
+          createdAt: recommendation.createdAt
+        }
+        await store.transaction(['jobPostings', 'jobRecommendations'], 'readwrite', async (transaction) => {
+          await transaction.put('jobPostings', promotionPosting)
+          await transaction.put('jobRecommendations', promotionRecommendation)
+        })
+      }
       saveJobPromotionIntent(createJobPromotionIntent({
-        posting,
-        recommendation,
+        posting: promotionPosting,
+        recommendation: promotionRecommendation,
         sourceDraftId: activeDraft.id
       }))
-      await decide(recommendation, 'saved')
+      await decide(promotionRecommendation, 'saved')
       navigateJobWorkspace(locale, '/jobs/target-job')
     } catch {
       setError(t('errors.promotion'))

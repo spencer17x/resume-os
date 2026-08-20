@@ -7,6 +7,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     sendResponse({ jobs: collectBossJobs() })
     return false
   }
+  if (message?.action === 'collect-boss-job-detail') {
+    sendResponse({ jobDetail: collectBossJobDetail() })
+    return false
+  }
   if (message?.action === 'inspect-boss-conversation') {
     sendResponse({ recipient: inspectBossConversation() })
     return false
@@ -44,13 +48,17 @@ function diagnoseBossAdapter() {
     : /\/web\/geek\/job|\/job_detail\//u.test(location.pathname)
       ? 'search'
       : 'other'
+  const visibleIdentity = visibleConversationIdentity()
+  const explicitRecipientIdentities = visibleMatches('[data-boss-id], [data-uid], [data-recruiter-id], [data-geek-id]').length
+  const explicitConversationIdentities = visibleMatches('[data-conversation-id], [data-lid], [data-chat-id]').length
+  const explicitRecipientNames = visibleMatches('[class*="chat-name"], [class*="boss-name"], [class*="recipient-name"]').length
   const counts = {
     jobLinks: document.querySelectorAll('a[href*="/job_detail/"]').length,
     editors: visibleMatches('[contenteditable="true"], textarea[placeholder*="消息"], textarea[placeholder*="沟通"]').length,
     sendControls: visibleMatches('button, [role="button"]', (element) => element.textContent?.trim() === '发送').length,
-    recipientIdentities: visibleMatches('[data-boss-id], [data-uid], [data-recruiter-id], [data-geek-id]').length,
-    conversationIdentities: visibleMatches('[data-conversation-id], [data-lid], [data-chat-id]').length,
-    recipientNames: visibleMatches('[class*="chat-name"], [class*="boss-name"], [class*="recipient-name"]').length,
+    recipientIdentities: explicitRecipientIdentities || (visibleIdentity ? 1 : 0),
+    conversationIdentities: explicitConversationIdentities || (visibleIdentity ? 1 : 0),
+    recipientNames: explicitRecipientNames || (visibleIdentity ? 1 : 0),
     docxInputs: [...document.querySelectorAll('input[type="file"]')].filter((input) => {
       const accept = input.getAttribute('accept')?.toLocaleLowerCase() ?? ''
       return accept.includes('docx') || accept.includes('wordprocessingml')
@@ -128,18 +136,53 @@ function conversationContext() {
   const conversationId = conversationNode?.getAttribute('data-conversation-id')
     || conversationNode?.getAttribute('data-lid')
     || conversationNode?.getAttribute('data-chat-id')
-  const recipientName = nameNode?.textContent?.trim()
-  if (!platformRecipientId || !conversationId || !recipientName) return null
+  const visibleIdentity = visibleConversationIdentity()
+  const recipientName = nameNode?.textContent?.trim() || visibleIdentity?.recipientName
+  const resolvedPlatformRecipientId = platformRecipientId || visibleIdentity?.platformRecipientId
+  const resolvedConversationId = conversationId || visibleIdentity?.conversationId
+  if (!resolvedPlatformRecipientId || !resolvedConversationId || !recipientName) return null
   const titleNode = uniqueVisible('[class*="boss-title"], [class*="recipient-title"], [class*="chat-position"]')
   return {
     editor,
     sendButton,
     recipient: {
-      platformRecipientId: platformRecipientId.slice(0, 500),
-      conversationId: conversationId.slice(0, 500),
+      platformRecipientId: resolvedPlatformRecipientId.slice(0, 500),
+      conversationId: resolvedConversationId.slice(0, 500),
       recipientName: recipientName.slice(0, 300),
-      ...(titleNode?.textContent?.trim() ? { recipientTitle: titleNode.textContent.trim().slice(0, 300) } : {})
+      ...(titleNode?.textContent?.trim()
+        ? { recipientTitle: titleNode.textContent.trim().slice(0, 300) }
+        : visibleIdentity?.recipientTitle
+          ? { recipientTitle: visibleIdentity.recipientTitle.slice(0, 300) }
+          : {})
     }
+  }
+}
+
+function visibleConversationIdentity() {
+  const root = uniqueVisible('.chat-conversation')
+  if (!root) return null
+  const controls = root.querySelector('.message-controls, [class*="message-controls"], [class*="chat-editor"]')
+  const header = [...root.children].find((element) => {
+    if (controls && (element === controls || element.contains(controls))) return false
+    const text = element.textContent?.replace(/\s+/gu, ' ').trim() ?? ''
+    return text.length >= 2 && text.length <= 160 && !/按Enter键发送|发简历|换电话|换微信/u.test(text)
+  })
+  if (!header) return null
+  const labels = [...header.querySelectorAll('*')].flatMap((element) => {
+    if (element.children.length > 0) return []
+    const text = element.textContent?.replace(/\s+/gu, ' ').trim() ?? ''
+    return text.length >= 2 && text.length <= 80 ? [text] : []
+  }).filter((value, index, values) => values.indexOf(value) === index)
+  const recipientName = labels[0] || header.textContent?.replace(/\s+/gu, ' ').trim()
+  if (!recipientName || recipientName.length > 300) return null
+  const recipientTitle = labels[1]
+  const jobNode = root.querySelector('[class*="job"], [class*="position"]')
+  const jobContext = jobNode?.textContent?.replace(/\s+/gu, ' ').trim().slice(0, 500) ?? ''
+  return {
+    platformRecipientId: `visible:${fingerprint({ recipientName })}`,
+    conversationId: `visible:${fingerprint({ recipientName, recipientTitle, jobContext })}`,
+    recipientName,
+    ...(recipientTitle ? { recipientTitle } : {})
   }
 }
 
@@ -337,6 +380,27 @@ function collectBossJobs() {
     seen.add(externalId)
     return [{ externalId, url: url.toString(), title: title.slice(0, 300), company: company.slice(0, 300), summary, ...(locationText ? { location: locationText.slice(0, 500) } : {}), ...(salary ? { minimumMonthlySalary: Math.round(Number(salary[1]) * 1_000), maximumMonthlySalary: Math.round(Number(salary[2]) * 1_000) } : {}) }]
   }).slice(0, 50)
+}
+
+function collectBossJobDetail() {
+  if (!location.hostname.endsWith('zhipin.com')) return null
+  const externalId = /\/job_detail\/([^/.?]+)/u.exec(location.pathname)?.[1]
+  if (!externalId) return null
+  const direct = [...document.querySelectorAll([
+    '.job-sec-text',
+    '[class*="job-sec-text"]',
+    '[class*="job-detail-content"]',
+    '[class*="job-description"]'
+  ].join(','))].map((element) => element.textContent?.replace(/\s+/gu, ' ').trim() ?? '')
+    .filter((value) => value.length >= 40)
+    .sort((left, right) => right.length - left.length)[0]
+  const heading = [...document.querySelectorAll('h1, h2, h3, h4, strong, span')]
+    .find((element) => element.textContent?.trim() === '职位描述')
+  const section = heading?.closest('section, article, [class*="job-sec"], [class*="job-detail"]')
+  const fallback = section?.textContent?.replace(/\s+/gu, ' ').trim().replace(/^职位描述\s*/u, '') ?? ''
+  const description = (direct || fallback).slice(0, 50_000)
+  if (description.length < 40) return null
+  return { externalId, url: location.href, description }
 }
 
 function detectSessionState() {
