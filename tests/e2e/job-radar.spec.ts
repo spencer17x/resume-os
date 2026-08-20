@@ -34,6 +34,9 @@ test('uses the Job Agent backend as the localized product root', async ({ page }
   await expect(page).toHaveURL(/\/zh\/jobs$/u)
   await expect(page.getByRole('application', { name: '求职 Agent' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '求职概览', level: 1 })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '请先完成求职设置' })).toBeVisible()
+  await expect(page.getByRole('link', { name: '开始设置' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '暂停' })).toHaveCount(0)
   await expect(page.locator('.desktop-shell, .mobile-home, .desktop-dock')).toHaveCount(0)
 })
 

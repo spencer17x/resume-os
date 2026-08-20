@@ -94,6 +94,7 @@ function renderRadar(options: {
 afterEach(async () => {
   cleanup()
   mockPathname = '/jobs'
+  window.localStorage.clear()
   await Promise.all(stores.splice(0).map((store) => store.close()))
 })
 
@@ -148,13 +149,14 @@ describe('JobRadarApp', () => {
     })
   })
 
-  it('defaults to zero-configuration automation and keeps unconnected messaging draft-only', async () => {
+  it('requires saved job requirements before the Agent can start', async () => {
     const store = createStore()
     renderRadar({ store, storage: trustedStorage() })
 
-    expect(await screen.findByRole('heading', { name: 'Agent is ready' })).toBeVisible()
+    expect(await screen.findByRole('heading', { name: 'Complete job setup first' })).toBeVisible()
     expect(screen.getByRole('navigation', { name: 'Job workspace navigation' }).querySelectorAll('a')).toHaveLength(7)
-    expect(screen.getByRole('link', { name: /Review pending tasks/ })).toBeVisible()
+    expect(screen.getByRole('link', { name: /Start setup/ })).toHaveAttribute('href', '/jobs/preferences')
+    expect(screen.queryByRole('button', { name: 'Start Agent' })).not.toBeInTheDocument()
   })
 
   it('shows content-free BOSS adapter diagnostics in preferences', async () => {
@@ -190,6 +192,19 @@ describe('JobRadarApp', () => {
     }
   })
 
+  it('starts only after requirements are saved and the user explicitly starts it', async () => {
+    const user = userEvent.setup()
+    const store = createStore()
+    await store.put('jobSearchProfiles', { ...profile, platforms: ['boss'] })
+    renderRadar({ store, storage: trustedStorage() })
+
+    expect(await screen.findByRole('heading', { name: 'Agent is paused' })).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Start Agent' }))
+    expect(await screen.findByRole('heading', { name: 'Agent is ready' })).toBeVisible()
+    expect(JSON.parse(window.localStorage.getItem('resume-os:job-agent-preferences:v1') ?? '{}'))
+      .toMatchObject({ enabled: true })
+  })
+
   it('automatically searches the first three configured BOSS title types', async () => {
     const store = createStore()
     await store.put('jobSearchProfiles', {
@@ -197,6 +212,14 @@ describe('JobRadarApp', () => {
       platforms: ['boss'],
       titles: ['Platform Engineer', 'Backend Engineer', 'AI Engineer', 'Fourth Role']
     })
+    window.localStorage.setItem('resume-os:job-agent-preferences:v1', JSON.stringify({
+      version: 1,
+      enabled: true,
+      autonomy: 'autopilot',
+      platforms: ['boss'],
+      learnFromReplies: true,
+      learnFromOutcomes: true
+    }))
     const queries: string[] = []
     const respond = (event: Event) => {
       const request = (event as CustomEvent<{ requestId: string; action: string; payload?: { query?: string } }>).detail

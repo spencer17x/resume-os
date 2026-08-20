@@ -10,14 +10,14 @@ The product is built around four principles:
 
 - **Evidence before claims:** saved career facts are the boundary for resume content; missing evidence becomes a question, not an invented achievement.
 - **Job-specific decisions:** the target role determines which verified experience should be emphasized.
-- **Zero-configuration automation:** after model setup, every supported platform is enabled and the Agent reuses available local Chrome sessions. Login challenges remain user actions.
+- **Explicit activation:** platform connection alone never starts the Agent. A trusted resume and saved job requirements are required, followed by an explicit Start action. Login challenges remain user actions.
 - **Local-first ownership:** resume drafts and AI configuration stay in the browser. The server handles individual requests without persisting career data or API keys.
 
 The primary workflow is:
 
 1. Import or paste an existing resume in Resume Studio.
-2. Open Job Agent. It enables all supported platforms, detects available Chrome sessions, derives the initial search, and starts automatically.
-3. Run discovery. Reviewed public sources refresh inside Resume OS; restricted platforms open fixed-host searches or produce draft-only handoffs until an authorized connector exists.
+2. Save the target titles, locations, constraints, and communication preferences in Job Agent.
+3. Explicitly start the Agent. Only then does it enable its recurring browser schedule, detect available Chrome sessions, and run discovery.
 4. Confirm every extracted requirement and inspect the evidence and gaps.
 5. Ask the Resume Agent for job-specific, reviewable changes.
 6. Verify each claim and apply selected changes to a separate resume variant.

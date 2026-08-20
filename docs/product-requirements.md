@@ -14,11 +14,11 @@ rules, user intent, and a complete action history.
 
 1. The user imports a trusted resume and confirms job goals, locations, compensation,
    exclusions, and communication preferences.
-2. After the user configures the model, the agent enables BOSS Zhipin automatically.
-   Per-platform API configuration and platform selection
-   are not part of the primary flow.
-3. The local Browser Agent detects platform sessions already available in Chrome and
-   starts discovery automatically. A missing or expired session opens the relevant
+2. Model configuration and BOSS connection do not start the agent. The user must save
+   a trusted resume and explicit target-job requirements, then select Start. Per-platform
+   API configuration and platform selection are not part of the primary flow.
+3. After explicit activation, the local Browser Agent detects platform sessions already
+   available in Chrome and starts recurring discovery. A missing or expired session opens the relevant
    login page; login, QR code, SMS, 2FA, and CAPTCHA completion remain user actions.
    After the first successful login, the local browser session is reused without
    exporting cookies or credentials to Resume OS.

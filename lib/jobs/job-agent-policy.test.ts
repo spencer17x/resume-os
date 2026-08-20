@@ -24,8 +24,8 @@ describe('job agent policy', () => {
     })
   })
 
-  it('starts with only BOSS Zhipin enabled and no platform-specific setup', () => {
-    expect(DEFAULT_JOB_AGENT_PREFERENCES).toMatchObject({ enabled: true, autonomy: 'autopilot' })
+  it('starts paused with only BOSS Zhipin selected and no platform-specific setup', () => {
+    expect(DEFAULT_JOB_AGENT_PREFERENCES).toMatchObject({ enabled: false, autonomy: 'autopilot' })
     expect(DEFAULT_JOB_AGENT_PREFERENCES.platforms).toEqual(['boss'])
   })
 

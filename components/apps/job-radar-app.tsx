@@ -176,6 +176,10 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
   const seededDraftIdRef = useRef('')
   const agentPreferencesHydratedRef = useRef(false)
   const browserAutoRunRef = useRef(false)
+  const savedSearchProfile = profiles[0]
+  const agentSetupComplete = trustedDraft && Boolean(savedSearchProfile?.titles.length)
+  const agentExecutionEnabled = agentPreferences.enabled && agentSetupComplete
+  const agentRunning = agentExecutionEnabled && browserAgentAvailable
 
   const load = useCallback(async () => {
     const [nextSources, nextProfiles, nextPostings, nextRecommendations, nextApplications, nextThreads, nextMessages] = await Promise.all([
@@ -235,6 +239,10 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
     window.localStorage.setItem(JOB_AGENT_PREFERENCES_KEY, serializeJobAgentPreferences(agentPreferences))
   }, [agentPreferences])
   useEffect(() => {
+    if (!loaded || !agentPreferencesHydratedRef.current || agentSetupComplete) return
+    setAgentPreferences((current) => current.enabled ? { ...current, enabled: false } : current)
+  }, [agentSetupComplete, loaded])
+  useEffect(() => {
     let active = true
     void detectBrowserAgentSessions({ window }).then((response) => {
       if (!active) return
@@ -283,7 +291,7 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
   useEffect(() => {
     if (
       !browserAgentAvailable
-      || !agentPreferences.enabled
+      || !agentExecutionEnabled
       || browserAutoRunRef.current
       || !loaded
       || !trustedDraft
@@ -292,21 +300,22 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
     ) return
     browserAutoRunRef.current = true
     void searchMarket()
-  }, [agentPreferences.enabled, browserAgentAvailable, busySourceId, loaded, titles, trustedDraft])
+  }, [agentExecutionEnabled, browserAgentAvailable, busySourceId, loaded, titles, trustedDraft])
   useEffect(() => {
     if (!browserAgentAvailable) return
-    void configureBrowserJobAgent({ window, enabled: agentPreferences.enabled, intervalMinutes: 15 })
-  }, [agentPreferences.enabled, browserAgentAvailable])
+    void configureBrowserJobAgent({ window, enabled: agentExecutionEnabled, intervalMinutes: 15 })
+  }, [agentExecutionEnabled, browserAgentAvailable])
   useEffect(() => {
     const wake = () => {
-      if (!agentPreferences.enabled || !trustedDraft || !titles.trim() || busySourceId) return
+      if (!agentExecutionEnabled || !titles.trim() || busySourceId) return
       void Promise.all([searchMarket(), syncConversationSignals()])
     }
     window.addEventListener(JOB_AGENT_WAKE_EVENT, wake)
     return () => window.removeEventListener(JOB_AGENT_WAKE_EVENT, wake)
-  }, [agentPreferences.enabled, busySourceId, titles, trustedDraft])
+  }, [agentExecutionEnabled, busySourceId, titles])
 
   function toggleJobAgent() {
+    if (!agentSetupComplete) return
     setAgentPreferences((current) => {
       const enabled = !current.enabled
       if (!enabled) controllerRef.current?.abort()
@@ -985,7 +994,10 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
       {notice ? <p className="job-workspace__alert" data-tone="success" role="status">{notice}</p> : null}
 
       {workspaceSection === 'overview' ? <div className="job-overview">
-        <section className="job-overview__agent"><div><span data-running={agentPreferences.enabled && browserAgentAvailable} /><div><h2>{!agentPreferences.enabled ? t('workspace.agentPaused') : browserAgentAvailable ? t('workspace.agentRunning') : t('workspace.agentReady')}</h2><p>{t('workspace.targetSummary', { titles: splitTerms(titles).slice(0, 2).join('、') || t('unknown'), location: splitTerms(locations)[0] || t('unknown') })}</p></div></div><div><button type="button" className="job-button job-button--secondary" onClick={toggleJobAgent}>{agentPreferences.enabled ? <Pause size={15} /> : <Play size={15} />}{agentPreferences.enabled ? t('workspace.pauseAgent') : t('workspace.resumeAgent')}</button><Link className="job-button job-button--primary" href={pendingRequirements > 0 ? '/jobs/resumes' : pendingMessages > 0 ? '/jobs/conversations' : '/jobs/opportunities'}>{t('workspace.reviewTasks')}<ChevronRight size={16} /></Link></div></section>
+        <section className="job-overview__agent">
+          <div><span data-running={agentRunning} /><div><h2>{!agentSetupComplete ? t('workspace.setupRequired') : !agentPreferences.enabled ? t('workspace.agentPaused') : browserAgentAvailable ? t('workspace.agentRunning') : t('workspace.agentReady')}</h2><p>{agentSetupComplete ? t('workspace.targetSummary', { titles: savedSearchProfile?.titles.slice(0, 2).join('、') || t('unknown'), location: savedSearchProfile?.locations[0] || t('unknown') }) : t('workspace.setupHelp')}</p></div></div>
+          <div>{!agentSetupComplete ? <Link className="job-button job-button--primary" href={!trustedDraft ? '/jobs/profile' : '/jobs/preferences'}>{t('workspace.setupAction')}<ChevronRight size={16} /></Link> : <><button type="button" className="job-button job-button--secondary" onClick={toggleJobAgent}>{agentPreferences.enabled ? <Pause size={15} /> : <Play size={15} />}{agentPreferences.enabled ? t('workspace.pauseAgent') : t('workspace.startAgent')}</button><Link className="job-button job-button--primary" href={pendingRequirements > 0 ? '/jobs/resumes' : pendingMessages > 0 ? '/jobs/conversations' : '/jobs/opportunities'}>{t('workspace.reviewTasks')}<ChevronRight size={16} /></Link></>}</div>
+        </section>
         <div className="job-overview__columns">
           <section><h2>{t('workspace.todayActivity')}</h2><div className="job-overview__timeline">
             <Link href="/jobs/opportunities"><time>{formatActivityTime(postings[0]?.lastCheckedAt, locale)}</time><span><BriefcaseBusiness size={17} /></span><div><strong>{t('workspace.activityFound', { count: postings.length })}</strong><p>{t('workspace.activityFoundHelp')}</p></div><ChevronRight size={17} /></Link>
