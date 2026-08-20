@@ -80,9 +80,13 @@ export function ResumeVariantLibrary({ store, sourceDraftId, baseResume, planned
       <header><h3>{t(`strategy.${group.strategy}`)}</h3><span>{group.items.length}</span></header>
       <div className="resume-variant-library__grid">{group.items.map((item) => {
         const markdown = renderResumeMarkdown(item.data)
+        const fitCount = plannedTitles.filter((title) => classifyRoleTitle(title) === group.strategy).length
+        const keySkills = item.data.skills.flatMap((skillGroup) => skillGroup.items).slice(0, 6)
         return <article key={item.id}>
           <div><FileText size={18} aria-hidden="true" /><div><strong>{item.name}</strong><span>{item.targetLabel}</span></div></div>
           <small>{item.planned ? t('planned') : t('updated', { value: new Date(item.updatedAt) })}</small>
+          <div className="resume-variant-library__meta"><span>{t('fitCount', { count: Math.max(1, fitCount) })}</span><span>{item.planned ? t('differenceReordered') : t('differenceOptimized')}</span></div>
+          {keySkills.length > 0 ? <div className="resume-variant-library__skills" aria-label={t('keySkills')}>{keySkills.map((skill) => <b key={skill}>{skill}</b>)}</div> : null}
           <details><summary>{t('preview')}</summary><pre>{markdown}</pre></details>
           <footer>
             <button type="button" onClick={() => downloadBytes(renderResumePdf(item.data), 'application/pdf', resumePdfFileName(item.data, item.name))}><Download size={13} />PDF</button>
