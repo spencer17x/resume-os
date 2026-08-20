@@ -849,6 +849,22 @@
       "start": "确认并启动 Agent",
       "startManaged": "授权并启动全面托管"
     },
+    "runtime": {
+      "title": "Agent 持续运行状态",
+      "lastRun": "最近完成",
+      "nextRun": "下次运行",
+      "pending": "积压任务",
+      "runtimeState": "运行状态",
+      "never": "尚未完成",
+      "paused": "已暂停",
+      "catchUp": "检测到错过 {count} 个周期，将合并补跑并在执行前重新校验岗位和会话。",
+      "offlineReason": {
+        "none": "运行正常",
+        "page-closed": "Resume OS 页面曾关闭，任务已保留",
+        "browser-restarted": "Chrome 已重启，等待补跑",
+        "dispatch-failed": "最近派发失败，将限速重试"
+      }
+    },
     "historyLearning": {
       "title": "从历史求职记录学习",
       "description": "读取 BOSS 当前可见的历史沟通与本地投递状态，先生成模拟策略，再由你决定是否应用。",

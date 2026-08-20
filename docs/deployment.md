@@ -307,6 +307,15 @@ probe visible platform pages but must not request cookie permissions, export ses
 credentials, or report a send as successful without a platform receipt. New deployment
 origins require an intentional manifest change and extension review.
 
+The extension persists only a bounded runtime queue in `chrome.storage.local`: cycle ID,
+scheduled time, reason, attempt count, and coalesced missed-interval count. Page closure
+does not delete pending cycles. A reopened Resume OS page announces readiness, receives
+one oldest cycle, and reports completed/failed/skipped before another cycle can dispatch.
+Chrome startup restores the alarm and coalesces missed periods into one catch-up cycle;
+it does not replay every missed interval or execute BOSS actions while Chrome is closed.
+No job, resume, career fact, message body, platform credential, or cookie enters this
+extension queue.
+
 ## GitHub Pages boundary
 
 GitHub Pages serves static files and cannot execute the Next.js route handlers used for document extraction and OpenAI-compatible AI tasks. The current repository therefore cannot provide its complete workflow on GitHub Pages.

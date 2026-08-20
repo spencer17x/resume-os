@@ -849,6 +849,22 @@
       "start": "Confirm and start Agent",
       "startManaged": "Authorize and start managed mode"
     },
+    "runtime": {
+      "title": "Agent runtime",
+      "lastRun": "Last completed",
+      "nextRun": "Next run",
+      "pending": "Pending cycles",
+      "runtimeState": "Runtime state",
+      "never": "Not completed yet",
+      "paused": "Paused",
+      "catchUp": "{count} missed cycles will be coalesced and checked before execution.",
+      "offlineReason": {
+        "none": "Running normally",
+        "page-closed": "Resume OS page was closed; work was retained",
+        "browser-restarted": "Chrome restarted; catch-up is pending",
+        "dispatch-failed": "The last dispatch failed and will retry with rate limiting"
+      }
+    },
     "historyLearning": {
       "title": "Learn from job-search history",
       "description": "Read currently visible BOSS history and local application state, simulate a policy first, and let you choose whether to apply it.",

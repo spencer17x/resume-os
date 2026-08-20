@@ -12,7 +12,7 @@ import type { JobSourceAdapter } from '@/lib/jobs/sources'
 import { createResumeDraft, normalizeResumeData } from '@/lib/resume-model'
 import { writeDraftState } from '@/lib/resume-store'
 import { createBossConversationThread, createBossMessageDraft } from '@/lib/jobs/boss-conversation'
-import { BROWSER_AGENT_REQUEST_EVENT, BROWSER_AGENT_RESPONSE_EVENT } from '@/lib/jobs/browser-agent-protocol'
+import { BROWSER_AGENT_REQUEST_EVENT, BROWSER_AGENT_RESPONSE_EVENT, JOB_AGENT_WAKE_EVENT } from '@/lib/jobs/browser-agent-protocol'
 import en from '@/messages/en.json'
 import { BossConversationQueue, JobRadarApp } from './job-radar-app'
 
@@ -244,9 +244,11 @@ describe('JobRadarApp', () => {
       learnFromOutcomes: true
     }))
     const queries: string[] = []
+    const configured: boolean[] = []
     const respond = (event: Event) => {
-      const request = (event as CustomEvent<{ requestId: string; action: string; payload?: { query?: string } }>).detail
+      const request = (event as CustomEvent<{ requestId: string; action: string; payload?: { query?: string; enabled?: boolean } }>).detail
       if (request.action === 'search-boss-jobs' && request.payload?.query) queries.push(request.payload.query)
+      if (request.action === 'configure-job-agent') configured.push(request.payload?.enabled === true)
       window.dispatchEvent(new CustomEvent(BROWSER_AGENT_RESPONSE_EVENT, { detail: {
         requestId: request.requestId,
         ok: true,
@@ -256,13 +258,18 @@ describe('JobRadarApp', () => {
     window.addEventListener(BROWSER_AGENT_REQUEST_EVENT, respond)
     try {
       renderRadar({ store, storage: trustedStorage() })
+      await waitFor(() => expect(configured).toContain(true), { timeout: 5_000 })
+      await waitFor(() => expect(screen.getByText(/Platform Engineer.*Backend Engineer/)).toBeVisible())
+      window.dispatchEvent(new CustomEvent(JOB_AGENT_WAKE_EVENT, { detail: {
+        id: 'cycle-test', scheduledAt: now, reason: 'scheduled', missedIntervals: 0, attempt: 1
+      } }))
       await waitFor(() => expect(queries).toEqual([
         'Platform Engineer', 'Backend Engineer', 'AI Engineer'
       ]), { timeout: 5_000 })
     } finally {
       window.removeEventListener(BROWSER_AGENT_REQUEST_EVENT, respond)
     }
-  })
+  }, 10_000)
 
   it('shows scored jobs and preserves a saved application when ignored later', async () => {
     mockPathname = '/jobs/opportunities'

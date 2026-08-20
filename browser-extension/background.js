@@ -1,3 +1,5 @@
+if (typeof importScripts === 'function') importScripts('job-agent-runtime.js')
+
 const PLATFORM_HOSTS = {
   boss: ['zhipin.com']
 }
@@ -5,12 +7,17 @@ const PLATFORM_HOSTS = {
 const bossFrameIds = new Map()
 const AGENT_ALARM = 'resume-os-job-agent'
 const AGENT_CONFIG_KEY = 'jobAgentSchedule'
+const AGENT_RUNTIME_KEY = 'jobAgentRuntimeV1'
 const INTERVIEW_SIGNALS_KEY = 'seenInterviewSignals'
 const NOTIFICATION_ICON = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL5WQAAAABJRU5ErkJggg=='
 
 chrome.alarms?.onAlarm.addListener((alarm) => {
   if (alarm.name !== AGENT_ALARM) return
-  Promise.all([wakeResumeOsTabs(), notifyNewInterviewInvitations()]).catch(() => undefined)
+  Promise.all([queueScheduledCycle('scheduled'), notifyNewInterviewInvitations()]).catch(() => undefined)
+})
+
+chrome.runtime.onStartup?.addListener(() => {
+  restoreJobAgentOnStartup().catch(() => undefined)
 })
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -18,6 +25,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const frames = bossFrameIds.get(sender.tab.id) ?? new Set()
     frames.add(sender.frameId)
     bossFrameIds.set(sender.tab.id, frames)
+    return false
+  }
+  if (message?.action === 'job-agent-page-ready') {
+    dispatchPendingCycle().catch(() => undefined)
     return false
   }
   if (typeof message?.requestId !== 'string') return false
@@ -75,8 +86,37 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return false
     }
     configureJobAgent({ enabled, intervalMinutes: enabled ? intervalMinutes : 15 })
-      .then(() => sendResponse({ requestId: message.requestId, ok: true, extensionVersion: chrome.runtime.getManifest().version }))
+      .then((runtime) => sendResponse({
+        requestId: message.requestId,
+        ok: true,
+        extensionVersion: chrome.runtime.getManifest().version,
+        jobAgentRuntime: ResumeOsJobRuntime.publicStatus(runtime, new Date().toISOString())
+      }))
       .catch(() => sendResponse({ requestId: message.requestId, ok: false, error: 'PROBE_FAILED' }))
+    return true
+  }
+  if (message.action === 'get-job-agent-runtime') {
+    readJobAgentRuntime().then((runtime) => sendResponse({
+      requestId: message.requestId,
+      ok: true,
+      extensionVersion: chrome.runtime.getManifest().version,
+      jobAgentRuntime: ResumeOsJobRuntime.publicStatus(runtime, new Date().toISOString())
+    })).catch(() => sendResponse({ requestId: message.requestId, ok: false, error: 'PROBE_FAILED' }))
+    return true
+  }
+  if (message.action === 'report-job-agent-cycle') {
+    const cycleId = typeof message.payload?.cycleId === 'string' ? message.payload.cycleId.trim() : ''
+    const status = message.payload?.status
+    if (!cycleId || cycleId.length > 160 || !['completed', 'failed', 'skipped'].includes(status)) {
+      sendResponse({ requestId: message.requestId, ok: false, error: 'INVALID_REQUEST' })
+      return false
+    }
+    acknowledgeJobAgentCycle(cycleId, status).then((runtime) => sendResponse({
+      requestId: message.requestId,
+      ok: true,
+      extensionVersion: chrome.runtime.getManifest().version,
+      jobAgentRuntime: ResumeOsJobRuntime.publicStatus(runtime, new Date().toISOString())
+    })).catch(() => sendResponse({ requestId: message.requestId, ok: false, error: 'PROBE_FAILED' }))
     return true
   }
   if (message.action === 'inspect-boss-conversation') {
@@ -147,14 +187,42 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 async function configureJobAgent(config) {
   await chrome.storage.local.set({ [AGENT_CONFIG_KEY]: config })
   await chrome.alarms.clear(AGENT_ALARM)
+  const now = new Date().toISOString()
+  const runtime = await readJobAgentRuntime()
+  const next = ResumeOsJobRuntime.configure(runtime, config, now, createCycleId(now))
+  await writeJobAgentRuntime(next)
   if (config.enabled) {
     await chrome.alarms.create(AGENT_ALARM, { delayInMinutes: 1, periodInMinutes: config.intervalMinutes })
+    await dispatchPendingCycle()
   }
+  return readJobAgentRuntime()
 }
 
-async function wakeResumeOsTabs() {
+async function restoreJobAgentOnStartup() {
   const stored = await chrome.storage.local.get(AGENT_CONFIG_KEY)
-  if (!stored?.[AGENT_CONFIG_KEY]?.enabled) return
+  const config = stored?.[AGENT_CONFIG_KEY]
+  if (!config?.enabled) return
+  const intervalMinutes = Number.isFinite(config.intervalMinutes) ? config.intervalMinutes : 15
+  await chrome.alarms.create(AGENT_ALARM, { delayInMinutes: 1, periodInMinutes: intervalMinutes })
+  await queueScheduledCycle('browser-restarted')
+}
+
+async function queueScheduledCycle(reason) {
+  const runtime = await readJobAgentRuntime()
+  if (!runtime.enabled) return runtime
+  const now = new Date().toISOString()
+  const next = ResumeOsJobRuntime.schedule(runtime, now, createCycleId(now), reason)
+  await writeJobAgentRuntime(next)
+  await dispatchPendingCycle()
+  return next
+}
+
+async function dispatchPendingCycle() {
+  let runtime = await readJobAgentRuntime()
+  if (!runtime.enabled) return runtime
+  const now = new Date().toISOString()
+  const cycle = ResumeOsJobRuntime.nextDispatchable(runtime, now)
+  if (!cycle) return runtime
   const tabs = await chrome.tabs.query({
     url: [
       'http://127.0.0.1/*',
@@ -162,9 +230,59 @@ async function wakeResumeOsTabs() {
       'https://resume-os-phi.vercel.app/*'
     ]
   })
-  await Promise.all(tabs.flatMap((tab) => tab.id
-    ? [chrome.tabs.sendMessage(tab.id, { action: 'job-agent-wakeup' }).catch(() => undefined)]
-    : []))
+  const tab = tabs.find((candidate) => candidate.id)
+  if (!tab?.id) {
+    runtime = ResumeOsJobRuntime.markUnavailable(runtime, 'page-closed', now)
+    await writeJobAgentRuntime(runtime)
+    return runtime
+  }
+  runtime = ResumeOsJobRuntime.markDispatched(runtime, cycle.id, now)
+  await writeJobAgentRuntime(runtime)
+  try {
+    await chrome.tabs.sendMessage(tab.id, {
+      action: 'job-agent-wakeup',
+      cycle: {
+        id: cycle.id,
+        scheduledAt: cycle.scheduledAt,
+        reason: cycle.reason,
+        missedIntervals: cycle.missedIntervals,
+        attempt: cycle.attempts + 1
+      }
+    })
+    return runtime
+  } catch {
+    runtime = ResumeOsJobRuntime.markUnavailable(runtime, 'dispatch-failed', new Date().toISOString())
+    await writeJobAgentRuntime(runtime)
+    return runtime
+  }
+}
+
+async function acknowledgeJobAgentCycle(cycleId, status) {
+  const now = new Date().toISOString()
+  const runtime = await readJobAgentRuntime()
+  const next = ResumeOsJobRuntime.acknowledge(runtime, cycleId, status, now)
+  await writeJobAgentRuntime(next)
+  setTimeout(() => dispatchPendingCycle().catch(() => undefined), 2_000)
+  return next
+}
+
+async function readJobAgentRuntime() {
+  const stored = await chrome.storage.local.get([AGENT_RUNTIME_KEY, AGENT_CONFIG_KEY])
+  const now = new Date().toISOString()
+  const runtime = ResumeOsJobRuntime.normalizeRuntime(stored?.[AGENT_RUNTIME_KEY], now)
+  const config = stored?.[AGENT_CONFIG_KEY]
+  if (config?.enabled === true && !runtime.enabled) {
+    return ResumeOsJobRuntime.configure(runtime, config, now, createCycleId(now))
+  }
+  return runtime
+}
+
+async function writeJobAgentRuntime(runtime) {
+  await chrome.storage.local.set({ [AGENT_RUNTIME_KEY]: runtime })
+}
+
+function createCycleId(now) {
+  return `cycle-${Date.parse(now).toString(36)}-${Math.random().toString(36).slice(2, 10)}`
 }
 
 async function notifyNewInterviewInvitations() {

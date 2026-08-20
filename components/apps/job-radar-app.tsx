@@ -30,6 +30,7 @@ import { ApplicationPipeline } from '@/components/apps/application-pipeline'
 import { ResumeVariantLibrary } from '@/components/apps/resume-variant-library'
 import { JobProcessBoard } from '@/components/apps/job-process-board'
 import { JobHistoryLearningPanel } from '@/components/apps/job-history-learning-panel'
+import { JobAgentRuntimeStatus } from '@/components/apps/job-agent-runtime-status'
 import type { JobSetupValues } from '@/components/apps/job-agent-setup'
 import { careerEvidenceSourceId } from '@/lib/agent/career-evidence'
 import { ACTIVE_WORKFLOW_CHANGED_EVENT } from '@/lib/agent/workflow-persistence'
@@ -76,7 +77,10 @@ import {
   configureBrowserJobAgent,
   detectBrowserAgentSessions,
   diagnoseBossBrowserAdapter,
+  getBrowserJobAgentRuntime,
   inspectBossBrowserConversation,
+  readBrowserJobAgentCycle,
+  reportBrowserJobAgentCycle,
   searchBossBrowserJobs,
   summarizeBossHistory,
   sendBossBrowserMessage,
@@ -84,6 +88,7 @@ import {
   JOB_AGENT_WAKE_EVENT,
   type BrowserBossJob,
   type BrowserBossAdapterDiagnostic,
+  type BrowserJobAgentRuntime,
   type BrowserPlatformSession
 } from '@/lib/jobs/browser-agent-protocol'
 import {
@@ -204,6 +209,7 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
   const [browserSessions, setBrowserSessions] = useState<BrowserPlatformSession[]>([])
   const [browserAgentAvailable, setBrowserAgentAvailable] = useState(false)
   const [adapterDiagnostics, setAdapterDiagnostics] = useState<BrowserBossAdapterDiagnostic[]>([])
+  const [browserJobRuntime, setBrowserJobRuntime] = useState<BrowserJobAgentRuntime | null>(null)
   const [diagnosingAdapter, setDiagnosingAdapter] = useState(false)
   const [historyLearningBusy, setHistoryLearningBusy] = useState(false)
   const [historySimulation, setHistorySimulation] = useState<JobHistorySimulation | null>(null)
@@ -246,7 +252,7 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
   const refreshGenerationRef = useRef(0)
   const hydratedProfileIdRef = useRef('')
   const seededDraftIdRef = useRef('')
-  const browserAutoRunRef = useRef(false)
+  const activeBrowserCyclesRef = useRef(new Set<string>())
   const savedSearchProfile = profiles[0]
   const agentSetupComplete = trustedDraft && Boolean(savedSearchProfile?.titles.length)
   const agentExecutionEnabled = agentPreferences.enabled && agentSetupComplete
@@ -354,6 +360,7 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
       if (response.ok) {
         void syncConversationSignals()
         void runBossAdapterDiagnostics()
+        void refreshBrowserJobRuntime()
       }
     })
     return () => { active = false }
@@ -405,26 +412,37 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
     setPreferredTerms(seed.preferredTerms.join(', '))
   }, [activeDraft, loaded, profiles.length, trustedDraft])
   useEffect(() => {
-    if (
-      !browserAgentAvailable
-      || !agentExecutionEnabled
-      || browserAutoRunRef.current
-      || !loaded
-      || !trustedDraft
-      || !titles.trim()
-      || busySourceId
-    ) return
-    browserAutoRunRef.current = true
-    void searchMarket()
-  }, [agentExecutionEnabled, browserAgentAvailable, busySourceId, loaded, titles, trustedDraft])
-  useEffect(() => {
     if (!browserAgentAvailable) return
-    void configureBrowserJobAgent({ window, enabled: agentExecutionEnabled, intervalMinutes: 15 })
+    const timeout = window.setTimeout(() => {
+      void configureBrowserJobAgent({ window, enabled: agentExecutionEnabled, intervalMinutes: 15 }).then((response) => {
+        if (response.jobAgentRuntime) setBrowserJobRuntime(response.jobAgentRuntime)
+      })
+    }, 0)
+    return () => window.clearTimeout(timeout)
   }, [agentExecutionEnabled, browserAgentAvailable])
   useEffect(() => {
-    const wake = () => {
-      if (!agentExecutionEnabled || !titles.trim() || busySourceId) return
-      void Promise.all([searchMarket(), syncConversationSignals()])
+    const wake = (event: Event) => {
+      const parsed = readBrowserJobAgentCycle(event)
+      if (!parsed.success || activeBrowserCyclesRef.current.has(parsed.data.id)) return
+      activeBrowserCyclesRef.current.add(parsed.data.id)
+      const run = async () => {
+        try {
+          if (!agentExecutionEnabled || !titles.trim() || busySourceId) {
+            const response = await reportBrowserJobAgentCycle({ window, cycleId: parsed.data.id, status: 'skipped' })
+            if (response.jobAgentRuntime) setBrowserJobRuntime(response.jobAgentRuntime)
+            return
+          }
+          await Promise.all([searchMarket(), syncConversationSignals()])
+          const response = await reportBrowserJobAgentCycle({ window, cycleId: parsed.data.id, status: 'completed' })
+          if (response.jobAgentRuntime) setBrowserJobRuntime(response.jobAgentRuntime)
+        } catch {
+          const response = await reportBrowserJobAgentCycle({ window, cycleId: parsed.data.id, status: 'failed' }).catch(() => null)
+          if (response?.jobAgentRuntime) setBrowserJobRuntime(response.jobAgentRuntime)
+        } finally {
+          activeBrowserCyclesRef.current.delete(parsed.data.id)
+        }
+      }
+      void run()
     }
     window.addEventListener(JOB_AGENT_WAKE_EVENT, wake)
     return () => window.removeEventListener(JOB_AGENT_WAKE_EVENT, wake)
@@ -435,7 +453,6 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
     setAgentPreferences((current) => {
       const enabled = !current.enabled
       if (!enabled) controllerRef.current?.abort()
-      else browserAutoRunRef.current = false
       return { ...current, enabled }
     })
   }
@@ -474,7 +491,6 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
 
   async function startConfiguredAgent() {
     setAgentPreferences((current) => ({ ...current, enabled: true }))
-    browserAutoRunRef.current = false
     navigateJobWorkspace(locale, '/jobs')
   }
 
@@ -510,6 +526,11 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
     } finally {
       setDiagnosingAdapter(false)
     }
+  }
+
+  async function refreshBrowserJobRuntime() {
+    const response = await getBrowserJobAgentRuntime({ window })
+    if (response.jobAgentRuntime) setBrowserJobRuntime(response.jobAgentRuntime)
   }
 
   async function simulateHistoryLearning() {
@@ -1249,6 +1270,7 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
           <div><span data-running={agentRunning} /><div><h2>{!agentSetupComplete ? t('workspace.setupRequired') : !agentPreferences.enabled ? t('workspace.agentPaused') : browserAgentAvailable ? t('workspace.agentRunning') : t('workspace.agentReady')}</h2><p>{agentSetupComplete ? t('workspace.targetSummary', { titles: savedSearchProfile?.titles.slice(0, 2).join('、') || t('unknown'), location: savedSearchProfile?.locations[0] || t('unknown') }) : t('workspace.setupHelp')}</p></div></div>
           <div>{!agentSetupComplete ? <Link className="job-button job-button--primary" href="/jobs/setup">{t('workspace.setupAction')}<ChevronRight size={16} /></Link> : <><button type="button" className="job-button job-button--secondary" onClick={toggleJobAgent}>{agentPreferences.enabled ? <Pause size={15} /> : <Play size={15} />}{agentPreferences.enabled ? t('workspace.pauseAgent') : t('workspace.startAgent')}</button><Link className="job-button job-button--primary" href={pendingRequirements > 0 ? '/jobs/resumes' : pendingMessages > 0 ? '/jobs/conversations' : '/jobs/opportunities'}>{t(managedMode ? 'workspace.viewProgress' : 'workspace.reviewTasks')}<ChevronRight size={16} /></Link></>}</div>
         </section>
+        <JobAgentRuntimeStatus runtime={browserJobRuntime} />
         <div className="job-overview__columns">
           <section><h2>{t('workspace.todayActivity')}</h2><div className="job-overview__timeline">
             <Link href="/jobs/opportunities"><time>{formatActivityTime(postings[0]?.lastCheckedAt, locale)}</time><span><BriefcaseBusiness size={17} /></span><div><strong>{t('workspace.activityFound', { count: postings.length })}</strong><p>{t('workspace.activityFoundHelp')}</p></div><ChevronRight size={17} /></Link>

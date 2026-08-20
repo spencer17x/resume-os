@@ -132,6 +132,38 @@ describe('browser agent protocol', () => {
       .resolves.toMatchObject({ historySummary: { conversationCount: 20, recruiterReplyCount: 5 } })
   })
 
+  it('reads runtime state and reports a completed persisted cycle', async () => {
+    const target = new EventTarget()
+    target.addEventListener(BROWSER_AGENT_REQUEST_EVENT, (event) => {
+      const request = (event as CustomEvent<{ requestId: string; action: string; payload?: { cycleId: string; status: string } }>).detail
+      if (request.action === 'report-job-agent-cycle') {
+        expect(request.payload).toEqual({ cycleId: 'cycle-1', status: 'completed' })
+      }
+      if (!['get-job-agent-runtime', 'report-job-agent-cycle'].includes(request.action)) return
+      target.dispatchEvent(new CustomEvent(BROWSER_AGENT_RESPONSE_EVENT, { detail: {
+        requestId: request.requestId,
+        ok: true,
+        jobAgentRuntime: {
+          enabled: true, intervalMinutes: 15, pendingCount: request.action === 'get-job-agent-runtime' ? 1 : 0,
+          missedRunCount: 0, offlineReason: 'none', nextRunAt: '2026-08-20T09:15:00.000Z'
+        }
+      } }))
+    })
+    const { getBrowserJobAgentRuntime, reportBrowserJobAgentCycle } = await import('./browser-agent-protocol')
+    await expect(getBrowserJobAgentRuntime({ window: target as Window, timeoutMs: 50 }))
+      .resolves.toMatchObject({ jobAgentRuntime: { pendingCount: 1 } })
+    await expect(reportBrowserJobAgentCycle({ window: target as Window, cycleId: 'cycle-1', status: 'completed', timeoutMs: 50 }))
+      .resolves.toMatchObject({ jobAgentRuntime: { pendingCount: 0 } })
+  })
+
+  it('validates wake event details before running a cycle', async () => {
+    const { readBrowserJobAgentCycle } = await import('./browser-agent-protocol')
+    expect(readBrowserJobAgentCycle(new CustomEvent('wake', { detail: {
+      id: 'cycle-1', scheduledAt: '2026-08-20T09:00:00.000Z', reason: 'catch-up', missedIntervals: 2, attempt: 1
+    } })).success).toBe(true)
+    expect(readBrowserJobAgentCycle(new CustomEvent('wake', { detail: { id: 'bad' } })).success).toBe(false)
+  })
+
   it('validates content-free adapter diagnostics', async () => {
     const target = new EventTarget()
     target.addEventListener(BROWSER_AGENT_REQUEST_EVENT, (event) => {

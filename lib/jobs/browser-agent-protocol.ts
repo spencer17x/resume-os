@@ -5,6 +5,30 @@ export const BROWSER_AGENT_REQUEST_EVENT = 'resume-os:browser-agent:request'
 export const BROWSER_AGENT_RESPONSE_EVENT = 'resume-os:browser-agent:response'
 export const JOB_AGENT_WAKE_EVENT = 'resume-os:job-agent:wakeup'
 
+export const browserJobAgentCycleSchema = z.object({
+  id: z.string().trim().min(1).max(160),
+  scheduledAt: z.iso.datetime({ offset: true }),
+  reason: z.enum(['scheduled', 'catch-up', 'resume']),
+  missedIntervals: z.number().int().min(0).max(96),
+  attempt: z.number().int().min(1).max(10)
+}).strict()
+
+export type BrowserJobAgentCycle = z.infer<typeof browserJobAgentCycleSchema>
+
+export const browserJobAgentRuntimeSchema = z.object({
+  enabled: z.boolean(),
+  intervalMinutes: z.number().min(5).max(1_440),
+  pendingCount: z.number().int().min(0).max(12),
+  missedRunCount: z.number().int().min(0).max(10_000),
+  offlineReason: z.enum(['none', 'page-closed', 'browser-restarted', 'dispatch-failed']),
+  lastScheduledAt: z.iso.datetime({ offset: true }).optional(),
+  lastDispatchedAt: z.iso.datetime({ offset: true }).optional(),
+  lastCompletedAt: z.iso.datetime({ offset: true }).optional(),
+  nextRunAt: z.iso.datetime({ offset: true }).optional()
+}).strict()
+
+export type BrowserJobAgentRuntime = z.infer<typeof browserJobAgentRuntimeSchema>
+
 export const browserPlatformSessionSchema = z.object({
   platform: jobAgentPlatformIdSchema,
   state: z.enum(['available', 'login-required', 'unknown']),
@@ -140,6 +164,7 @@ export const browserAgentResponseSchema = z.object({
   historySummary: browserBossHistorySummarySchema.optional(),
   resumeReceipt: browserBossResumeReceiptSchema.optional(),
   diagnostics: z.array(browserBossAdapterDiagnosticSchema).max(50).optional(),
+  jobAgentRuntime: browserJobAgentRuntimeSchema.optional(),
   error: z.enum(['EXTENSION_UNAVAILABLE', 'INVALID_REQUEST', 'PROBE_FAILED']).optional()
 })
 
@@ -309,10 +334,37 @@ export async function configureBrowserJobAgent(input: {
   })
 }
 
+export async function getBrowserJobAgentRuntime(input: {
+  window: Pick<Window, 'addEventListener' | 'removeEventListener' | 'dispatchEvent'>
+  timeoutMs?: number
+}): Promise<BrowserAgentResponse> {
+  return requestBrowserAgent({ ...input, action: 'get-job-agent-runtime' })
+}
+
+export async function reportBrowserJobAgentCycle(input: {
+  window: Pick<Window, 'addEventListener' | 'removeEventListener' | 'dispatchEvent'>
+  cycleId: string
+  status: 'completed' | 'failed' | 'skipped'
+  timeoutMs?: number
+}): Promise<BrowserAgentResponse> {
+  const cycleId = input.cycleId.trim()
+  if (!cycleId || cycleId.length > 160) throw new TypeError('Job Agent cycle ID is invalid')
+  return requestBrowserAgent({
+    window: input.window,
+    timeoutMs: input.timeoutMs,
+    action: 'report-job-agent-cycle',
+    payload: { cycleId, status: input.status }
+  })
+}
+
+export function readBrowserJobAgentCycle(event: Event) {
+  return browserJobAgentCycleSchema.safeParse((event as CustomEvent<unknown>).detail)
+}
+
 async function requestBrowserAgent(input: {
   window: Pick<Window, 'addEventListener' | 'removeEventListener' | 'dispatchEvent'>
   timeoutMs?: number
-  action: 'detect-platforms' | 'collect-boss-jobs' | 'collect-boss-job-detail' | 'search-boss-jobs' | 'inspect-boss-conversation' | 'collect-boss-conversation-signals' | 'summarize-boss-history' | 'diagnose-boss-adapter' | 'send-boss-message' | 'send-boss-resume-attachment' | 'configure-job-agent'
+  action: 'detect-platforms' | 'collect-boss-jobs' | 'collect-boss-job-detail' | 'search-boss-jobs' | 'inspect-boss-conversation' | 'collect-boss-conversation-signals' | 'summarize-boss-history' | 'diagnose-boss-adapter' | 'send-boss-message' | 'send-boss-resume-attachment' | 'configure-job-agent' | 'get-job-agent-runtime' | 'report-job-agent-cycle'
   payload?: Record<string, unknown>
 }): Promise<BrowserAgentResponse> {
   const requestId = crypto.randomUUID()

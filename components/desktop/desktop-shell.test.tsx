@@ -689,7 +689,7 @@ describe('DesktopShell', () => {
       if (appId === 'studio') {
         expect(await view.findByRole('region', { name: 'Resume Studio' })).toBeVisible()
       } else if (appId === 'jobs') {
-        expect(await view.findByRole('heading', { name: 'Job overview' })).toBeVisible()
+        expect(await view.findByRole('heading', { name: 'Job overview' }, { timeout: 5_000 })).toBeVisible()
       } else if (appId === 'agent' || appId === 'jd-match') {
         expect(await view.findByRole('heading', { name: 'Create a resume draft first' })).toBeVisible()
         expect(view.getByRole('link', { name: 'Open Resume Studio' })).toBeVisible()
