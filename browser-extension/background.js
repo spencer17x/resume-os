@@ -97,6 +97,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     })).catch(() => sendResponse({ requestId: message.requestId, ok: false, error: 'PROBE_FAILED' }))
     return true
   }
+  if (message.action === 'summarize-boss-history') {
+    summarizeBossHistory().then((historySummary) => sendResponse({
+      requestId: message.requestId,
+      ok: Boolean(historySummary),
+      extensionVersion: chrome.runtime.getManifest().version,
+      ...(historySummary ? { historySummary } : { error: 'PROBE_FAILED' })
+    })).catch(() => sendResponse({ requestId: message.requestId, ok: false, error: 'PROBE_FAILED' }))
+    return true
+  }
   if (message.action === 'diagnose-boss-adapter') {
     diagnoseBossAdapter().then((diagnostics) => sendResponse({
       requestId: message.requestId,
@@ -319,6 +328,23 @@ async function collectBossConversationSignals() {
   return [...new Map(signals.flatMap((signal) => (
     validConversationSignal(signal) ? [[signal.signalId, signal]] : []
   ))).values()].slice(0, 100)
+}
+
+async function summarizeBossHistory() {
+  const tabs = await chrome.tabs.query({ url: ['https://www.zhipin.com/web/geek/chat*'] })
+  for (const tab of tabs) {
+    if (!tab.id) continue
+    const frameIds = [...new Set([0, ...(bossFrameIds.get(tab.id) ?? [])])]
+    for (const frameId of frameIds) {
+      try {
+        const response = await chrome.tabs.sendMessage(tab.id, { action: 'summarize-boss-history' }, { frameId })
+        if (response?.historySummary) return response.historySummary
+      } catch {
+        // Continue to the next registered frame or chat tab.
+      }
+    }
+  }
+  return null
 }
 
 async function diagnoseBossAdapter() {

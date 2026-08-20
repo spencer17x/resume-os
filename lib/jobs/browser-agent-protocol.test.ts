@@ -112,6 +112,26 @@ describe('browser agent protocol', () => {
       .resolves.toMatchObject({ conversationSignals: [{ kind: 'resume-request' }] })
   })
 
+  it('accepts only aggregate BOSS history statistics', async () => {
+    const target = new EventTarget()
+    target.addEventListener(BROWSER_AGENT_REQUEST_EVENT, (event) => {
+      const request = (event as CustomEvent<{ requestId: string; action: string }>).detail
+      if (request.action !== 'summarize-boss-history') return
+      target.dispatchEvent(new CustomEvent(BROWSER_AGENT_RESPONSE_EVENT, { detail: {
+        requestId: request.requestId,
+        ok: true,
+        historySummary: {
+          conversationCount: 20, outgoingMessageCount: 18, incomingMessageCount: 5,
+          recruiterReplyCount: 5, resumeRequestCount: 2, interviewInviteCount: 1,
+          offerCount: 0, rejectionCount: 2, observedAt: '2026-08-20T08:00:00.000Z'
+        }
+      } }))
+    })
+    const { summarizeBossHistory } = await import('./browser-agent-protocol')
+    await expect(summarizeBossHistory({ window: target as Window, timeoutMs: 50 }))
+      .resolves.toMatchObject({ historySummary: { conversationCount: 20, recruiterReplyCount: 5 } })
+  })
+
   it('validates content-free adapter diagnostics', async () => {
     const target = new EventTarget()
     target.addEventListener(BROWSER_AGENT_REQUEST_EVENT, (event) => {

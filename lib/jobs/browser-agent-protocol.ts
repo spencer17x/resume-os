@@ -66,6 +66,20 @@ export const browserBossConversationSignalSchema = z.object({
 
 export type BrowserBossConversationSignal = z.infer<typeof browserBossConversationSignalSchema>
 
+export const browserBossHistorySummarySchema = z.object({
+  conversationCount: z.number().int().min(0).max(10_000),
+  outgoingMessageCount: z.number().int().min(0).max(10_000),
+  incomingMessageCount: z.number().int().min(0).max(10_000),
+  recruiterReplyCount: z.number().int().min(0).max(10_000),
+  resumeRequestCount: z.number().int().min(0).max(10_000),
+  interviewInviteCount: z.number().int().min(0).max(10_000),
+  offerCount: z.number().int().min(0).max(10_000),
+  rejectionCount: z.number().int().min(0).max(10_000),
+  observedAt: z.iso.datetime({ offset: true })
+}).strict()
+
+export type BrowserBossHistorySummary = z.infer<typeof browserBossHistorySummarySchema>
+
 export const resumeArtifactMimeTypeSchema = z.enum([
   'application/pdf',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
@@ -123,6 +137,7 @@ export const browserAgentResponseSchema = z.object({
   recipient: browserBossRecipientSchema.optional(),
   sendReceipt: browserBossSendReceiptSchema.optional(),
   conversationSignals: z.array(browserBossConversationSignalSchema).max(100).optional(),
+  historySummary: browserBossHistorySummarySchema.optional(),
   resumeReceipt: browserBossResumeReceiptSchema.optional(),
   diagnostics: z.array(browserBossAdapterDiagnosticSchema).max(50).optional(),
   error: z.enum(['EXTENSION_UNAVAILABLE', 'INVALID_REQUEST', 'PROBE_FAILED']).optional()
@@ -192,6 +207,17 @@ export async function collectBossConversationSignals(input: {
     ...input,
     timeoutMs: input.timeoutMs ?? 5_000,
     action: 'collect-boss-conversation-signals'
+  })
+}
+
+export async function summarizeBossHistory(input: {
+  window: Pick<Window, 'addEventListener' | 'removeEventListener' | 'dispatchEvent'>
+  timeoutMs?: number
+}): Promise<BrowserAgentResponse> {
+  return requestBrowserAgent({
+    ...input,
+    timeoutMs: input.timeoutMs ?? 8_000,
+    action: 'summarize-boss-history'
   })
 }
 
@@ -286,7 +312,7 @@ export async function configureBrowserJobAgent(input: {
 async function requestBrowserAgent(input: {
   window: Pick<Window, 'addEventListener' | 'removeEventListener' | 'dispatchEvent'>
   timeoutMs?: number
-  action: 'detect-platforms' | 'collect-boss-jobs' | 'collect-boss-job-detail' | 'search-boss-jobs' | 'inspect-boss-conversation' | 'collect-boss-conversation-signals' | 'diagnose-boss-adapter' | 'send-boss-message' | 'send-boss-resume-attachment' | 'configure-job-agent'
+  action: 'detect-platforms' | 'collect-boss-jobs' | 'collect-boss-job-detail' | 'search-boss-jobs' | 'inspect-boss-conversation' | 'collect-boss-conversation-signals' | 'summarize-boss-history' | 'diagnose-boss-adapter' | 'send-boss-message' | 'send-boss-resume-attachment' | 'configure-job-agent'
   payload?: Record<string, unknown>
 }): Promise<BrowserAgentResponse> {
   const requestId = crypto.randomUUID()

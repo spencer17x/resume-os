@@ -19,6 +19,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     sendResponse({ signals: collectBossConversationSignals() })
     return false
   }
+  if (message?.action === 'summarize-boss-history') {
+    sendResponse({ historySummary: summarizeBossHistory() })
+    return false
+  }
   if (message?.action === 'diagnose-boss-adapter') {
     sendResponse({ diagnostic: diagnoseBossAdapter() })
     return false
@@ -111,6 +115,33 @@ function collectBossConversationSignals() {
       observedAt: new Date().toISOString()
     }]
   }).slice(-100)
+}
+
+function summarizeBossHistory() {
+  if (!location.hostname.endsWith('zhipin.com') || !/\/web\/geek\/chat/u.test(location.pathname)) return null
+  const conversationNodes = visibleMatches([
+    '[class*="chat-list"] > *', '[class*="conversation-list"] > *',
+    '[class*="contact-list"] > *', '[class*="user-list"] > *'
+  ].join(','))
+  const incomingNodes = visibleMatches('[data-direction="incoming"], [class*="message-left"], [class*="item-friend"], [class*="message-other"]')
+  const outgoingNodes = visibleMatches('[data-direction="outgoing"], [class*="message-right"], [class*="item-my"], [class*="message-self"]')
+  const historyNodes = [...new Set([...conversationNodes, ...incomingNodes])]
+  const texts = historyNodes.map((element) => element.textContent?.replace(/\s+/gu, ' ').trim().slice(0, 5_000) ?? '').filter(Boolean)
+  const count = (pattern) => texts.filter((text) => pattern.test(text)).length
+  const uniqueConversations = new Set(conversationNodes.map((element) => fingerprint(
+    element.textContent?.replace(/\s+/gu, ' ').trim().slice(0, 500) ?? ''
+  )))
+  return {
+    conversationCount: Math.min(10_000, uniqueConversations.size),
+    outgoingMessageCount: Math.min(10_000, outgoingNodes.length),
+    incomingMessageCount: Math.min(10_000, incomingNodes.length),
+    recruiterReplyCount: Math.min(10_000, incomingNodes.length),
+    resumeRequestCount: count(/(?:(简历|附件).{0,20}(发送|发一份|提供|麻烦|可以发)|(发送|发一份|提供|麻烦|可以发).{0,20}(简历|附件))/u),
+    interviewInviteCount: count(/(面试|面谈|约面).{0,30}(方便|邀请|参加|时间|几点|日期|日程|安排)/u),
+    offerCount: count(/(录用|offer|发放意向|通过终面)/iu),
+    rejectionCount: count(/(不合适|未通过|不匹配|遗憾|暂不考虑)/u),
+    observedAt: new Date().toISOString()
+  }
 }
 
 function classifyConversationSignal(text) {

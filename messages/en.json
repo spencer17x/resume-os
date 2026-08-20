@@ -842,6 +842,113 @@
       "start": "Confirm and start Agent",
       "startManaged": "Authorize and start managed mode"
     },
+    "historyLearning": {
+      "title": "Learn from job-search history",
+      "description": "Read currently visible BOSS history and local application state, simulate a policy first, and let you choose whether to apply it.",
+      "privacy": "The extension returns counts, conversion signals, and policy parameters only—not private message bodies, contact lists, cookies, or credentials.",
+      "readHistory": "Read history and simulate",
+      "reading": "Reading…",
+      "readFailed": "History could not be read. Keep the signed-in BOSS conversation page open and try again.",
+      "simulationTitle": "History policy simulation",
+      "sampleSize": "{count} samples",
+      "dismiss": "Dismiss simulation",
+      "signals": {
+        "conversations": "Conversations",
+        "recruiterReplies": "Recruiter replies",
+        "resumeRequests": "Resume requests",
+        "interviewInvites": "Interview invitations",
+        "offers": "Offers",
+        "rejections": "Rejections"
+      },
+      "minimumScore": "Suggested minimum match",
+      "dailyLimit": "Suggested daily contact cap",
+      "automation": "Suggested automation",
+      "autoResume": "Auto-send PDF after request",
+      "autonomy": { "approval": "Approve key actions", "autopilot": "Managed mode" },
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "reasons": {
+        "history-empty": "There is not enough history to recommend applying this simulation.",
+        "reply-observed": "Recruiter replies were observed, so the current communication rhythm can inform the simulation.",
+        "resume-request-observed": "Resume requests were observed, so PDF auto-send can be simulated.",
+        "interview-observed": "Interview conversion was observed, allowing a somewhat broader candidate range.",
+        "low-conversion": "Historical reply conversion is low, so the simulation raises the filter threshold.",
+        "outcome-observed": "Final outcomes were observed and can inform later review parameters."
+      },
+      "apply": "Apply history policy",
+      "keepCurrent": "Keep current settings",
+      "applied": "The simulated history policy was applied; match threshold, daily cap, and automation preferences were updated."
+    },
+    "resumeLibrary": {
+      "title": "Job resume library",
+      "description": "The Agent groups resumes by role direction instead of mechanically copying one per company. Every version uses only trusted resumes, user-entered content, and verified career facts.",
+      "count": "{count} resumes",
+      "empty": "No evidence-validated job resume variants are ready yet.",
+      "evidenceBoundary": "Compression, reordering, and clearer wording are allowed; unsupported experience, responsibilities, skills, or metrics are prohibited.",
+      "updated": "Updated {value, date, medium}",
+      "planned": "Prepared automatically from the job goal using reordered trusted content only",
+      "plannedName": "{strategy} resume",
+      "preview": "Browse Markdown content",
+      "strategy": {
+        "ai-agent": "AI Agent / LLM applications",
+        "frontend": "Senior frontend",
+        "fullstack": "Full-stack engineering",
+        "mobile": "Mobile / React Native",
+        "backend": "Backend engineering",
+        "general": "General version"
+      }
+    },
+    "processBoard": {
+      "title": "Managed job-search progress",
+      "description": "See resume, conversation, message, application, and interview status for every role without exposing private message bodies.",
+      "job": "Job",
+      "resume": "Resume",
+      "conversation": "Conversation stage",
+      "message": "Latest message",
+      "application": "Application status",
+      "interview": "Interview status",
+      "unknown": "Unknown",
+      "resumeReady": "Resume ready",
+      "resumePreparing": "Preparing",
+      "notStarted": "Not started",
+      "noMessage": "No message",
+      "noInterview": "No interview",
+      "conversationStage": {
+        "outreach-draft": "Preparing outreach",
+        "awaiting-reply": "Awaiting recruiter reply",
+        "recruiter-replied": "Recruiter replied",
+        "resume-requested": "Resume requested",
+        "resume-sent": "Resume sent",
+        "interview-invited": "Interview invitation",
+        "interview-scheduled": "Interview scheduled",
+        "interviewing": "Interviewing",
+        "awaiting-result": "Awaiting result",
+        "completed": "Completed"
+      },
+      "messageStatus": {
+        "draft": "Draft",
+        "awaiting-approval": "Awaiting automatic validation",
+        "approved": "Validated",
+        "sending": "Sending",
+        "sent": "Sent",
+        "delivered": "Delivered",
+        "read": "Read",
+        "failed": "Failed"
+      },
+      "applicationStatus": {
+        "saved": "Saved",
+        "analyzing": "Analyzing",
+        "preparing": "Preparing materials",
+        "ready-to-apply": "Ready to apply",
+        "applied": "Applied",
+        "interviewing": "Interviewing",
+        "offered": "Offer received",
+        "rejected": "Rejected",
+        "withdrawn": "Withdrawn",
+        "archived": "Archived"
+      },
+      "interviewStatus": { "interviewing": "Interviewing", "offered": "Passed", "rejected": "Rejected" }
+    },
     "jobAgent": {
       "title": "Job automation controls",
       "description": "After saving a trusted resume and job requirements, explicitly start the Agent before platform detection and recurring discovery begin.",
@@ -929,7 +1036,7 @@
         "messageSend": "Message send selectors",
         "resumeUpload": "PDF resume upload selectors"
       },
-      "diagnosticCounts": "Job links {jobs} · editors {editors} · send controls {send} · recipient IDs {identities} · conversation IDs {conversations} · names {names} · DOCX inputs {docx}",
+      "diagnosticCounts": "Job links {jobs} · editors {editors} · send controls {send} · recipient IDs {identities} · conversation IDs {conversations} · names {names} · PDF inputs {pdf}",
       "messageStatus": {
         "draft": "Draft",
         "awaiting-approval": "Awaiting review",

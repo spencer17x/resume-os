@@ -27,6 +27,9 @@ import { useCallback, useEffect, useRef, useState, type ComponentPropsWithoutRef
 import { usePathname } from '@/i18n/navigation'
 import { useResumeDraft } from '@/components/resume-draft-provider'
 import { ApplicationPipeline } from '@/components/apps/application-pipeline'
+import { ResumeVariantLibrary } from '@/components/apps/resume-variant-library'
+import { JobProcessBoard } from '@/components/apps/job-process-board'
+import { JobHistoryLearningPanel } from '@/components/apps/job-history-learning-panel'
 import type { JobSetupValues } from '@/components/apps/job-agent-setup'
 import { careerEvidenceSourceId } from '@/lib/agent/career-evidence'
 import { ACTIVE_WORKFLOW_CHANGED_EVENT } from '@/lib/agent/workflow-persistence'
@@ -74,6 +77,7 @@ import {
   diagnoseBossBrowserAdapter,
   inspectBossBrowserConversation,
   searchBossBrowserJobs,
+  summarizeBossHistory,
   sendBossBrowserMessage,
   sendBossResumeAttachment,
   JOB_AGENT_WAKE_EVENT,
@@ -89,6 +93,7 @@ import {
   serializeJobAgentPreferences,
   type JobAgentPreferences
 } from '@/lib/jobs/job-agent-policy'
+import { simulateJobAgentFromHistory, type JobHistorySimulation } from '@/lib/jobs/job-history-learning'
 import {
   DEFAULT_JOB_MARKETPLACES,
   PRIMARY_JOB_MARKETPLACE_IDS,
@@ -198,6 +203,8 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
   const [browserAgentAvailable, setBrowserAgentAvailable] = useState(false)
   const [adapterDiagnostics, setAdapterDiagnostics] = useState<BrowserBossAdapterDiagnostic[]>([])
   const [diagnosingAdapter, setDiagnosingAdapter] = useState(false)
+  const [historyLearningBusy, setHistoryLearningBusy] = useState(false)
+  const [historySimulation, setHistorySimulation] = useState<JobHistorySimulation | null>(null)
   const [profileName, setProfileName] = useState('')
   const [goalDescription, setGoalDescription] = useState('')
   const [titles, setTitles] = useState('')
@@ -504,6 +511,39 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
     }
   }
 
+  async function simulateHistoryLearning() {
+    setHistoryLearningBusy(true)
+    setError('')
+    try {
+      const response = await summarizeBossHistory({ window, timeoutMs: 8_000 })
+      setHistorySimulation(simulateJobAgentFromHistory({
+        boss: response.ok ? response.historySummary : undefined,
+        applications,
+        messages: conversationMessages,
+        now: new Date().toISOString()
+      }))
+    } catch {
+      setError(t('historyLearning.readFailed'))
+    } finally {
+      setHistoryLearningBusy(false)
+    }
+  }
+
+  function applyHistoryLearning() {
+    if (!historySimulation || historySimulation.sampleSize === 0) return
+    setAgentPreferences((current) => ({
+      ...current,
+      minimumMatchScore: historySimulation.recommendedMinimumMatchScore,
+      dailyContactLimit: historySimulation.recommendedDailyContactLimit,
+      autonomy: historySimulation.recommendedAutonomy,
+      autoSendResume: historySimulation.recommendedAutoSendResume,
+      learnFromReplies: true,
+      learnFromOutcomes: true
+    }))
+    setNotice(t('historyLearning.applied'))
+    setHistorySimulation(null)
+  }
+
   async function tryAutopilotMessage(message: BossConversationMessage) {
     try {
       if (!await hasAutomaticContactCapacity()) return
@@ -558,20 +598,12 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
         && item.ready.conversation
         && item.conversationFingerprint === conversationFingerprint
       ))
-      const usePdf = chatDiagnostic?.counts.pdfInputs === 1
-      const useDocx = !usePdf && chatDiagnostic?.counts.docxInputs === 1
-      if (!usePdf && !useDocx) throw new TypeError('No unique supported BOSS resume input is available')
-      const mimeType = usePdf
-        ? 'application/pdf' as const
-        : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' as const
-      const artifactModule = usePdf ? await import('@/lib/resume-pdf') : await import('@/lib/resume-docx')
-      const bytes = usePdf
-        ? (artifactModule as typeof import('@/lib/resume-pdf')).renderResumePdf(variant.data)
-        : (artifactModule as typeof import('@/lib/resume-docx')).renderResumeDocx(variant.data)
+      if (chatDiagnostic?.counts.pdfInputs !== 1) throw new TypeError('No unique BOSS PDF resume input is available')
+      const mimeType = 'application/pdf' as const
+      const artifactModule = await import('@/lib/resume-pdf')
+      const bytes = artifactModule.renderResumePdf(variant.data)
       const bytesBase64 = bytesToBase64(bytes)
-      const fileName = usePdf
-        ? (artifactModule as typeof import('@/lib/resume-pdf')).resumePdfFileName(variant.data, variant.name)
-        : (artifactModule as typeof import('@/lib/resume-docx')).resumeDocxFileName(variant.data, variant.name)
+      const fileName = artifactModule.resumePdfFileName(variant.data, variant.name)
       const contentFingerprint = createJobInputFingerprint(bytesBase64)
       const sentThread = await executeBossResumeAttachment({
         store,
@@ -607,7 +639,7 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
         now: new Date().toISOString()
       })
       if (agentPreferences.autonomy === 'autopilot') await tryAutopilotMessage(acknowledgement.message)
-      setNotice(t('jobAgent.resumeSent', { format: usePdf ? 'PDF' : 'DOCX' }))
+      setNotice(t('jobAgent.resumeSent', { format: 'PDF' }))
       await load()
     } catch {
       setError(t('jobAgent.resumeSendFailed'))
@@ -1229,6 +1261,8 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
           </div></section>
         </div>
         <section className="job-overview__progress"><h2>{t('workspace.applicationProgress')}</h2><div>{(['applied', 'viewed', 'conversations', 'interviews', 'offers'] as const).map((key) => <article key={key}><strong>{applicationCounts[key]}</strong><span>{t(`workspace.progress.${key}`)}</span></article>)}</div></section>
+        <JobProcessBoard applications={applications} postings={postings} threads={conversationThreads} messages={conversationMessages} />
+        <JobHistoryLearningPanel simulation={historySimulation} busy={historyLearningBusy} onSimulate={() => void simulateHistoryLearning()} onApply={applyHistoryLearning} onDismiss={() => setHistorySimulation(null)} />
       </div> : null}
 
       {workspaceSection === 'opportunities' ? <div className="job-opportunities">
@@ -1236,7 +1270,7 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
         <section className="job-opportunities__detail">{selectedPosting ? <><header><span>{selectedPosting.company}</span><h2>{selectedPosting.title}</h2><p>{[selectedPosting.location, selectedPosting.workplaceType, selectedPosting.employmentType].filter(Boolean).join(' · ') || t('unknown')}</p></header><div className="job-opportunities__score"><span>{t('workspace.matchScore')}</span><strong>{selectedRecommendation?.preliminaryScore !== undefined ? `${Math.round(selectedRecommendation.preliminaryScore)}%` : '—'}</strong></div><section><h3>{t('whyRecommended')}</h3>{selectedRecommendation?.reasons.length ? <ol>{selectedRecommendation.reasons.slice(0, 3).map((reason) => <li key={reason.code}><CheckCircle2 size={15} />{t('reason', { code: reason.code, contribution: reason.contribution })}</li>)}</ol> : <p>{t('unknownRecommendation')}</p>}</section><p className="job-opportunities__description">{selectedPosting.description.slice(0, 520)}</p><footer>{selectedRecommendation ? <><button type="button" className="job-button job-button--primary" onClick={() => void analyzePosting(selectedPosting, selectedRecommendation)}>{t('workspace.confirmInterest')}</button><button type="button" className="job-button job-button--secondary" onClick={() => void decide(selectedRecommendation, 'saved')}><Save size={14} />{t('save')}</button><button type="button" className="job-button job-button--secondary" onClick={() => void decide(selectedRecommendation, 'ignored')}>{t('ignore')}</button></> : null}<a href={selectedPosting.canonicalUrl} target="_blank" rel="noopener noreferrer"><ExternalLink size={15} />{t('openOriginal')}</a></footer></> : <p className="job-workspace__empty">{t('workspace.selectOpportunity')}</p>}</section>
       </div> : null}
 
-      {workspaceSection === 'resumes' ? <div className="job-workspace__content"><section className="job-section-heading"><div><h2>{t('workspace.resumeTasksTitle')}</h2><p>{t('workspace.resumeTasksHelp')}</p></div><span>{pendingRequirements + readyApplications}</span></section><div className="job-resume-agent"><LazyResumeAgentApp appId="agent" /></div><ApplicationPipeline packets={packets} pendingId={busyApplicationId} onPrepare={(id) => void prepareApplication(id)} onMarkApplied={(id) => void confirmApplied(id)} onNotesChange={(id, notes) => void saveApplicationNotes(id, notes)} /></div> : null}
+      {workspaceSection === 'resumes' ? <div className="job-workspace__content"><section className="job-section-heading"><div><h2>{t('workspace.resumeTasksTitle')}</h2><p>{t('workspace.resumeTasksHelp')}</p></div><span>{pendingRequirements + readyApplications}</span></section><ResumeVariantLibrary store={store} sourceDraftId={trustedDraft ? activeDraft?.id : undefined} baseResume={trustedDraft ? activeDraft?.data : undefined} plannedTitles={savedSearchProfile?.titles ?? []} /><div className="job-resume-agent"><LazyResumeAgentApp appId="agent" /></div><ApplicationPipeline packets={packets} pendingId={busyApplicationId} onPrepare={(id) => void prepareApplication(id)} onMarkApplied={(id) => void confirmApplied(id)} onNotesChange={(id, notes) => void saveApplicationNotes(id, notes)} /></div> : null}
 
       {workspaceSection === 'conversations' ? <div className="job-workspace__content"><section className="job-section-heading"><div><h2>{t('jobAgent.messageQueueTitle')}</h2><p>{t('jobAgent.messageQueueHelp')}</p></div><span>{conversationMessages.length}</span></section><BossConversationQueue threads={conversationThreads} messages={conversationMessages} applications={applications} postings={postings} pendingMessageId={busyConversationMessageId} pendingResumeThreadId={busyResumeThreadId} onRevise={(messageId, body) => void reviseConversationMessage(messageId, body)} onVerify={(messageId) => void verifyAndApproveConversationMessage(messageId)} onSend={(messageId) => void sendApprovedConversationMessage(messageId)} onSendResume={(thread) => void sendRequestedResume(thread)} /></div> : null}
 
@@ -1254,7 +1288,7 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
 
       {workspaceSection === 'activity' ? <div className="job-workspace__content"><section className="job-section-heading"><div><h2>{t('workspace.activityTitle')}</h2><p>{t('workspace.activityHelp')}</p></div></section><div className="job-activity-list">{postings.slice(0, 12).map((posting) => <article key={posting.id}><span><BriefcaseBusiness size={16} /></span><div><strong>{t('workspace.activityPosting', { title: posting.title })}</strong><p>{posting.company} · {posting.lastCheckedAt.slice(0, 10)}</p></div></article>)}{postings.length === 0 ? <p className="job-workspace__empty">{t('workspace.noActivity')}</p> : null}</div></div> : null}
 
-      {workspaceSection === 'preferences' ? <div className="job-preferences"><section><header><h2>{t('workspace.preferencesTitle')}</h2><p>{t('workspace.preferencesHelp')}</p></header><div className="job-preferences__grid"><label>{t('profileName')}<input value={profileName} onChange={(event) => setProfileName(event.target.value)} /></label><label>{t('titles')}<input value={titles} onChange={(event) => setTitles(event.target.value)} /></label><label>{t('locations')}<input value={locations} onChange={(event) => setLocations(event.target.value)} /></label><label>{t('preferredCompanies')}<input value={preferredCompanies} onChange={(event) => setPreferredCompanies(event.target.value)} placeholder={t('preferredCompaniesPlaceholder')} /></label><label>{t('requiredTerms')}<input value={requiredTerms} onChange={(event) => setRequiredTerms(event.target.value)} /></label><label>{t('preferredTerms')}<input value={preferredTerms} onChange={(event) => setPreferredTerms(event.target.value)} /></label><label>{t('excludedTerms')}<input value={excludedTerms} onChange={(event) => setExcludedTerms(event.target.value)} /></label></div><button type="button" className="job-button job-button--primary" onClick={() => void saveProfile()} disabled={!profileName.trim() || !titles.trim()}><Save size={15} />{t('saveProfile')}</button></section><section className="job-adapter-diagnostics"><header><div><h2>{t('jobAgent.diagnosticsTitle')}</h2><p>{t('jobAgent.diagnosticsHelp')}</p></div><button type="button" className="job-button job-button--secondary" onClick={() => void runBossAdapterDiagnostics()} disabled={diagnosingAdapter}>{t('jobAgent.runDiagnostics')}</button></header>{adapterDiagnostics.length === 0 ? <div className="job-adapter-diagnostics__empty"><p>{t('jobAgent.diagnosticsEmpty')}</p><a href="https://www.zhipin.com/web/geek/chat" target="_blank" rel="noopener noreferrer">{t('jobAgent.openBossChat')}</a></div> : <div className="job-adapter-diagnostics__list">{adapterDiagnostics.map((diagnostic, index) => <article key={`${diagnostic.pageKind}-${diagnostic.frameId}-${index}`}><header><strong>{t(`jobAgent.diagnosticPage.${diagnostic.pageKind}`)}</strong><span>{t(`jobAgent.session.${diagnostic.sessionState}`)}</span></header><div>{(['discovery', 'conversation', 'messageSend', 'resumeUpload'] as const).map((key) => <p key={key} data-ready={diagnostic.ready[key]}><CheckCircle2 size={14} />{t(`jobAgent.diagnosticReady.${key}`)}</p>)}</div><small>{t('jobAgent.diagnosticCounts', { jobs: diagnostic.counts.jobLinks, editors: diagnostic.counts.editors, send: diagnostic.counts.sendControls, identities: diagnostic.counts.recipientIdentities, conversations: diagnostic.counts.conversationIdentities, names: diagnostic.counts.recipientNames, docx: diagnostic.counts.docxInputs })}</small></article>)}</div>}</section><details><summary>{t('importJob')}</summary><p>{t('importJobHelp')}</p><label>{t('clipboardJob')}<textarea value={clipboardJobText} onChange={(event) => setClipboardJobText(event.target.value)} rows={5} placeholder={t('clipboardJobPlaceholder')} /></label><button type="button" className="job-button job-button--secondary" onClick={prefillFromClipboard} disabled={!clipboardJobText.trim()}><ClipboardPaste size={14} />{t('parseClipboardJob')}</button><div className="job-preferences__grid"><label>{t('importUrl')}<input type="url" value={importUrl} onChange={(event) => setImportUrl(event.target.value)} /></label><label>{t('importTitle')}<input value={importTitle} onChange={(event) => setImportTitle(event.target.value)} /></label><label>{t('importCompany')}<input value={importCompany} onChange={(event) => setImportCompany(event.target.value)} /></label><label>{t('importLocation')}<input value={importLocation} onChange={(event) => setImportLocation(event.target.value)} /></label></div><label>{t('importDescription')}<textarea value={importDescription} onChange={(event) => setImportDescription(event.target.value)} rows={6} /></label><button type="button" className="job-button job-button--primary" onClick={() => void importAndAnalyze()} disabled={!trustedDraft || !importUrl.trim() || !importTitle.trim() || !importCompany.trim() || !importDescription.trim()}>{t('importAndAnalyze')}</button></details></div> : null}
+      {workspaceSection === 'preferences' ? <div className="job-preferences"><section><header><h2>{t('workspace.preferencesTitle')}</h2><p>{t('workspace.preferencesHelp')}</p></header><div className="job-preferences__grid"><label>{t('profileName')}<input value={profileName} onChange={(event) => setProfileName(event.target.value)} /></label><label>{t('titles')}<input value={titles} onChange={(event) => setTitles(event.target.value)} /></label><label>{t('locations')}<input value={locations} onChange={(event) => setLocations(event.target.value)} /></label><label>{t('preferredCompanies')}<input value={preferredCompanies} onChange={(event) => setPreferredCompanies(event.target.value)} placeholder={t('preferredCompaniesPlaceholder')} /></label><label>{t('requiredTerms')}<input value={requiredTerms} onChange={(event) => setRequiredTerms(event.target.value)} /></label><label>{t('preferredTerms')}<input value={preferredTerms} onChange={(event) => setPreferredTerms(event.target.value)} /></label><label>{t('excludedTerms')}<input value={excludedTerms} onChange={(event) => setExcludedTerms(event.target.value)} /></label></div><button type="button" className="job-button job-button--primary" onClick={() => void saveProfile()} disabled={!profileName.trim() || !titles.trim()}><Save size={15} />{t('saveProfile')}</button></section><section className="job-adapter-diagnostics"><header><div><h2>{t('jobAgent.diagnosticsTitle')}</h2><p>{t('jobAgent.diagnosticsHelp')}</p></div><button type="button" className="job-button job-button--secondary" onClick={() => void runBossAdapterDiagnostics()} disabled={diagnosingAdapter}>{t('jobAgent.runDiagnostics')}</button></header>{adapterDiagnostics.length === 0 ? <div className="job-adapter-diagnostics__empty"><p>{t('jobAgent.diagnosticsEmpty')}</p><a href="https://www.zhipin.com/web/geek/chat" target="_blank" rel="noopener noreferrer">{t('jobAgent.openBossChat')}</a></div> : <div className="job-adapter-diagnostics__list">{adapterDiagnostics.map((diagnostic, index) => <article key={`${diagnostic.pageKind}-${diagnostic.frameId}-${index}`}><header><strong>{t(`jobAgent.diagnosticPage.${diagnostic.pageKind}`)}</strong><span>{t(`jobAgent.session.${diagnostic.sessionState}`)}</span></header><div>{(['discovery', 'conversation', 'messageSend', 'resumeUpload'] as const).map((key) => <p key={key} data-ready={diagnostic.ready[key]}><CheckCircle2 size={14} />{t(`jobAgent.diagnosticReady.${key}`)}</p>)}</div><small>{t('jobAgent.diagnosticCounts', { jobs: diagnostic.counts.jobLinks, editors: diagnostic.counts.editors, send: diagnostic.counts.sendControls, identities: diagnostic.counts.recipientIdentities, conversations: diagnostic.counts.conversationIdentities, names: diagnostic.counts.recipientNames, pdf: diagnostic.counts.pdfInputs })}</small></article>)}</div>}</section><details><summary>{t('importJob')}</summary><p>{t('importJobHelp')}</p><label>{t('clipboardJob')}<textarea value={clipboardJobText} onChange={(event) => setClipboardJobText(event.target.value)} rows={5} placeholder={t('clipboardJobPlaceholder')} /></label><button type="button" className="job-button job-button--secondary" onClick={prefillFromClipboard} disabled={!clipboardJobText.trim()}><ClipboardPaste size={14} />{t('parseClipboardJob')}</button><div className="job-preferences__grid"><label>{t('importUrl')}<input type="url" value={importUrl} onChange={(event) => setImportUrl(event.target.value)} /></label><label>{t('importTitle')}<input value={importTitle} onChange={(event) => setImportTitle(event.target.value)} /></label><label>{t('importCompany')}<input value={importCompany} onChange={(event) => setImportCompany(event.target.value)} /></label><label>{t('importLocation')}<input value={importLocation} onChange={(event) => setImportLocation(event.target.value)} /></label></div><label>{t('importDescription')}<textarea value={importDescription} onChange={(event) => setImportDescription(event.target.value)} rows={6} /></label><button type="button" className="job-button job-button--primary" onClick={() => void importAndAnalyze()} disabled={!trustedDraft || !importUrl.trim() || !importTitle.trim() || !importCompany.trim() || !importDescription.trim()}>{t('importAndAnalyze')}</button></details></div> : null}
     </section>
   </main>
 }

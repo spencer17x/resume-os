@@ -842,6 +842,113 @@
       "start": "确认并启动 Agent",
       "startManaged": "授权并启动全面托管"
     },
+    "historyLearning": {
+      "title": "从历史求职记录学习",
+      "description": "读取 BOSS 当前可见的历史沟通与本地投递状态，先生成模拟策略，再由你决定是否应用。",
+      "privacy": "扩展只返回数量、转化信号和策略参数，不返回私聊原文、联系人列表、Cookie 或登录凭据。",
+      "readHistory": "读取历史并模拟",
+      "reading": "正在读取…",
+      "readFailed": "无法读取历史记录，请保持 BOSS 沟通页已登录并打开后重试。",
+      "simulationTitle": "历史策略模拟",
+      "sampleSize": "样本 {count} 条",
+      "dismiss": "关闭模拟",
+      "signals": {
+        "conversations": "历史沟通",
+        "recruiterReplies": "招聘方回复",
+        "resumeRequests": "索要简历",
+        "interviewInvites": "面试邀请",
+        "offers": "Offer",
+        "rejections": "未通过"
+      },
+      "minimumScore": "建议最低匹配度",
+      "dailyLimit": "建议每日沟通上限",
+      "automation": "建议自动化模式",
+      "autoResume": "招聘方索要后自动发 PDF",
+      "autonomy": { "approval": "关键动作确认", "autopilot": "全面托管" },
+      "enabled": "开启",
+      "disabled": "关闭",
+      "reasons": {
+        "history-empty": "没有足够历史样本，暂不建议应用。",
+        "reply-observed": "历史中观察到招聘方回复，可学习现有沟通节奏。",
+        "resume-request-observed": "历史中存在索要简历信号，可模拟自动发送 PDF。",
+        "interview-observed": "历史中存在面试转化，可适当扩大候选范围。",
+        "low-conversion": "历史回复转化偏低，模拟策略会提高筛选门槛。",
+        "outcome-observed": "历史中存在最终结果，可用于后续复盘参数。"
+      },
+      "apply": "应用历史策略",
+      "keepCurrent": "保留当前设置",
+      "applied": "已应用历史模拟策略；Agent 的匹配阈值、每日上限和自动化偏好已更新。"
+    },
+    "resumeLibrary": {
+      "title": "岗位简历库",
+      "description": "Agent 按岗位方向聚类管理简历，不按公司机械复制。每个版本只使用可信简历、用户填写内容和已验证职业事实。",
+      "count": "{count} 份简历",
+      "empty": "还没有通过证据校验的岗位简历版本。",
+      "evidenceBoundary": "允许压缩、重排和优化表达；禁止新增未经证据支持的经历、职责、技能或业绩数字。",
+      "updated": "更新于 {value, date, medium}",
+      "planned": "Agent 根据求职目标自动准备；仅重排可信内容",
+      "plannedName": "{strategy}方向简历",
+      "preview": "浏览 Markdown 内容",
+      "strategy": {
+        "ai-agent": "AI Agent / 大模型应用",
+        "frontend": "高级前端",
+        "fullstack": "全栈工程",
+        "mobile": "移动端 / React Native",
+        "backend": "后端工程",
+        "general": "通用版本"
+      }
+    },
+    "processBoard": {
+      "title": "托管求职全流程",
+      "description": "统一查看每个岗位的简历、沟通、消息、投递和面试状态，不展示私聊正文。",
+      "job": "岗位",
+      "resume": "简历",
+      "conversation": "沟通阶段",
+      "message": "最新消息",
+      "application": "投递状态",
+      "interview": "面试状态",
+      "unknown": "未知",
+      "resumeReady": "简历已就绪",
+      "resumePreparing": "准备中",
+      "notStarted": "未开始沟通",
+      "noMessage": "暂无消息",
+      "noInterview": "暂无面试",
+      "conversationStage": {
+        "outreach-draft": "准备开场沟通",
+        "awaiting-reply": "等待招聘方回复",
+        "recruiter-replied": "招聘方已回复",
+        "resume-requested": "招聘方索要简历",
+        "resume-sent": "简历已发送",
+        "interview-invited": "收到面试邀请",
+        "interview-scheduled": "面试已排期",
+        "interviewing": "面试中",
+        "awaiting-result": "等待结果",
+        "completed": "流程已结束"
+      },
+      "messageStatus": {
+        "draft": "草稿",
+        "awaiting-approval": "等待自动校验",
+        "approved": "已通过校验",
+        "sending": "发送中",
+        "sent": "已发送",
+        "delivered": "已送达",
+        "read": "已读",
+        "failed": "发送失败"
+      },
+      "applicationStatus": {
+        "saved": "已保存",
+        "analyzing": "分析中",
+        "preparing": "准备材料",
+        "ready-to-apply": "可以投递",
+        "applied": "已投递",
+        "interviewing": "面试中",
+        "offered": "已获 Offer",
+        "rejected": "未通过",
+        "withdrawn": "已撤回",
+        "archived": "已归档"
+      },
+      "interviewStatus": { "interviewing": "面试中", "offered": "已通过", "rejected": "未通过" }
+    },
     "jobAgent": {
       "title": "自动求职控制台",
       "description": "保存可信简历和求职要求后，由你明确启动 Agent；随后才检测平台并持续找岗。",
@@ -929,7 +1036,7 @@
         "messageSend": "消息发送选择器",
         "resumeUpload": "PDF 简历上传选择器"
       },
-      "diagnosticCounts": "岗位链接 {jobs} · 编辑器 {editors} · 发送控件 {send} · 招聘方身份 {identities} · 会话身份 {conversations} · 姓名 {names} · DOCX 输入 {docx}",
+      "diagnosticCounts": "岗位链接 {jobs} · 编辑器 {editors} · 发送控件 {send} · 招聘方身份 {identities} · 会话身份 {conversations} · 姓名 {names} · PDF 输入 {pdf}",
       "messageStatus": {
         "draft": "草稿",
         "awaiting-approval": "待审阅",

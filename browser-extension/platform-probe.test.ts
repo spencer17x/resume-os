@@ -94,6 +94,31 @@ describe('BOSS page send adapter', () => {
     expect(recipient?.conversationId).toMatch(/^visible:fnv1a64:/u)
   })
 
+  it('summarizes visible BOSS history without returning private message bodies', async () => {
+    document.body.innerHTML = `
+      <div class="chat-list"><div>招聘经理 A 面试邀请 时间明天下午</div><div>招聘经理 B 请发一份简历</div></div>
+      <div class="message-left">可以安排面试，时间是明天下午</div>
+      <div class="message-right">好的，谢谢</div>`
+    let listener: ((message: unknown, sender: unknown, respond: (value: unknown) => void) => boolean) | undefined
+    const chrome = { runtime: { onMessage: { addListener: (value: typeof listener) => { listener = value } }, sendMessage: async () => undefined } }
+    runInNewContext(readFileSync('browser-extension/platform-probe.js', 'utf8'), {
+      chrome, document, location: new URL('https://www.zhipin.com/web/geek/chat'), URL,
+      Element, HTMLTextAreaElement, HTMLInputElement, InputEvent, Event, TextEncoder, BigInt, Date, Promise,
+      setTimeout, clearTimeout
+    })
+    const response = await new Promise<{ historySummary: Record<string, unknown> | null }>((resolve) => {
+      listener?.({ action: 'summarize-boss-history' }, {}, (value) => resolve(value as { historySummary: Record<string, unknown> | null }))
+    })
+    expect(response.historySummary).toMatchObject({
+      conversationCount: 2,
+      outgoingMessageCount: 1,
+      incomingMessageCount: 1,
+      interviewInviteCount: 2,
+      resumeRequestCount: 1
+    })
+    expect(JSON.stringify(response.historySummary)).not.toContain('明天下午')
+  })
+
   it('sends only the exact approved body to the exact verified recipient and returns a receipt', async () => {
     let listener: ((message: unknown, sender: unknown, respond: (value: unknown) => void) => boolean) | undefined
     const chrome = {

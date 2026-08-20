@@ -186,7 +186,7 @@ describe('JobRadarApp', () => {
       expect(await screen.findByRole('heading', { name: 'BOSS adapter diagnostics' })).toBeVisible()
       expect(await screen.findByText('Conversation page')).toBeVisible()
       expect(screen.getByText('PDF resume upload selectors')).toBeVisible()
-      expect(screen.getByText(/DOCX inputs 1/)).toBeVisible()
+      expect(screen.getByText(/PDF inputs 1/)).toBeVisible()
     } finally {
       window.removeEventListener(BROWSER_AGENT_REQUEST_EVENT, respond)
     }
