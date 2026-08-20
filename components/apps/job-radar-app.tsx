@@ -64,6 +64,7 @@ import { refreshJobSource } from '@/lib/jobs/job-refresh'
 import { refreshSelectedJobMarket } from '@/lib/jobs/job-market-search'
 import { importMarketplaceJob } from '@/lib/jobs/manual-job-import'
 import { parseJobClipboardText } from '@/lib/jobs/job-clipboard-import'
+import { analyzeJobGoalDescription } from '@/lib/jobs/job-goal-description'
 import {
   collectBossBrowserJobs,
   collectBossJobDetail,
@@ -198,6 +199,7 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
   const [adapterDiagnostics, setAdapterDiagnostics] = useState<BrowserBossAdapterDiagnostic[]>([])
   const [diagnosingAdapter, setDiagnosingAdapter] = useState(false)
   const [profileName, setProfileName] = useState('')
+  const [goalDescription, setGoalDescription] = useState('')
   const [titles, setTitles] = useState('')
   const [locations, setLocations] = useState('')
   const [preferredCompanies, setPreferredCompanies] = useState('')
@@ -249,6 +251,7 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
     experienceCount: activeDraft.data.experiences.length
   } : null
   const setupValues: JobSetupValues = {
+    goalDescription,
     profileName,
     titles,
     locations,
@@ -270,7 +273,7 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
     minimumMatchScore: agentPreferences.minimumMatchScore ?? 70,
     dailyContactLimit: agentPreferences.dailyContactLimit ?? 20,
     autonomy: agentPreferences.autonomy,
-    autoSendResume: agentPreferences.autoSendResume ?? true
+    autoSendResume: agentPreferences.autoSendResume ?? false
   }
 
   const load = useCallback(async () => {
@@ -430,6 +433,7 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
   }
 
   function updateSetupValue(key: keyof JobSetupValues, value: JobSetupValues[keyof JobSetupValues]) {
+    if (key === 'goalDescription') return setGoalDescription(String(value))
     if (key === 'profileName') return setProfileName(String(value))
     if (key === 'titles') return setTitles(String(value))
     if (key === 'locations') return setLocations(String(value))
@@ -442,6 +446,22 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
       return
     }
     setAdvancedSetup((current) => ({ ...current, [key]: value }))
+  }
+
+  function analyzeSetupGoal() {
+    const analyzed = analyzeJobGoalDescription(goalDescription)
+    if (analyzed.titles.length > 0) setTitles(analyzed.titles.join(', '))
+    if (analyzed.locations.length > 0) setLocations(analyzed.locations.join(', '))
+    if (analyzed.preferredTerms.length > 0) {
+      setPreferredTerms((current) => [...new Set([...splitTerms(current), ...analyzed.preferredTerms])].join(', '))
+    }
+    setAdvancedSetup((current) => ({
+      ...current,
+      ...(analyzed.minimumSalary !== undefined ? { minimumSalary: String(analyzed.minimumSalary) } : {}),
+      ...(analyzed.maximumSalary !== undefined ? { maximumSalary: String(analyzed.maximumSalary) } : {}),
+      ...(analyzed.workplaceTypes.length > 0 ? { workplaceTypes: analyzed.workplaceTypes } : {}),
+      ...(analyzed.employmentTypes.length > 0 ? { employmentTypes: analyzed.employmentTypes } : {})
+    }))
   }
 
   async function startConfiguredAgent() {
@@ -1224,7 +1244,7 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
 
       {workspaceSection === 'interviews' ? <LazyInterviewWorkspace store={store} applications={applications} postings={postings} locale={locale} onChanged={load} /> : null}
 
-      {workspaceSection === 'setup' ? <LazyJobAgentSetup trustedResume={trustedDraft} resumeEditor={<LazyResumeStudioApp appId="studio" />} analysis={setupAnalysis} values={setupValues} onChange={updateSetupValue} onSave={async () => Boolean(await saveProfile())} onStart={startConfiguredAgent} /> : null}
+      {workspaceSection === 'setup' ? <LazyJobAgentSetup trustedResume={trustedDraft} resumeEditor={<LazyResumeStudioApp appId="studio" />} analysis={setupAnalysis} values={setupValues} onChange={updateSetupValue} onAnalyzeGoal={analyzeSetupGoal} onSave={async () => Boolean(await saveProfile())} onStart={startConfiguredAgent} /> : null}
 
       {workspaceSection === 'profile' ? <div className="job-workspace__embedded" role="application" aria-label={desktopT('apps.studio')}><LazyResumeStudioApp appId="studio" /></div> : null}
 

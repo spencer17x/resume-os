@@ -781,9 +781,14 @@
     },
     "setup": {
       "eyebrow": "首次启动向导",
-      "title": "把求职目标交给 Agent 前，先完成四步设置",
-      "description": "完成前不会搜索、沟通或发送简历；设置完成后仍由你明确启动。",
-      "steps": { "1": "上传简历", "2": "分析简历", "3": "投递条件", "4": "托管规则" },
+      "title": "描述目标并一次性托管给求职 Agent",
+      "description": "启动前完成求职目标、可信简历和托管授权；启动后自动找岗、准备材料、沟通和跟进。",
+      "steps": { "1": "求职目标", "2": "上传简历", "3": "分析简历", "4": "投递条件", "5": "全面托管" },
+      "goalTitle": "先描述你想找什么工作",
+      "goalHelp": "使用自然语言说明岗位、城市、薪资、工作方式和偏好，Agent 会转换为 BOSS 筛选条件。",
+      "goalDescription": "我的求职需求",
+      "goalPlaceholder": "例如：想在杭州找全职 AI Agent 或 AI 全栈岗位，月薪 35K-60K，接受远程，偏好 TypeScript、React 和 RAG，不考虑外包。",
+      "analyzeGoal": "让 Agent 分析需求",
       "resumeTitle": "上传一份可信简历",
       "resumeHelp": "支持 PDF、DOCX、TXT 或直接粘贴。原始文件只用于临时解析，不会持久化保存。",
       "continue": "继续分析",
@@ -822,7 +827,8 @@
       "saving": "正在保存…",
       "saveOptions": "保存投递条件",
       "delegationTitle": "确认 Agent 托管规则",
-      "delegationHelp": "设置匹配阈值、每日上限和哪些外部动作可以自动执行。",
+      "delegationHelp": "平台沟通和招聘方索要后的简历发送只在启动前授权一次；正式投递和证据不足仍会暂停。",
+      "managedDelegation": "我授权 Agent 自动找岗、筛选、准备岗位简历、发送沟通、跟进回复，并在招聘方明确索要且平台允许时自动发送岗位专属简历。",
       "autonomy": "自动化级别",
       "autonomyMode": { "copilot": "只分析，不执行", "approval": "关键动作逐次确认", "autopilot": "通过验证后自动沟通" },
       "minimumMatchScore": "最低岗位匹配度",
@@ -833,7 +839,8 @@
       "boundaryCaptcha": "登录、短信、二维码和验证码由用户完成。",
       "boundaryOutcome": "面试通过、失败和最终结果由用户反馈；预测仅作建议。",
       "back": "上一步",
-      "start": "确认并启动 Agent"
+      "start": "确认并启动 Agent",
+      "startManaged": "授权并启动全面托管"
     },
     "jobAgent": {
       "title": "自动求职控制台",

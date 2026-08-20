@@ -3529,7 +3529,7 @@ a {
 .job-setup__header > div > span { color: var(--jw-primary); font-size: 12px; font-weight: 750; }
 .job-setup__header h2 { margin-top: 5px; font-size: 24px; }
 .job-setup__header p { max-width: 680px; margin-top: 7px; color: var(--jw-muted); }
-.job-setup__header ol { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.job-setup__header ol { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .job-setup__header li { position: relative; display: grid; justify-items: center; gap: 6px; color: var(--jw-muted); text-align: center; }
 .job-setup__header li::before { position: absolute; z-index: 0; top: 15px; right: 50%; left: -50%; height: 1px; background: var(--jw-line); content: ''; }
 .job-setup__header li:first-child::before { display: none; }
@@ -3556,7 +3556,9 @@ a {
 .job-setup__fields > label,
 .job-setup__delegation > label,
 .job-setup__salary > label { display: grid; gap: 6px; color: #555d69; font-size: 12px; font-weight: 650; }
-.job-setup :is(input, select) { width: 100%; min-height: 40px; border: 1px solid #d9dde4; border-radius: 7px; background: var(--jw-surface); padding: 7px 10px; }
+.job-setup :is(input, select, textarea) { width: 100%; min-height: 40px; border: 1px solid #d9dde4; border-radius: 7px; background: var(--jw-surface); padding: 7px 10px; }
+.job-setup__goal { display: grid; gap: 8px; margin-top: 22px; color: #555d69; font-size: 12px; font-weight: 650; }
+.job-setup__goal textarea { min-height: 150px; resize: vertical; line-height: 1.6; }
 .job-setup__salary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .job-setup fieldset { min-width: 0; border: 1px solid var(--jw-line); border-radius: 8px; padding: 10px 12px 12px; }
 .job-setup legend { padding: 0 5px; color: #555d69; font-size: 12px; font-weight: 650; }

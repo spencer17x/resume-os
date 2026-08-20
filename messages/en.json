@@ -781,9 +781,14 @@
     },
     "setup": {
       "eyebrow": "First-run setup",
-      "title": "Complete four steps before delegating your job search",
-      "description": "No search, communication, or resume send occurs before setup; you still explicitly start the Agent at the end.",
-      "steps": { "1": "Upload resume", "2": "Analyze resume", "3": "Job criteria", "4": "Delegation" },
+      "title": "Describe your goal and delegate the search once",
+      "description": "Set your goal, trusted resume, and delegation boundary before launch; the Agent then finds roles, prepares materials, communicates, and follows up.",
+      "steps": { "1": "Job goal", "2": "Upload resume", "3": "Analyze resume", "4": "Job criteria", "5": "Managed mode" },
+      "goalTitle": "Describe the job you want",
+      "goalHelp": "Use natural language for roles, cities, compensation, work style, and preferences. The Agent converts it into BOSS filters.",
+      "goalDescription": "My job-search goal",
+      "goalPlaceholder": "Example: Full-time AI Agent or AI full-stack roles in Hangzhou, 35K-60K monthly, remote accepted, TypeScript, React, and RAG preferred; exclude outsourcing.",
+      "analyzeGoal": "Let Agent analyze goal",
       "resumeTitle": "Upload a trusted resume",
       "resumeHelp": "Use PDF, DOCX, TXT, or pasted text. Original file bytes are transient extraction inputs and are not persisted.",
       "continue": "Continue to analysis",
@@ -822,7 +827,8 @@
       "saving": "Saving…",
       "saveOptions": "Save job criteria",
       "delegationTitle": "Confirm delegation rules",
-      "delegationHelp": "Set the match threshold, daily cap, and which external actions may run automatically.",
+      "delegationHelp": "Authorize platform communication and recruiter-requested resume sends once before launch; formal submission and evidence gaps still pause.",
+      "managedDelegation": "I authorize the Agent to find and qualify roles, prepare job-specific resumes, communicate, follow up, and send a job-specific resume after a verified recruiter request when the platform allows it.",
       "autonomy": "Automation level",
       "autonomyMode": { "copilot": "Analyze only", "approval": "Approve key actions", "autopilot": "Communicate after verification" },
       "minimumMatchScore": "Minimum match score",
@@ -833,7 +839,8 @@
       "boundaryCaptcha": "Login, SMS, QR codes, and CAPTCHAs remain user actions.",
       "boundaryOutcome": "The user reports interview pass/fail and final outcomes; predictions remain advisory.",
       "back": "Back",
-      "start": "Confirm and start Agent"
+      "start": "Confirm and start Agent",
+      "startManaged": "Authorize and start managed mode"
     },
     "jobAgent": {
       "title": "Job automation controls",
