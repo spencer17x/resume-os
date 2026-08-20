@@ -205,6 +205,29 @@ describe('JobRadarApp', () => {
       .toMatchObject({ enabled: true })
   })
 
+  it('preserves an enabled Agent preference while hydrating after refresh', async () => {
+    const store = createStore()
+    await store.put('jobSearchProfiles', { ...profile, platforms: ['boss'] })
+    window.localStorage.setItem('resume-os:job-agent-preferences:v1', JSON.stringify({
+      version: 1,
+      enabled: true,
+      autonomy: 'autopilot',
+      platforms: ['boss'],
+      learnFromReplies: true,
+      learnFromOutcomes: true,
+      minimumMatchScore: 70,
+      dailyContactLimit: 20,
+      autoSendResume: true
+    }))
+
+    renderRadar({ store, storage: trustedStorage() })
+
+    expect(await screen.findByRole('heading', { name: 'Agent is ready' })).toBeVisible()
+    await waitFor(() => expect(JSON.parse(
+      window.localStorage.getItem('resume-os:job-agent-preferences:v1') ?? '{}'
+    )).toMatchObject({ enabled: true, autonomy: 'autopilot' }))
+  })
+
   it('automatically searches the first three configured BOSS title types', async () => {
     const store = createStore()
     await store.put('jobSearchProfiles', {

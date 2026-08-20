@@ -200,6 +200,7 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
   const [sourceKey, setSourceKey] = useState('')
   const [selectedPlatforms, setSelectedPlatforms] = useState<JobMarketplaceId[]>([...DEFAULT_JOB_MARKETPLACES])
   const [agentPreferences, setAgentPreferences] = useState<JobAgentPreferences>(DEFAULT_JOB_AGENT_PREFERENCES)
+  const [agentPreferencesHydrated, setAgentPreferencesHydrated] = useState(false)
   const [browserSessions, setBrowserSessions] = useState<BrowserPlatformSession[]>([])
   const [browserAgentAvailable, setBrowserAgentAvailable] = useState(false)
   const [adapterDiagnostics, setAdapterDiagnostics] = useState<BrowserBossAdapterDiagnostic[]>([])
@@ -245,7 +246,6 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
   const refreshGenerationRef = useRef(0)
   const hydratedProfileIdRef = useRef('')
   const seededDraftIdRef = useRef('')
-  const agentPreferencesHydratedRef = useRef(false)
   const browserAutoRunRef = useRef(false)
   const savedSearchProfile = profiles[0]
   const agentSetupComplete = trustedDraft && Boolean(savedSearchProfile?.titles.length)
@@ -335,16 +335,16 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
   }, [load, store, t])
   useEffect(() => {
     setAgentPreferences(parseJobAgentPreferences(window.localStorage.getItem(JOB_AGENT_PREFERENCES_KEY)))
-    agentPreferencesHydratedRef.current = true
+    setAgentPreferencesHydrated(true)
   }, [])
   useEffect(() => {
-    if (!agentPreferencesHydratedRef.current) return
+    if (!agentPreferencesHydrated) return
     window.localStorage.setItem(JOB_AGENT_PREFERENCES_KEY, serializeJobAgentPreferences(agentPreferences))
-  }, [agentPreferences])
+  }, [agentPreferences, agentPreferencesHydrated])
   useEffect(() => {
-    if (!loaded || !agentPreferencesHydratedRef.current || agentSetupComplete) return
+    if (!loaded || !agentPreferencesHydrated || agentSetupComplete) return
     setAgentPreferences((current) => current.enabled ? { ...current, enabled: false } : current)
-  }, [agentSetupComplete, loaded])
+  }, [agentPreferencesHydrated, agentSetupComplete, loaded])
   useEffect(() => {
     let active = true
     void detectBrowserAgentSessions({ window }).then((response) => {
