@@ -1,14 +1,20 @@
 import {
   AI_API_KEY_HEADER,
   AI_BASE_URL_HEADER,
-  AI_MODEL_HEADER
+  AI_MODEL_HEADER,
+  LEGACY_AI_API_KEY_HEADER,
+  LEGACY_AI_BASE_URL_HEADER,
+  LEGACY_AI_MODEL_HEADER
 } from './provider-headers'
 
 export const DEFAULT_AI_BASE_URL = 'https://api.openai.com/v1'
 export const DEFAULT_AI_MODEL = 'gpt-4.1-mini'
-export const AI_CONFIG_STORAGE_KEY = 'resume-os-ai-config-v1'
-export const AI_KEY_STORAGE_KEY = 'resume-os-ai-key'
-export const AI_KEY_BINDING_STORAGE_KEY = 'resume-os-ai-key-binding-v1'
+export const AI_CONFIG_STORAGE_KEY = 'job-seeker-agent-ai-config-v1'
+export const AI_KEY_STORAGE_KEY = 'job-seeker-agent-ai-key'
+export const AI_KEY_BINDING_STORAGE_KEY = 'job-seeker-agent-ai-key-binding-v1'
+const LEGACY_AI_CONFIG_STORAGE_KEY = 'resume-os-ai-config-v1'
+const LEGACY_AI_KEY_STORAGE_KEY = 'resume-os-ai-key'
+const LEGACY_AI_KEY_BINDING_STORAGE_KEY = 'resume-os-ai-key-binding-v1'
 
 export type BrowserAiConfig = {
   baseURL: string
@@ -66,10 +72,14 @@ function browserStorage(name: 'localStorage' | 'sessionStorage'): BrowserStorage
   }
 }
 
-function readStorage(storage: BrowserStorage | null, key: string): StorageRead {
+function readStorage(storage: BrowserStorage | null, key: string, legacyKey?: string): StorageRead {
   if (!storage) return { available: false, value: null }
   try {
-    return { available: true, value: storage.getItem(key) }
+    const current = storage.getItem(key)
+    if (current !== null || !legacyKey) return { available: true, value: current }
+    const legacy = storage.getItem(legacyKey)
+    if (legacy !== null) storage.setItem(key, legacy)
+    return { available: true, value: legacy }
   } catch {
     return { available: false, value: null }
   }
@@ -207,7 +217,7 @@ function keyBindingMatches(
 export function readBrowserAiConfig(): BrowserAiConfig {
   const localStorage = browserStorage('localStorage')
   const sessionStorage = browserStorage('sessionStorage')
-  const storedConfigRead = readStorage(localStorage, AI_CONFIG_STORAGE_KEY)
+  const storedConfigRead = readStorage(localStorage, AI_CONFIG_STORAGE_KEY, LEGACY_AI_CONFIG_STORAGE_KEY)
   const storedConfig = parseStoredConfig(storedConfigRead.value)
   const memoryPublicConfig = {
     baseURL: memoryConfig.baseURL,
@@ -225,8 +235,8 @@ export function readBrowserAiConfig(): BrowserAiConfig {
       rememberApiKey: false
     })
   const keyStorage = publicConfig.rememberApiKey ? localStorage : sessionStorage
-  const keyRead = readStorage(keyStorage, AI_KEY_STORAGE_KEY)
-  const bindingRead = readStorage(keyStorage, AI_KEY_BINDING_STORAGE_KEY)
+  const keyRead = readStorage(keyStorage, AI_KEY_STORAGE_KEY, LEGACY_AI_KEY_STORAGE_KEY)
+  const bindingRead = readStorage(keyStorage, AI_KEY_BINDING_STORAGE_KEY, LEGACY_AI_KEY_BINDING_STORAGE_KEY)
   const binding = parseKeyBinding(bindingRead.value)
   const publicMatchesMemory = sameStoredConfig(publicConfig, memoryPublicConfig)
   const canUseMemoryKey = publicMatchesMemory
@@ -294,10 +304,15 @@ export function clearBrowserAiConfig(): void {
   const localStorage = browserStorage('localStorage')
   const sessionStorage = browserStorage('sessionStorage')
   removeStorage(localStorage, AI_CONFIG_STORAGE_KEY)
+  removeStorage(localStorage, LEGACY_AI_CONFIG_STORAGE_KEY)
   removeStorage(localStorage, AI_KEY_STORAGE_KEY)
+  removeStorage(localStorage, LEGACY_AI_KEY_STORAGE_KEY)
   removeStorage(localStorage, AI_KEY_BINDING_STORAGE_KEY)
+  removeStorage(localStorage, LEGACY_AI_KEY_BINDING_STORAGE_KEY)
   removeStorage(sessionStorage, AI_KEY_STORAGE_KEY)
+  removeStorage(sessionStorage, LEGACY_AI_KEY_STORAGE_KEY)
   removeStorage(sessionStorage, AI_KEY_BINDING_STORAGE_KEY)
+  removeStorage(sessionStorage, LEGACY_AI_KEY_BINDING_STORAGE_KEY)
   memoryConfig = { ...DEFAULT_CONFIG }
   needsMemoryFallback = false
 }
@@ -337,6 +352,9 @@ export function aiFetch(input: RequestInfo | URL, init: RequestInit = {}): Promi
   headers.delete(AI_API_KEY_HEADER)
   headers.delete(AI_BASE_URL_HEADER)
   headers.delete(AI_MODEL_HEADER)
+  headers.delete(LEGACY_AI_API_KEY_HEADER)
+  headers.delete(LEGACY_AI_BASE_URL_HEADER)
+  headers.delete(LEGACY_AI_MODEL_HEADER)
 
   const config = readBrowserAiConfig()
   if (config.apiKey) headers.set(AI_API_KEY_HEADER, config.apiKey)

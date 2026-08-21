@@ -102,8 +102,8 @@ test('starts with the workflow overview and manages concurrent windows with pers
 
 test('captures fully settled Studio windows at both acceptance viewports', async ({ page }) => {
   const captures = [
-    { width: 1440, height: 900, path: '/tmp/resume-os-task14-acceptance-desktop-1440x900.png' },
-    { width: 1280, height: 800, path: '/tmp/resume-os-task14-acceptance-desktop-1280x800.png' }
+    { width: 1440, height: 900, path: '/tmp/job-seeker-agent-task14-acceptance-desktop-1440x900.png' },
+    { width: 1280, height: 800, path: '/tmp/job-seeker-agent-task14-acceptance-desktop-1280x800.png' }
   ]
 
   for (const capture of captures) {
@@ -237,7 +237,7 @@ test('renders the AI agent constellation across desktop motion states and viewpo
 
   await expectNoDevelopmentOverlay(page)
   const fullImage = await page.screenshot({
-    path: '/tmp/resume-os-agent-constellation-full-1440x900.png'
+    path: '/tmp/job-seeker-agent-agent-constellation-full-1440x900.png'
   })
   await expectReadableScreenshot(page, fullImage)
 
@@ -283,7 +283,7 @@ test('renders the AI agent constellation across desktop motion states and viewpo
   ])).toEqual(['0px', '0px', '0deg', '0deg'])
 
   const reducedImage = await page.screenshot({
-    path: '/tmp/resume-os-agent-constellation-reduced-1440x900.png'
+    path: '/tmp/job-seeker-agent-agent-constellation-reduced-1440x900.png'
   })
   await expectReadableScreenshot(page, reducedImage)
 
@@ -423,13 +423,13 @@ test('survives project detail refresh and resets desktop state without deleting 
   await page.reload()
   await expect(page.getByRole('heading', { name: 'Evidence RAG Lab' })).toBeVisible()
 
-  await page.evaluate(() => localStorage.setItem('resume-os-drafts-v1', 'draft-sentinel'))
+  await page.evaluate(() => localStorage.setItem('job-seeker-agent-drafts-v1', 'draft-sentinel'))
   await page.getByRole('navigation', { name: 'Dock' }).getByRole('button', { name: 'Settings' }).click()
   const settings = page.getByRole('application', { name: 'Settings' })
   await settings.getByRole('button', { name: 'Reset desktop layout' }).click()
   await settings.getByRole('button', { name: 'Confirm reset' }).click()
-  expect(await page.evaluate(() => localStorage.getItem('resume-os-drafts-v1'))).toBe('draft-sentinel')
-  expect(await page.evaluate(() => localStorage.getItem('resume-os-desktop-v1'))).toBeNull()
+  expect(await page.evaluate(() => localStorage.getItem('job-seeker-agent-drafts-v1'))).toBe('draft-sentinel')
+  expect(await page.evaluate(() => localStorage.getItem('job-seeker-agent-desktop-v1'))).toBeNull()
 })
 
 test('keeps a BYOK key local and attaches it only to the AI diagnostic request', async ({ page }) => {
@@ -453,9 +453,9 @@ test('keeps a BYOK key local and attaches it only to the AI diagnostic request',
   await expect(settings.getByRole('status')).toContainText('this session')
 
   const storage = await page.evaluate(() => ({
-    config: JSON.parse(localStorage.getItem('resume-os-ai-config-v1') ?? 'null'),
-    localKey: localStorage.getItem('resume-os-ai-key'),
-    sessionKey: sessionStorage.getItem('resume-os-ai-key')
+    config: JSON.parse(localStorage.getItem('job-seeker-agent-ai-config-v1') ?? 'null'),
+    localKey: localStorage.getItem('job-seeker-agent-ai-key'),
+    sessionKey: sessionStorage.getItem('job-seeker-agent-ai-key')
   }))
   expect(storage.config).toEqual({
     version: 1,
@@ -469,8 +469,8 @@ test('keeps a BYOK key local and attaches it only to the AI diagnostic request',
   await settings.getByRole('button', { name: 'Check selected AI' }).click()
   await expect(settings.getByText('Check succeeded: Self-configured AI · e2e-model')).toBeVisible()
   expect(requestHeaders).toMatchObject({
-    'x-resume-os-ai-key': 'e2e-user-key',
-    'x-resume-os-ai-base-url': 'https://api.openai.com/v1',
-    'x-resume-os-ai-model': 'e2e-model'
+    'x-job-seeker-agent-ai-key': 'e2e-user-key',
+    'x-job-seeker-agent-ai-base-url': 'https://api.openai.com/v1',
+    'x-job-seeker-agent-ai-model': 'e2e-model'
   })
 })

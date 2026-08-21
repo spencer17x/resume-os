@@ -75,10 +75,10 @@ describe('SettingsApp', () => {
     renderSettings()
 
     fireEvent.click(screen.getByRole('radio', { name: 'Light' }))
-    expect(window.localStorage.getItem('resume-os-theme')).toBe('light')
+    expect(window.localStorage.getItem('job-seeker-agent-theme')).toBe('light')
 
     fireEvent.click(screen.getByRole('radio', { name: 'Reduced motion' }))
-    expect(window.localStorage.getItem('resume-os-motion')).toBe('reduced')
+    expect(window.localStorage.getItem('job-seeker-agent-motion')).toBe('reduced')
 
     fireEvent.click(screen.getByRole('radio', { name: '中文' }))
     expect(routerReplace).toHaveBeenCalledWith('/settings', { locale: 'zh' })

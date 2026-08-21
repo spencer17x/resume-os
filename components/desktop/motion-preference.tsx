@@ -12,6 +12,7 @@ import {
   type ReactNode
 } from 'react'
 import { useTranslations } from 'next-intl'
+import { readMigratedStorageValue } from '@/lib/brand-migration'
 
 export type MotionMode = 'system' | 'full' | 'reduced'
 
@@ -21,8 +22,9 @@ type MotionPreferenceContextValue = {
   setMode(mode: MotionMode): void
 }
 
-const STORAGE_KEY = 'resume-os-motion'
-const CHANGE_EVENT = 'resume-os-motion-change'
+const STORAGE_KEY = 'job-seeker-agent-motion'
+const LEGACY_STORAGE_KEY = 'resume-os-motion'
+const CHANGE_EVENT = 'job-seeker-agent-motion-change'
 const MEDIA_QUERY = '(prefers-reduced-motion: reduce)'
 const SERVER_MODE: MotionMode = 'system'
 const MOTION_MODES: readonly MotionMode[] = ['system', 'full', 'reduced']
@@ -35,7 +37,7 @@ function isMotionMode(value: unknown): value is MotionMode {
 
 function readStoredMode(): MotionMode {
   try {
-    const value = window.localStorage.getItem(STORAGE_KEY)
+    const value = readMigratedStorageValue(window.localStorage, STORAGE_KEY, LEGACY_STORAGE_KEY)
     memoryMode = isMotionMode(value) ? value : SERVER_MODE
     return memoryMode
   } catch {
@@ -45,7 +47,7 @@ function readStoredMode(): MotionMode {
 
 function subscribeToMode(onStoreChange: () => void) {
   const onStorage = (event: StorageEvent) => {
-    if (event.key !== STORAGE_KEY) return
+    if (event.key !== STORAGE_KEY && event.key !== LEGACY_STORAGE_KEY) return
 
     try {
       const storage = window.localStorage

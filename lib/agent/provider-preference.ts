@@ -1,6 +1,8 @@
 import type { AiProviderKind } from './providers'
+import { readMigratedStorageValue } from '@/lib/brand-migration'
 
-export const AI_PROVIDER_PREFERENCE_STORAGE_KEY = 'resume-os-ai-provider-preference-v1'
+export const AI_PROVIDER_PREFERENCE_STORAGE_KEY = 'job-seeker-agent-ai-provider-preference-v1'
+const LEGACY_AI_PROVIDER_PREFERENCE_STORAGE_KEY = 'resume-os-ai-provider-preference-v1'
 
 export type AiProviderMode = AiProviderKind | 'automatic'
 
@@ -62,7 +64,11 @@ export function readAiProviderPreference(): AiProviderPreference {
   if (!storage) return { ...memoryPreference }
 
   try {
-    const serialized = storage.getItem(AI_PROVIDER_PREFERENCE_STORAGE_KEY)
+    const serialized = readMigratedStorageValue(
+      storage,
+      AI_PROVIDER_PREFERENCE_STORAGE_KEY,
+      LEGACY_AI_PROVIDER_PREFERENCE_STORAGE_KEY
+    )
     if (serialized === null) {
       const preference = storageWriteFailed
         ? { ...memoryPreference }
@@ -110,6 +116,7 @@ export function clearAiProviderPreference(): void {
   if (!storage) return
   try {
     storage.removeItem(AI_PROVIDER_PREFERENCE_STORAGE_KEY)
+    storage.removeItem(LEGACY_AI_PROVIDER_PREFERENCE_STORAGE_KEY)
   } catch {
     // The in-memory default is still applied when browser persistence is restricted.
   }

@@ -43,7 +43,7 @@ function resume(name: string, title: string, source: ResumeData['metadata']['sou
     targetRole: title,
     skills: [{ group: 'Core', items: ['TypeScript', 'AI'] }],
     experiences: [{ company: 'Example Co', role: title, period: '2024 - Present', tags: [], bullets: ['Owned delivery'] }],
-    projects: [{ id: `${name}-project`, name: 'Resume OS', type: 'Product', tags: ['AI'], summary: 'A resume workspace', highlights: ['Structured data'] }],
+    projects: [{ id: `${name}-project`, name: 'JobSeeker Agent', type: 'Product', tags: ['AI'], summary: 'A resume workspace', highlights: ['Structured data'] }],
     education: [],
     certifications: [],
     awards: [],

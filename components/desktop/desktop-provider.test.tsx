@@ -303,7 +303,7 @@ describe('DesktopProvider', () => {
     await waitFor(() => expect(desktop().state.focusedAppId).toBe('agent'))
     act(() => desktop().resetDesktop())
 
-    expect(storage.removeCalls).toEqual([DESKTOP_STORAGE_KEY])
+    expect(storage.removeCalls).toEqual([DESKTOP_STORAGE_KEY, 'resume-os-desktop-v1'])
     expect(storage.getItem(DESKTOP_STORAGE_KEY)).toBeNull()
     expect(desktop().state).toEqual(createInitialDesktopState())
   })

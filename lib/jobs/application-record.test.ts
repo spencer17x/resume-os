@@ -60,7 +60,7 @@ async function readyHarness() {
   run = transitionOptimizationRun(run, { type: 'approve-changes', acceptedChangeIds: ['change-1'] }, now)
   run = transitionOptimizationRun(run, { type: 'apply', currentFingerprint: workflowFingerprint, appliedVariantId: 'variant-1', scoreAfter: score }, now)
   const variant = { id: 'variant-1', sourceDraftId: 'draft-1', targetJobId: target.id, name: 'Ada · Engineer', data: resume, createdAt: now, updatedAt: now }
-  const recommendation = { id: 'recommendation-1', postingId: posting.id, searchProfileId: profile.id, sourceDraftId: 'draft-1', rubricVersion: 'resume-os-job-relevance-v1', inputFingerprint: 'recommendation:fingerprint', eligibility: 'eligible' as const, preliminaryScore: 90, decision: 'saved' as const, reasons: [], analyzedTargetJobId: target.id, createdAt: now, updatedAt: now }
+  const recommendation = { id: 'recommendation-1', postingId: posting.id, searchProfileId: profile.id, sourceDraftId: 'draft-1', rubricVersion: 'job-seeker-agent-job-relevance-v1', inputFingerprint: 'recommendation:fingerprint', eligibility: 'eligible' as const, preliminaryScore: 90, decision: 'saved' as const, reasons: [], analyzedTargetJobId: target.id, createdAt: now, updatedAt: now }
   const application: ApplicationRecord = { ...baseRecord(), targetJobId: target.id, postingContentHash: posting.contentHash, recommendationFingerprint: recommendation.inputFingerprint, status: 'analyzing' }
   await store.put('evidenceSources', { id: 'evidence-1', type: 'user-answer', label: 'Synthetic evidence', excerpt: 'Built reliable systems.', createdAt: now })
   await store.put('careerFacts', fact)

@@ -134,7 +134,7 @@ async function githubGet(path, { allowMissing = false } = {}) {
     headers: {
       Accept: 'application/vnd.github+json',
       Authorization: `Bearer ${token}`,
-      'User-Agent': 'resume-os-release-state',
+      'User-Agent': 'job-seeker-agent-release-state',
       'X-GitHub-Api-Version': '2022-11-28'
     }
   })

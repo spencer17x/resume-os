@@ -115,18 +115,18 @@ describe('MotionPreferenceProvider', () => {
   it('persists changes and applies storage and same-tab preference events', async () => {
     renderPreference()
     fireEvent.click(screen.getByRole('button', { name: 'Reduced' }))
-    expect(window.localStorage.getItem('resume-os-motion')).toBe('reduced')
+    expect(window.localStorage.getItem('job-seeker-agent-motion')).toBe('reduced')
     expect(document.documentElement.dataset.motion).toBe('reduced')
 
-    window.localStorage.setItem('resume-os-motion', 'full')
+    window.localStorage.setItem('job-seeker-agent-motion', 'full')
     act(() => window.dispatchEvent(new StorageEvent('storage', {
-      key: 'resume-os-motion',
+      key: 'job-seeker-agent-motion',
       newValue: 'full',
       storageArea: window.localStorage
     })))
     expect(screen.getByTestId('mode')).toHaveTextContent('full')
 
-    act(() => window.dispatchEvent(new CustomEvent('resume-os-motion-change', { detail: 'system' })))
+    act(() => window.dispatchEvent(new CustomEvent('job-seeker-agent-motion-change', { detail: 'system' })))
     expect(screen.getByTestId('mode')).toHaveTextContent('system')
     expect(document.documentElement.dataset.motion).toBe('system')
   })
@@ -147,37 +147,37 @@ describe('MotionPreferenceProvider', () => {
     renderPreference()
     fireEvent.click(screen.getByRole('button', { name: 'Full' }))
 
-    window.sessionStorage.setItem('resume-os-motion', 'reduced')
+    window.sessionStorage.setItem('job-seeker-agent-motion', 'reduced')
     act(() => window.dispatchEvent(new StorageEvent('storage', {
-      key: 'resume-os-motion',
+      key: 'job-seeker-agent-motion',
       newValue: 'reduced',
       storageArea: window.sessionStorage
     })))
     expect(screen.getByTestId('mode')).toHaveTextContent('full')
-    expect(window.localStorage.getItem('resume-os-motion')).toBe('full')
+    expect(window.localStorage.getItem('job-seeker-agent-motion')).toBe('full')
 
-    window.localStorage.removeItem('resume-os-motion')
+    window.localStorage.removeItem('job-seeker-agent-motion')
     act(() => window.dispatchEvent(new StorageEvent('storage', {
-      key: 'resume-os-motion',
+      key: 'job-seeker-agent-motion',
       newValue: null,
       storageArea: window.localStorage
     })))
     expect(screen.getByTestId('mode')).toHaveTextContent('system')
-    expect(window.localStorage.getItem('resume-os-motion')).toBeNull()
+    expect(window.localStorage.getItem('job-seeker-agent-motion')).toBeNull()
   })
 
   it('does not overwrite a newer concurrent storage value with stale event data', () => {
     renderPreference()
     fireEvent.click(screen.getByRole('button', { name: 'Full' }))
 
-    window.localStorage.setItem('resume-os-motion', 'reduced')
+    window.localStorage.setItem('job-seeker-agent-motion', 'reduced')
     act(() => window.dispatchEvent(new StorageEvent('storage', {
-      key: 'resume-os-motion',
+      key: 'job-seeker-agent-motion',
       newValue: 'full',
       storageArea: window.localStorage
     })))
 
-    expect(window.localStorage.getItem('resume-os-motion')).toBe('reduced')
+    expect(window.localStorage.getItem('job-seeker-agent-motion')).toBe('reduced')
     expect(screen.getByTestId('mode')).toHaveTextContent('reduced')
   })
 
@@ -203,11 +203,11 @@ describe('MotionPreferenceProvider', () => {
     fireEvent.keyDown(system, { key: 'ArrowRight' })
     expect(full).toHaveAttribute('aria-checked', 'true')
     expect(full).toHaveFocus()
-    expect(window.localStorage.getItem('resume-os-motion')).toBe('full')
+    expect(window.localStorage.getItem('job-seeker-agent-motion')).toBe('full')
 
     fireEvent.click(reduced)
     expect(reduced).toHaveAttribute('aria-checked', 'true')
-    expect(window.localStorage.getItem('resume-os-motion')).toBe('reduced')
+    expect(window.localStorage.getItem('job-seeker-agent-motion')).toBe('reduced')
   })
 
   it('keeps the server snapshot stable before browser effects hydrate it', async () => {

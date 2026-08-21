@@ -5,7 +5,7 @@ const PLATFORM_HOSTS = {
 }
 
 const bossFrameIds = new Map()
-const AGENT_ALARM = 'resume-os-job-agent'
+const AGENT_ALARM = 'job-seeker-agent-job-agent'
 const AGENT_CONFIG_KEY = 'jobAgentSchedule'
 const AGENT_RUNTIME_KEY = 'jobAgentRuntimeV1'
 const INTERVIEW_SIGNALS_KEY = 'seenInterviewSignals'
@@ -227,7 +227,8 @@ async function dispatchPendingCycle() {
     url: [
       'http://127.0.0.1/*',
       'http://localhost/*',
-      'https://resume-os-phi.vercel.app/*'
+      'https://resume-os-phi.vercel.app/*',
+      'https://job-seeker-agent-phi.vercel.app/*'
     ]
   })
   const tab = tabs.find((candidate) => candidate.id)
@@ -310,10 +311,10 @@ async function notifyNewInterviewInvitations() {
   if (fresh.length === 0) return
   fresh.forEach((signal) => seen.add(signal.signalId))
   await chrome.storage.local.set({ [INTERVIEW_SIGNALS_KEY]: [...seen].slice(-100) })
-  await chrome.notifications.create(`resume-os-interview-${Date.now()}`, {
+  await chrome.notifications.create(`job-seeker-agent-interview-${Date.now()}`, {
     type: 'basic',
     iconUrl: NOTIFICATION_ICON,
-    title: 'Resume OS：发现约面消息',
+    title: 'JobSeeker Agent：发现约面消息',
     message: fresh.length === 1 ? 'BOSS 直聘出现一条可能的面试邀请，请打开沟通页面确认。' : `BOSS 直聘出现 ${fresh.length} 条可能的面试邀请，请打开沟通页面确认。`,
     priority: 2
   })

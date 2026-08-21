@@ -210,7 +210,7 @@ describe('DesktopShell', () => {
     const layout = readFileSync('app/[locale]/layout.tsx', 'utf8')
 
     expect(layout).toMatch(/<DesktopProvider locale={locale}>\s*<ResumeDraftProvider locale={locale}>\s*<DesktopShell>/)
-    expect(layout).toContain("title: 'Resume OS — Automated Job Agent'")
+    expect(layout).toContain("title: 'JobSeeker Agent — Automated Job Search'")
     expect(layout).not.toContain("title: 'Resume Agent OS'")
   })
 
@@ -251,8 +251,8 @@ describe('DesktopShell', () => {
   it('ships the original dark and light WebP wallpapers and references both variants', () => {
     const css = readFileSync('app/globals.css', 'utf8')
     const wallpapers = [
-      'public/wallpapers/resume-os-dark.webp',
-      'public/wallpapers/resume-os-light.webp'
+      'public/wallpapers/job-seeker-agent-dark.webp',
+      'public/wallpapers/job-seeker-agent-light.webp'
     ]
 
     for (const wallpaper of wallpapers) {
@@ -265,8 +265,8 @@ describe('DesktopShell', () => {
       expect(contents.readUIntLE(27, 3) + 1).toBeGreaterThanOrEqual(1600)
     }
 
-    expect(css).toContain('/wallpapers/resume-os-dark.webp')
-    expect(css).toContain('/wallpapers/resume-os-light.webp')
+    expect(css).toContain('/wallpapers/job-seeker-agent-dark.webp')
+    expect(css).toContain('/wallpapers/job-seeker-agent-light.webp')
     expect(css).toContain('image-set(')
   })
 
@@ -473,7 +473,7 @@ describe('DesktopShell', () => {
   })
 
   it('applies reduced window motion without scale or movement', async () => {
-    window.localStorage.setItem('resume-os-motion', 'reduced')
+    window.localStorage.setItem('job-seeker-agent-motion', 'reduced')
     renderDesktop()
     await waitFor(() => expect(document.documentElement.dataset.motion).toBe('reduced'))
     const studio = await screen.findByRole('application', { name: 'Resume Studio' })

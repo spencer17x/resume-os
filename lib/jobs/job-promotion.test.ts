@@ -14,7 +14,7 @@ const now = '2026-08-01T08:00:00.000Z'
 const source: JobSource = { id: 'source-1', kind: 'lever', label: 'Example', sourceKey: 'example', enabled: true, createdAt: now, updatedAt: now }
 const profile: JobSearchProfile = { id: 'profile-1', name: 'Roles', titles: ['Engineer'], adjacentTitles: [], locations: [], excludedLocations: [], workplaceTypes: [], employmentTypes: [], requiredTerms: [], preferredTerms: [], excludedTerms: [], maximumAgeDays: 30, createdAt: now, updatedAt: now }
 const posting: JobPosting = { id: 'posting-1', sourceId: source.id, externalId: '1', canonicalUrl: 'https://jobs.lever.co/example/1', applyUrl: 'https://jobs.lever.co/example/1/apply', title: 'Engineer', company: 'Example', description: 'Build systems.', locale: 'en', firstSeenAt: now, lastCheckedAt: now, status: 'open', contentHash: 'hash:one' }
-const recommendation: JobRecommendation = { id: 'recommendation-1', postingId: posting.id, searchProfileId: profile.id, sourceDraftId: 'draft-1', rubricVersion: 'resume-os-job-relevance-v1', inputFingerprint: 'fingerprint:one', eligibility: 'eligible', preliminaryScore: 80, decision: 'new', reasons: [], createdAt: now, updatedAt: now }
+const recommendation: JobRecommendation = { id: 'recommendation-1', postingId: posting.id, searchProfileId: profile.id, sourceDraftId: 'draft-1', rubricVersion: 'job-seeker-agent-job-relevance-v1', inputFingerprint: 'fingerprint:one', eligibility: 'eligible', preliminaryScore: 80, decision: 'new', reasons: [], createdAt: now, updatedAt: now }
 const target: TargetJob = { id: 'target-1', title: posting.title, company: posting.company, description: posting.description, locale: 'en', createdAt: now, updatedAt: now }
 
 async function seededStore() {

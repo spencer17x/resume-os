@@ -1,9 +1,9 @@
-# Resume OS Job Radar Implementation Plan
+# JobSeeker Agent Job Radar Implementation Plan
 
 ## Objective
 
 Implement the MVP defined in
-`docs/superpowers/specs/2026-08-01-resume-os-job-radar-design.md` without weakening
+`docs/superpowers/specs/2026-08-01-job-seeker-agent-job-radar-design.md` without weakening
 the existing evidence, privacy, provider, storage, request-guard, cancellation, or
 resume-variant boundaries.
 
@@ -286,7 +286,7 @@ corepack pnpm@11.17.0 test lib/jobs/job-refresh.test.ts lib/jobs/job-deduplicati
 
 ### Work
 
-1. Define `resume-os-job-relevance-v1` as a versioned rubric.
+1. Define `job-seeker-agent-job-relevance-v1` as a versioned rubric.
 2. Implement hard eligibility rules separately from ranking.
 3. Normalize title families, locations, workplace types, employment types, and terms
    without model inference.
@@ -462,7 +462,7 @@ corepack pnpm@11.17.0 test lib/jobs/application-record.test.ts components/apps/a
 
 - Update `README.md`, `docs/deployment.md`, and both locales to match the shipped
   behavior.
-- Explain that Resume OS discovers from authorized public sources, keeps private
+- Explain that JobSeeker Agent discovers from authorized public sources, keeps private
   matching local, and does not automatically submit.
 - Document source configuration, limits, privacy flow, retry behavior, and unsupported
   platform policy.

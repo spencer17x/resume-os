@@ -1,21 +1,23 @@
 # Deployment and data boundaries
 
-Resume OS is a local-first Evidence Agent with a stateless Next.js service boundary. “Local-first” means the durable career workspace belongs to the browser origin; it does not mean that every operation is guaranteed to run offline or that uploaded files never reach a same-origin route.
+JobSeeker Agent is a local-first Evidence Agent with a stateless Next.js service boundary. “Local-first” means the durable career workspace belongs to the browser origin; it does not mean that every operation is guaranteed to run offline or that uploaded files never reach a same-origin route.
 
 ## Runtime responsibilities
 
 | Runtime | Responsibilities | Durable user data |
 | --- | --- | --- |
 | Browser | Desktop/mobile UI, drafts, Career Evidence, requirement matrix, deterministic scoring, agent-run state, approvals, variants, provider selection | `localStorage` and IndexedDB for this origin |
-| Chrome Built-in AI (Beta) | Supported structured tasks through the browser `LanguageModel` API | Model lifecycle is managed by Chrome; Resume OS does not copy the model into its database |
+| Chrome Built-in AI (Beta) | Supported structured tasks through the browser `LanguageModel` API | Model lifecycle is managed by Chrome; JobSeeker Agent does not copy the model into its database |
 | Next.js route handlers | Same-origin request validation, bounded Greenhouse/Lever public-job discovery, PDF/DOCX/TXT extraction, OpenAI-compatible request execution, schema/error normalization | None; request-scoped processing only |
-| User-configured OpenAI-compatible provider | Cloud inference for explicitly selected cloud tasks | Governed by that provider's policy, not by Resume OS |
+| User-configured OpenAI-compatible provider | Cloud inference for explicitly selected cloud tasks | Governed by that provider's policy, not by JobSeeker Agent |
 
 The application has no server-side user database, ORM, account system, authentication session, vector database, or cloud-sync layer. Serverless Function instances may be created or discarded without losing the user's saved workspace because that workspace remains in the browser. Changing domains, subdomains, browser profiles, or site-storage partitions creates a different local workspace.
 
+The JobSeeker Agent rebrand migrates legacy `resume-os*` localStorage values into the new `job-seeker-agent*` keys on first read. The IndexedDB database intentionally retains its original `resume-os-domain` name so existing career evidence, jobs, variants, and Agent runs remain available without copying or clearing browser data. Legacy `RESUME_OS_*` environment variables and AI request headers remain accepted as compatibility aliases; new deployments should use `JOB_SEEKER_AGENT_*` and `x-job-seeker-agent-*`.
+
 ## What “RAG” means here
 
-Resume OS does not implement embedding search or a vector store. Its retrieval graph is typed and explicit:
+JobSeeker Agent does not implement embedding search or a vector store. Its retrieval graph is typed and explicit:
 
 - `CareerFact.evidenceRefs` points to one or more `EvidenceSource` records.
 - `RequirementMatch.factIds` points from a target-job requirement to relevant career facts.
@@ -37,7 +39,7 @@ This is structured evidence retrieval for a resume-tailoring domain. It is inten
 | Provider Base URL/model | `localStorage` | Per browser origin |
 | BYOK API key | `sessionStorage` by default | Moves to `localStorage` only after explicit device-persistence consent |
 
-If IndexedDB is unavailable, Resume OS reports that Career Evidence or agent state was not saved; it must not display an in-memory result as durable. Deletion checks are restrictive: a draft, fact, requirement, job, or variant referenced by saved agent data is not silently cascaded away.
+If IndexedDB is unavailable, JobSeeker Agent reports that Career Evidence or agent state was not saved; it must not display an in-memory result as durable. Deletion checks are restrictive: a draft, fact, requirement, job, or variant referenced by saved agent data is not silently cascaded away.
 
 ## Public job discovery boundary
 
@@ -81,7 +83,7 @@ Chrome owns model eligibility and download lifecycle. Availability can vary by b
 
 ### OpenAI-compatible BYOK
 
-The browser sends the configured Base URL, model, and API key only to approved same-origin Next.js AI routes. The route uses them for that invocation and forwards the request to the selected provider without persisting or echoing the key. Provider URLs must use HTTPS in public deployments, redirects are rejected, and browser-selected hosts must match the built-in exact-host allowlist (`api.openai.com` and `openrouter.ai`) or `RESUME_OS_ALLOWED_AI_HOSTS`.
+The browser sends the configured Base URL, model, and API key only to approved same-origin Next.js AI routes. The route uses them for that invocation and forwards the request to the selected provider without persisting or echoing the key. Provider URLs must use HTTPS in public deployments, redirects are rejected, and browser-selected hosts must match the built-in exact-host allowlist (`api.openai.com` and `openrouter.ai`) or `JOB_SEEKER_AGENT_ALLOWED_AI_HOSTS`.
 
 Public browser requests require a complete BYOK configuration. `OPENAI_API_KEY` on the Vercel project is not a shared fallback for browser UI traffic. The `OPENAI_*` variables are used for loopback/local-only operation or authenticated server-to-server calls.
 
@@ -97,19 +99,19 @@ Provider routing has three modes:
 
 Automatic mode defaults to cloud fallback **off**. Context overflow, invalid structured output, cancellation, and other local errors do not silently cross the device boundary.
 
-Chrome does not currently guarantee Chinese as a Prompt API input or output language. Resume OS therefore treats Chinese local AI tasks as experimental best-effort execution: it omits the unsupported `zh` capability declaration, sends the bounded task directly to the on-device model, and still requires the task's normal JSON schema, deterministic validations, cancellation, and stale-input checks where applicable. Invalid model output never triggers cloud fallback; model unavailability can use cloud only in Automatic mode after saved fallback consent.
+Chrome does not currently guarantee Chinese as a Prompt API input or output language. JobSeeker Agent therefore treats Chinese local AI tasks as experimental best-effort execution: it omits the unsupported `zh` capability declaration, sends the bounded task directly to the on-device model, and still requires the task's normal JSON schema, deterministic validations, cancellation, and stale-input checks where applicable. Invalid model output never triggers cloud fallback; model unavailability can use cloud only in Automatic mode after saved fallback consent.
 
 ## Data that crosses the device boundary
 
 - A Job Agent discovery refresh sends the configured public provider enum and board identifier to the same-origin discovery route. That route fetches public posting data from the fixed official host. Resume drafts, career facts, recommendation scores, conversation drafts, application notes, and application status are not included in source requests.
-- A PDF/DOCX/TXT upload is sent to the same-origin extraction route. Bytes are processed transiently and are not stored by Resume OS. The route returns extracted text.
+- A PDF/DOCX/TXT upload is sent to the same-origin extraction route. Bytes are processed transiently and are not stored by JobSeeker Agent. The route returns extracted text.
 - Pasted or extracted raw resume text is processed in the browser when Chrome Built-in AI is selected. It is sent through the same-origin parse route to the configured OpenAI-compatible provider only when that provider is explicitly selected or Automatic mode has saved fallback consent and the local model is unavailable or over its context budget.
 - Demo / Sandbox generation follows the same saved provider preference. Locally generated and cloud-generated demo resumes are both classified as `ai-generated` and never become verified Career Evidence.
 - Cloud agent tasks receive only the context assembled for that task, plus the user's instructions. Planning sends requirements, matches, facts already referenced by the Requirement Matrix, and a deterministic catalog of safe editable targets containing their paths, current text, and allowed transformations. The catalog excludes protected profile fields and unrelated resume sections. Change generation sends the full active structured resume and full target-job description so the provider can produce exact path/original edits, while requirement, match, and career-fact collections are limited to IDs cited by the approved plan.
-- Chrome Built-in AI tasks run in the browser and do not pass their prompt through Resume OS route handlers.
-- The same-origin route sees the BYOK credential for the duration of a cloud request, but Resume OS server code does not persist it.
+- Chrome Built-in AI tasks run in the browser and do not pass their prompt through JobSeeker Agent route handlers.
+- The same-origin route sees the BYOK credential for the duration of a cloud request, but JobSeeker Agent server code does not persist it.
 
-Users should still review the privacy and retention terms of their chosen hosting platform and OpenAI-compatible provider. “No Resume OS server database” is not a claim that network infrastructure or an external provider has no operational logs.
+Users should still review the privacy and retention terms of their chosen hosting platform and OpenAI-compatible provider. “No JobSeeker Agent server database” is not a claim that network infrastructure or an external provider has no operational logs.
 
 ## Quality, release, and deployment
 
@@ -257,18 +259,18 @@ Vercel is the supported zero-server-management topology because it runs the Next
 
 | Variable | Vercel browser deployment | Purpose |
 | --- | --- | --- |
-| `RESUME_OS_TRUSTED_PROXY=vercel` | Required | Trust Vercel's forwarded protocol/IP only when the Vercel runtime marker is present |
-| `RESUME_OS_ALLOWED_AI_HOSTS` | Optional | Comma-separated exact `host[:port]` additions for browser BYOK providers |
-| `RESUME_OS_LOCAL_ONLY` | Must be unset | Loopback-only mode would reject public clients |
+| `JOB_SEEKER_AGENT_TRUSTED_PROXY=vercel` | Required | Trust Vercel's forwarded protocol/IP only when the Vercel runtime marker is present |
+| `JOB_SEEKER_AGENT_ALLOWED_AI_HOSTS` | Optional | Comma-separated exact `host[:port]` additions for browser BYOK providers |
+| `JOB_SEEKER_AGENT_LOCAL_ONLY` | Must be unset | Loopback-only mode would reject public clients |
 | `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_MODEL` | Not required for browser BYOK | Local-only or authenticated server-to-server provider configuration |
-| `RESUME_OS_AI_ACCESS_TOKEN` | Optional; server-to-server only | High-entropy bearer token of at least 32 bytes; never expose to client JavaScript |
+| `JOB_SEEKER_AGENT_AI_ACCESS_TOKEN` | Optional; server-to-server only | High-entropy bearer token of at least 32 bytes; never expose to client JavaScript |
 
 ### Deployment steps
 
 1. Keep the GitHub repository connected to the existing Vercel project; `main` Production deployment remains disabled outside the Release workflow.
 2. Store the Vercel token, organization ID, and project ID as secrets on the `production` GitHub Environment, whose custom deployment branch policy allows only `main`. Do not commit `.vercel/`.
 3. Build from source on the GitHub-hosted Linux runner. The release workflow uses `vercel build --prod` and `vercel deploy --prebuilt --prod`; do not upload a `.next` output built on macOS because PDF extraction includes platform-native canvas code.
-4. Set `RESUME_OS_TRUSTED_PROXY=vercel` in Preview and Production. Keep `RESUME_OS_LOCAL_ONLY` unset.
+4. Set `JOB_SEEKER_AGENT_TRUSTED_PROXY=vercel` in Preview and Production. Keep `JOB_SEEKER_AGENT_LOCAL_ONLY` unset.
 5. Add only the exact additional BYOK provider hosts users need. Treat this list as an SSRF boundary.
 6. Add a Vercel Firewall or another distributed rate limit for `/api/`, including `/api/jobs/discover`. The built-in process-memory limiter is defense-in-depth and is not shared by serverless instances.
 7. After explicit release creation, dispatch the Release workflow with the existing `vX.Y.Z` tag and confirm that tagged quality validation and the Production deployment both succeed.
@@ -302,14 +304,14 @@ For a public deployment, also verify the browser network panel: Chrome-local tas
 For Job Agent, verify that refresh calls only `/api/jobs/discover`, the server calls only the fixed Greenhouse/Lever hosts, cancellation leaves no partial browser commit, career data is absent from the request, and selecting a platform does not imply connector authorization. In the current MVP, opening an application URL does not mark it submitted and an explicit submitted confirmation is required. Any later messaging or submission connector requires its own token, revocation, receipt, retry, and allow/deny-path verification before deployment.
 
 The optional Manifest V3 Browser Agent runs locally in Chrome. Its page bridge is
-allowlisted to the shipped Resume OS origin and loopback development origins. It may
+allowlisted to the shipped JobSeeker Agent origin and loopback development origins. It may
 probe visible platform pages but must not request cookie permissions, export session
 credentials, or report a send as successful without a platform receipt. New deployment
 origins require an intentional manifest change and extension review.
 
 The extension persists only a bounded runtime queue in `chrome.storage.local`: cycle ID,
 scheduled time, reason, attempt count, and coalesced missed-interval count. Page closure
-does not delete pending cycles. A reopened Resume OS page announces readiness, receives
+does not delete pending cycles. A reopened JobSeeker Agent page announces readiness, receives
 one oldest cycle, and reports completed/failed/skipped before another cycle can dispatch.
 Chrome startup restores the alarm and coalesces missed periods into one catch-up cycle;
 it does not replay every missed interval or execute BOSS actions while Chrome is closed.

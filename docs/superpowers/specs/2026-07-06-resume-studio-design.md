@@ -2,7 +2,7 @@
 
 ## Goal
 
-Upgrade Resume OS from a mostly static interactive resume into a Resume Studio product:
+Upgrade JobSeeker Agent from a mostly static interactive resume into a Resume Studio product:
 
 - The home route becomes the data production and draft management entry.
 - Users can upload or paste resume content, generate simulated resume data with AI, or chat with AI to create and improve a resume.

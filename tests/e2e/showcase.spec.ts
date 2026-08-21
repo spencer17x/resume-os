@@ -16,7 +16,7 @@ async function seedSampleResume(page: Page) {
     snapshots: []
   }
   await page.addInitScript(({ draft }) => {
-    localStorage.setItem('resume-os-drafts-v1', JSON.stringify({
+    localStorage.setItem('job-seeker-agent-drafts-v1', JSON.stringify({
       version: 1,
       state: { activeDraftId: draft.id, drafts: [draft] }
     }))
@@ -124,8 +124,8 @@ async function seedDenseResume(page: Page, count = 12) {
   }
   const draft = { id: 'dense-draft', name: 'Dense Resume', source: 'paste', createdAt: now, updatedAt: now, data, snapshots: [] }
   await page.addInitScript(({ draft }) => {
-    localStorage.setItem('resume-os-motion', 'reduced')
-    localStorage.setItem('resume-os-drafts-v1', JSON.stringify({
+    localStorage.setItem('job-seeker-agent-motion', 'reduced')
+    localStorage.setItem('job-seeker-agent-drafts-v1', JSON.stringify({
       version: 1,
       state: { activeDraftId: draft.id, drafts: [draft] }
     }))
@@ -159,8 +159,8 @@ async function seedLongResume(page: Page) {
   }
   const draft = { id: 'long-draft', name: token, source: 'paste', createdAt: now, updatedAt: now, data, snapshots: [] }
   await page.addInitScript(({ draft }) => {
-    localStorage.setItem('resume-os-motion', 'reduced')
-    localStorage.setItem('resume-os-drafts-v1', JSON.stringify({
+    localStorage.setItem('job-seeker-agent-motion', 'reduced')
+    localStorage.setItem('job-seeker-agent-drafts-v1', JSON.stringify({
       version: 1,
       state: { activeDraftId: draft.id, drafts: [draft] }
     }))
@@ -220,7 +220,7 @@ test('desktop Resume 3D renders real content, orbits, pauses, and falls back saf
   const canvas = await waitForRenderedCanvas(page)
   await waitForAppSurfaceToSettle(app)
   await expectNoDevelopmentOverlay(page)
-  await page.screenshot({ path: '/tmp/resume-os-task14-3d-desktop-1440x900.png', fullPage: true })
+  await page.screenshot({ path: '/tmp/job-seeker-agent-task14-3d-desktop-1440x900.png', fullPage: true })
 
   const metrics = await canvasPixelMetrics(page, canvas)
   expect(metrics.width).toBeGreaterThan(700)
@@ -277,7 +277,7 @@ test('desktop Resume 3D renders real content, orbits, pauses, and falls back saf
 test('Resume 3D disables automatic movement in reduced motion', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'Desktop reduced-motion coverage')
   await seedSampleResume(page)
-  await page.addInitScript(() => localStorage.setItem('resume-os-motion', 'reduced'))
+  await page.addInitScript(() => localStorage.setItem('job-seeker-agent-motion', 'reduced'))
   await page.goto('/en/3d')
   const canvas = await waitForRenderedCanvas(page)
   await expect(page.locator('.resume-3d__canvas')).toHaveAttribute('data-auto-rotate', 'false')
@@ -382,7 +382,7 @@ test('dense Resume 3D frames twelve nodes per category without DOM label collisi
     await expect(control).toHaveAttribute('aria-pressed', 'true')
     await expect(app.locator('.resume-3d__inspector h2')).toHaveText(name ?? '')
   }
-  await page.screenshot({ path: `/tmp/resume-os-task13-dense-${testInfo.project.name}.png`, fullPage: true })
+  await page.screenshot({ path: `/tmp/job-seeker-agent-task13-dense-${testInfo.project.name}.png`, fullPage: true })
 })
 
 test('mobile Resume 3D remains framed, interactive, and nonblank at 390x844', async ({ page }, testInfo) => {
@@ -394,7 +394,7 @@ test('mobile Resume 3D remains framed, interactive, and nonblank at 390x844', as
   const canvas = await waitForRenderedCanvas(page)
   await waitForAppSurfaceToSettle(frame)
   await expectNoDevelopmentOverlay(page)
-  await page.screenshot({ path: '/tmp/resume-os-task14-3d-mobile-390x844.png', fullPage: true })
+  await page.screenshot({ path: '/tmp/job-seeker-agent-task14-3d-mobile-390x844.png', fullPage: true })
   const metrics = await canvasPixelMetrics(page, canvas)
   expect(metrics.width).toBeGreaterThan(300)
   expect(metrics.height).toBeGreaterThan(400)
@@ -473,7 +473,7 @@ test('long unbroken resume text remains contained and reachable in 3D and Book',
         .every((region) => region.scrollWidth <= region.clientWidth + 1)
   }))
   expect(threeDimensions).toEqual({ appOverflow: 0, documentOverflow: 0, textRegionsFit: true })
-  await page.screenshot({ path: `/tmp/resume-os-task13-long-3d-${testInfo.project.name}.png`, fullPage: true })
+  await page.screenshot({ path: `/tmp/job-seeker-agent-task13-long-3d-${testInfo.project.name}.png`, fullPage: true })
 
   await canvas.dispatchEvent('webglcontextlost')
   const fallback = app.locator('.resume-3d__fallback')
@@ -497,7 +497,7 @@ test('long unbroken resume text remains contained and reachable in 3D and Book',
     expect(dimensions.documentOverflow).toBeLessThanOrEqual(1)
     if (pageIndex < 5) await book.getByRole('button', { name: 'Next page' }).click()
   }
-  await page.screenshot({ path: `/tmp/resume-os-task13-long-${testInfo.project.name}.png`, fullPage: true })
+  await page.screenshot({ path: `/tmp/job-seeker-agent-task13-long-${testInfo.project.name}.png`, fullPage: true })
 })
 
 test('375x667 reflows the 3D inspector into reachable page flow without overlap', async ({ page }, testInfo) => {
@@ -570,7 +570,7 @@ test('375x667 reflows the 3D inspector into reachable page flow without overlap'
   const after = await canvas.boundingBox()
   expect(after?.width).toBeCloseTo(before.width, 0)
   expect(after?.height).toBeCloseTo(before.height, 0)
-  await page.screenshot({ path: '/tmp/resume-os-task13-compact-375x667.png', fullPage: true })
+  await page.screenshot({ path: '/tmp/job-seeker-agent-task13-compact-375x667.png', fullPage: true })
 })
 
 test('Resume Book turns pages on desktop and becomes a single-page reader on mobile', async ({ page }, testInfo) => {
@@ -587,7 +587,7 @@ test('Resume Book turns pages on desktop and becomes a single-page reader on mob
   await expect(book.locator('[data-page-kind="profile"]')).toHaveAttribute('data-page-state', 'current')
   await expectBookControlsUnobscured(book)
   await expectNoDevelopmentOverlay(page)
-  const initialImage = await page.screenshot({ path: `/tmp/resume-os-task14-book-initial-${testInfo.project.name}.png`, fullPage: true })
+  const initialImage = await page.screenshot({ path: `/tmp/job-seeker-agent-task14-book-initial-${testInfo.project.name}.png`, fullPage: true })
   await expectReadableScreenshot(page, initialImage)
   await book.getByRole('button', { name: 'Next page' }).click()
   await expect(book.getByText('2 / 6')).toBeVisible()
@@ -601,7 +601,7 @@ test('Resume Book turns pages on desktop and becomes a single-page reader on mob
   await expect(book.locator('[data-page-kind="skills"]')).toHaveAttribute('data-page-state', 'current')
   await expectBookControlsUnobscured(book)
   await expectNoDevelopmentOverlay(page)
-  const turnedImage = await page.screenshot({ path: `/tmp/resume-os-task14-book-turned-${testInfo.project.name}.png`, fullPage: true })
+  const turnedImage = await page.screenshot({ path: `/tmp/job-seeker-agent-task14-book-turned-${testInfo.project.name}.png`, fullPage: true })
   await expectReadableScreenshot(page, turnedImage)
 
   const state = await book.evaluate((element) => {

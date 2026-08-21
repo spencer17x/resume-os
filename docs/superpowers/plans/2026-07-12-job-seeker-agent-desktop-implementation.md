@@ -1,8 +1,8 @@
-# Resume OS Desktop Experience Implementation Plan
+# JobSeeker Agent Desktop Experience Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build the approved Resume OS multi-window desktop, iOS-style mobile shell, resume creation workflow, Agent change preview, and structured 3D/Book presentation applications.
+**Goal:** Build the approved JobSeeker Agent multi-window desktop, iOS-style mobile shell, resume creation workflow, Agent change preview, and structured 3D/Book presentation applications.
 
 **Architecture:** A client `DesktopShell` in the locale layout renders applications from a typed registry. A reducer and browser-local persistence own window state, while a separate resume provider owns drafts and version snapshots. Route descriptors open and focus singleton applications; mobile reuses the same registry and application components in a full-screen frame.
 
@@ -74,7 +74,7 @@
 - `tests/e2e/mobile.spec.ts`: iOS-style shell workflows.
 - `tests/e2e/resume-flow.spec.ts`: draft and Agent workflows.
 - `tests/e2e/showcase.spec.ts`: 3D Canvas and Book verification.
-- `public/wallpapers/resume-os-dark.webp`, `public/wallpapers/resume-os-light.webp`: original Resume OS raster wallpapers.
+- `public/wallpapers/job-seeker-agent-dark.webp`, `public/wallpapers/job-seeker-agent-light.webp`: original JobSeeker Agent raster wallpapers.
 
 ---
 
@@ -215,7 +215,7 @@ describe('app registry', () => {
   it('maps localized paths to stable application ids', () => {
     expect(appIdFromPath('/zh/agent')).toBe('agent')
     expect(appIdFromPath('/en/3d')).toBe('resume-3d')
-    expect(appIdFromPath('/zh/projects/resume-os')).toBe('projects')
+    expect(appIdFromPath('/zh/projects/job-seeker-agent')).toBe('projects')
     expect(appIdFromPath('/zh')).toBe('studio')
   })
 
@@ -429,7 +429,7 @@ Expected: FAIL because persistence helpers do not exist.
 Export:
 
 ```ts
-export const DESKTOP_STORAGE_KEY = 'resume-os-desktop-v1'
+export const DESKTOP_STORAGE_KEY = 'job-seeker-agent-desktop-v1'
 export function readDesktopState(storage: Pick<Storage, 'getItem'>): DesktopState | null
 export function writeDesktopState(storage: Pick<Storage, 'setItem'>, state: DesktopState): void
 export function clearDesktopState(storage: Pick<Storage, 'removeItem'>): void
@@ -672,7 +672,7 @@ Expected: all pass.
 
 ```bash
 git add components/desktop components/apps/placeholder-app.tsx components/resume-draft-provider.tsx 'app/[locale]/layout.tsx' app/globals.css
-git commit -m "feat: add Resume OS desktop shell"
+git commit -m "feat: add JobSeeker Agent desktop shell"
 ```
 
 ---
@@ -680,8 +680,8 @@ git commit -m "feat: add Resume OS desktop shell"
 ### Task 7: Original Wallpaper And System Motion
 
 **Files:**
-- Create: `public/wallpapers/resume-os-dark.webp`
-- Create: `public/wallpapers/resume-os-light.webp`
+- Create: `public/wallpapers/job-seeker-agent-dark.webp`
+- Create: `public/wallpapers/job-seeker-agent-light.webp`
 - Create: `components/desktop/motion-preference.tsx`
 - Create: `components/desktop/motion-preference.test.tsx`
 - Modify: `components/desktop/desktop-surface.tsx`
@@ -694,7 +694,7 @@ git commit -m "feat: add Resume OS desktop shell"
 Use the image generation skill with this prompt for dark and light variants:
 
 ```text
-Abstract premium operating-system wallpaper for a product named Resume OS, layered folded glass and soft architectural light, graphite neutral foundation, teal highlights, restrained warm coral and muted gold accents, clean depth, no text, no logos, no circles, no bokeh, no gradient orbs, 16:10 desktop composition, detailed but quiet enough behind translucent application windows.
+Abstract premium operating-system wallpaper for a product named JobSeeker Agent, layered folded glass and soft architectural light, graphite neutral foundation, teal highlights, restrained warm coral and muted gold accents, clean depth, no text, no logos, no circles, no bokeh, no gradient orbs, 16:10 desktop composition, detailed but quiet enough behind translucent application windows.
 ```
 
 Export both variants as WebP at a minimum of 2560 x 1600.
@@ -705,7 +705,7 @@ Assert precedence: explicit local setting, then `prefers-reduced-motion`, then f
 
 - [ ] **Step 3: Implement motion preference**
 
-Use storage key `resume-os-motion` with values `system`, `full`, and `reduced`. Export `MotionPreferenceProvider`, `useMotionPreference`, and a setting control for the Settings application.
+Use storage key `job-seeker-agent-motion` with values `system`, `full`, and `reduced`. Export `MotionPreferenceProvider`, `useMotionPreference`, and a setting control for the Settings application.
 
 - [ ] **Step 4: Add P1 product motion**
 
@@ -721,7 +721,7 @@ Inspect `/zh` at 1440 x 900 in light and dark themes. Expected: readable window 
 
 ```bash
 git add public/wallpapers components/desktop app/globals.css
-git commit -m "feat: add Resume OS visual and motion system"
+git commit -m "feat: add JobSeeker Agent visual and motion system"
 ```
 
 ---
@@ -766,7 +766,7 @@ Expected: PASS.
 
 ```bash
 git add components/desktop/mobile-home.tsx components/desktop/mobile-app-frame.tsx components/desktop/mobile-shell.test.tsx components/desktop/desktop-shell.tsx app/globals.css
-git commit -m "feat: add Resume OS mobile shell"
+git commit -m "feat: add JobSeeker Agent mobile shell"
 ```
 
 ---
@@ -812,7 +812,7 @@ Cover create, rename, delete, set active, update with snapshot, fallback sample,
 
 - [ ] **Step 3: Implement store operations**
 
-Use storage key `resume-os-drafts-v1`. Export pure functions `readDraftState`, `writeDraftState`, `addDraft`, `renameDraft`, `deleteDraft`, `setActiveDraft`, and `updateDraftData`. `updateDraftData` accepts `{ snapshotReason?: ResumeSnapshot['reason'] }`.
+Use storage key `job-seeker-agent-drafts-v1`. Export pure functions `readDraftState`, `writeDraftState`, `addDraft`, `renameDraft`, `deleteDraft`, `setActiveDraft`, and `updateDraftData`. `updateDraftData` accepts `{ snapshotReason?: ResumeSnapshot['reason'] }`.
 
 - [ ] **Step 4: Implement the provider**
 
@@ -1150,7 +1150,7 @@ Inspect desktop at 1440 x 900 and 1280 x 800, plus mobile at 390 x 844 and 375 x
 
 ```bash
 git add components app messages tests playwright.config.ts
-git commit -m "test: verify Resume OS desktop experience"
+git commit -m "test: verify JobSeeker Agent desktop experience"
 ```
 
 ---

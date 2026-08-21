@@ -54,7 +54,8 @@ export const DEFAULT_JOB_AGENT_PREFERENCES: JobAgentPreferences = {
   autoSendResume: false
 }
 
-export const JOB_AGENT_PREFERENCES_KEY = 'resume-os:job-agent-preferences:v1'
+export const JOB_AGENT_PREFERENCES_KEY = 'job-seeker-agent:job-agent-preferences:v1'
+export const LEGACY_JOB_AGENT_PREFERENCES_KEY = 'resume-os:job-agent-preferences:v1'
 
 export function parseJobAgentPreferences(value: string | null): JobAgentPreferences {
   if (!value) return DEFAULT_JOB_AGENT_PREFERENCES

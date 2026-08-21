@@ -4,7 +4,10 @@ import type { ZodType } from 'zod'
 import {
   AI_API_KEY_HEADER,
   AI_BASE_URL_HEADER,
-  AI_MODEL_HEADER
+  AI_MODEL_HEADER,
+  LEGACY_AI_API_KEY_HEADER,
+  LEGACY_AI_BASE_URL_HEADER,
+  LEGACY_AI_MODEL_HEADER
 } from '@/lib/agent/provider-headers'
 import { apiErrorResponse, type ApiErrorCode } from '@/lib/server/request-guard'
 
@@ -56,9 +59,9 @@ function getRequiredOpenAIConfig(request?: Request) {
 function getCompleteRequestConfig(request?: Request) {
   if (!request) return null
 
-  const apiKey = request.headers.get(AI_API_KEY_HEADER)?.trim()
-  const baseURL = request.headers.get(AI_BASE_URL_HEADER)?.trim()
-  const model = request.headers.get(AI_MODEL_HEADER)?.trim()
+  const apiKey = (request.headers.get(AI_API_KEY_HEADER) ?? request.headers.get(LEGACY_AI_API_KEY_HEADER))?.trim()
+  const baseURL = (request.headers.get(AI_BASE_URL_HEADER) ?? request.headers.get(LEGACY_AI_BASE_URL_HEADER))?.trim()
+  const model = (request.headers.get(AI_MODEL_HEADER) ?? request.headers.get(LEGACY_AI_MODEL_HEADER))?.trim()
   if (!apiKey || !baseURL || !model) return null
 
   return { apiKey, baseURL, model }
@@ -92,7 +95,7 @@ function validateOpenAIConfig(
     throw new AgentConfigurationError('AI base URL is invalid')
   }
 
-  const localLoopback = process.env.RESUME_OS_LOCAL_ONLY === '1' && isLoopbackHost(url.hostname)
+  const localLoopback = brandedEnv('JOB_SEEKER_AGENT_LOCAL_ONLY', 'RESUME_OS_LOCAL_ONLY') === '1' && isLoopbackHost(url.hostname)
   if (url.protocol !== 'https:' && !(localLoopback && url.protocol === 'http:')) {
     throw new AgentConfigurationError('AI base URL is invalid')
   }
@@ -113,11 +116,15 @@ function assertBoundedValue(value: string, maxLength: number, field: string) {
 function allowedAiHosts() {
   return new Set([
     ...DEFAULT_ALLOWED_AI_HOSTS,
-    ...(process.env.RESUME_OS_ALLOWED_AI_HOSTS ?? '')
+    ...(brandedEnv('JOB_SEEKER_AGENT_ALLOWED_AI_HOSTS', 'RESUME_OS_ALLOWED_AI_HOSTS') ?? '')
       .split(',')
       .map((host) => host.trim().toLowerCase())
       .filter(Boolean)
   ])
+}
+
+function brandedEnv(current: string, legacy: string) {
+  return process.env[current] ?? process.env[legacy]
 }
 
 function isLoopbackHost(hostname: string) {

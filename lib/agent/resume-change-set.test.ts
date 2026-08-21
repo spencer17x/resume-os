@@ -34,8 +34,8 @@ function resume() {
       bullets: ['Owned delivery']
     }],
     projects: [{
-      id: 'resume-os',
-      name: 'Resume OS',
+      id: 'job-seeker-agent',
+      name: 'JobSeeker Agent',
       type: 'Product',
       tags: ['AI'],
       summary: 'Resume workspace',
@@ -173,7 +173,7 @@ describe('resume change sets', () => {
     expectChangeError(() => parseModelResumeChangeSet({
       summary: 'Order-dependent structural conflict',
       changes: [change({
-        path: 'projects', original: ['resume-os'], proposed: ['resume-os'],
+        path: 'projects', original: ['job-seeker-agent'], proposed: ['job-seeker-agent'],
         evidence: {
           requirementIds: ['requirement-1'], factIds: ['fact-1'], matchType: 'direct',
           support: 'verified', confidence: 1, transformation: 'reorder'
@@ -752,8 +752,8 @@ describe('resume change sets', () => {
       summary: 'Put the most relevant project first',
       changes: [change({
         path: 'projects',
-        original: ['resume-os', 'second-project'],
-        proposed: ['second-project', 'resume-os'],
+        original: ['job-seeker-agent', 'second-project'],
+        proposed: ['second-project', 'job-seeker-agent'],
         evidence: {
           requirementIds: ['requirement-1'], factIds: ['fact-1'], matchType: 'direct',
           support: 'verified', confidence: 1, transformation: 'reorder'
@@ -762,18 +762,18 @@ describe('resume change sets', () => {
     })
 
     const next = applyResumeChanges(original, set, ['change-1'], verifiedContext)
-    expect(next.projects.map(({ id }) => id)).toEqual(['second-project', 'resume-os'])
-    expect(next.projects.map(({ name }) => name)).toEqual(['Second Project', 'Resume OS'])
-    expect(original.projects.map(({ id }) => id)).toEqual(['resume-os', 'second-project'])
+    expect(next.projects.map(({ id }) => id)).toEqual(['second-project', 'job-seeker-agent'])
+    expect(next.projects.map(({ name }) => name)).toEqual(['Second Project', 'JobSeeker Agent'])
+    expect(original.projects.map(({ id }) => id)).toEqual(['job-seeker-agent', 'second-project'])
 
     for (const proposed of [
-      ['resume-os', 'resume-os'],
-      ['resume-os', 'unknown-project']
+      ['job-seeker-agent', 'job-seeker-agent'],
+      ['job-seeker-agent', 'unknown-project']
     ]) {
       const invalid = parseModelResumeChangeSet({
         summary: 'Invalid project order',
         changes: [change({
-          path: 'projects', original: ['resume-os', 'second-project'], proposed,
+          path: 'projects', original: ['job-seeker-agent', 'second-project'], proposed,
           evidence: {
             requirementIds: ['requirement-1'], factIds: ['fact-1'], matchType: 'direct',
             support: 'verified', confidence: 1, transformation: 'reorder'
@@ -787,11 +787,11 @@ describe('resume change sets', () => {
     }
 
     const duplicateIds = structuredClone(original)
-    duplicateIds.projects[1].id = 'resume-os'
+    duplicateIds.projects[1].id = 'job-seeker-agent'
     const duplicateCurrent = parseModelResumeChangeSet({
       summary: 'Current IDs are not stable',
       changes: [change({
-        path: 'projects', original: ['resume-os', 'resume-os'], proposed: ['resume-os', 'second-project'],
+        path: 'projects', original: ['job-seeker-agent', 'job-seeker-agent'], proposed: ['job-seeker-agent', 'second-project'],
         evidence: {
           requirementIds: ['requirement-1'], factIds: ['fact-1'], matchType: 'direct',
           support: 'verified', confidence: 1, transformation: 'reorder'

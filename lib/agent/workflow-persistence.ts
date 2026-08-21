@@ -25,9 +25,11 @@ import type {
 } from './requirement-matrix'
 import { requirementMatrixSchema } from './requirement-matrix'
 import type { ResumeData } from '@/lib/resume-model'
+import { readMigratedStorageValue } from '@/lib/brand-migration'
 
-export const ACTIVE_WORKFLOW_STORAGE_KEY = 'resume-os-active-workflow-v1'
-export const ACTIVE_WORKFLOW_CHANGED_EVENT = 'resume-os-active-workflow-changed'
+export const ACTIVE_WORKFLOW_STORAGE_KEY = 'job-seeker-agent-active-workflow-v1'
+const LEGACY_ACTIVE_WORKFLOW_STORAGE_KEY = 'resume-os-active-workflow-v1'
+export const ACTIVE_WORKFLOW_CHANGED_EVENT = 'job-seeker-agent-active-workflow-changed'
 
 export type ActiveWorkflowPreference = {
   targetJobId: string
@@ -105,7 +107,11 @@ export function readActiveWorkflowPreference(
 ): ActiveWorkflowPreference | null {
   if (!storage) return null
   try {
-    const value = JSON.parse(storage.getItem(ACTIVE_WORKFLOW_STORAGE_KEY) ?? 'null') as unknown
+    const value = JSON.parse(readMigratedStorageValue(
+      storage,
+      ACTIVE_WORKFLOW_STORAGE_KEY,
+      LEGACY_ACTIVE_WORKFLOW_STORAGE_KEY
+    ) ?? 'null') as unknown
     if (!isActiveWorkflowPreference(value)) return null
     return value
   } catch {
@@ -130,6 +136,7 @@ export function clearActiveWorkflowPreference(
   storage: BrowserStorage | null = browserStorage()
 ) {
   storage?.removeItem(ACTIVE_WORKFLOW_STORAGE_KEY)
+  storage?.removeItem(LEGACY_ACTIVE_WORKFLOW_STORAGE_KEY)
   if (typeof window !== 'undefined') window.dispatchEvent(new Event(ACTIVE_WORKFLOW_CHANGED_EVENT))
 }
 

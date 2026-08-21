@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Resume OS Browser Agent",
+  "name": "JobSeeker Agent Browser Extension",
   "version": "0.1.0",
-  "description": "Local browser bridge for Resume OS job-platform sessions.",
+  "description": "Local browser bridge for JobSeeker Agent job-platform sessions.",
   "permissions": ["tabs", "alarms", "storage", "notifications"],
   "host_permissions": [
     "https://www.zhipin.com/*"
@@ -13,9 +13,10 @@
       "matches": [
         "http://127.0.0.1/*",
         "http://localhost/*",
-        "https://resume-os-phi.vercel.app/*"
+        "https://resume-os-phi.vercel.app/*",
+        "https://job-seeker-agent-phi.vercel.app/*"
       ],
-      "js": ["resume-os-bridge.js"],
+      "js": ["job-seeker-agent-bridge.js"],
       "run_at": "document_start"
     },
     {

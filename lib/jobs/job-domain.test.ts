@@ -68,7 +68,7 @@ const recommendation: JobRecommendation = {
   postingId: posting.id,
   searchProfileId: profile.id,
   sourceDraftId: 'draft-1',
-  rubricVersion: 'resume-os-job-relevance-v1',
+  rubricVersion: 'job-seeker-agent-job-relevance-v1',
   inputFingerprint: 'fnv1a64:recommendation-1',
   eligibility: 'eligible',
   preliminaryScore: 86,

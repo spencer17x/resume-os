@@ -8,7 +8,7 @@ export default defineConfig({
   use: { baseURL: 'http://127.0.0.1:3101', trace: 'retain-on-failure' },
   webServer: {
     command:
-      'RESUME_OS_E2E=1 corepack pnpm@11.17.0 exec next dev --hostname 127.0.0.1 -p 3101',
+      'JOB_SEEKER_AGENT_E2E=1 corepack pnpm@11.17.0 exec next dev --hostname 127.0.0.1 -p 3101',
     url: 'http://127.0.0.1:3101',
     reuseExistingServer: false,
     timeout: 120_000

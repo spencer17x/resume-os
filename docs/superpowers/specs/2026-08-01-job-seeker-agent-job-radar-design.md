@@ -1,4 +1,4 @@
-# Resume OS Job Radar Product Design
+# JobSeeker Agent Job Radar Product Design
 
 ## Status
 
@@ -12,10 +12,10 @@ career-data persistence, or unattended application submission.
 
 ## Product Decision
 
-Extend Resume OS from a resume-tailoring workflow into an evidence-grounded job
+Extend JobSeeker Agent from a resume-tailoring workflow into an evidence-grounded job
 search copilot:
 
-> Resume OS discovers relevant jobs, explains which verified career facts support
+> JobSeeker Agent discovers relevant jobs, explains which verified career facts support
 > each match, prepares a job-specific application packet, and leaves the final
 > submission decision with the user.
 
@@ -50,7 +50,7 @@ writer produces text but does not maintain claim provenance. An unattended auto-
 bot increases application count but can submit unsuitable roles, inaccurate answers,
 or unreviewed personal information.
 
-Resume OS should connect discovery to its existing evidence and approval model.
+JobSeeker Agent should connect discovery to its existing evidence and approval model.
 
 ## Target User
 
@@ -140,7 +140,7 @@ The Greenhouse Job Board documentation classifies board data as public and requi
 no authentication for GET endpoints. Lever describes its Postings API as publicly
 accessible for published postings and documents the fixed `/v0/postings/{site}` GET.
 The separate application POST endpoints require credentials or candidate data and
-remain outside this MVP; Resume OS opens the provider-hosted form instead. These
+remain outside this MVP; JobSeeker Agent opens the provider-hosted form instead. These
 source classifications and endpoints were re-checked on 2026-08-01.
 
 As of 2026-08-01, LinkedIn states that unauthorized third-party software and browser
@@ -187,7 +187,7 @@ Hard exclusions are applied before ranking. An absent field is unknown, not a ma
 
 ### 3. Refresh Job Radar
 
-The user explicitly starts a refresh. Resume OS fetches only configured, authorized
+The user explicitly starts a refresh. JobSeeker Agent fetches only configured, authorized
 public sources. The MVP may continue refreshing while the application is open, but
 does not promise execution while the browser is closed.
 
@@ -207,7 +207,7 @@ For each posting, the UI shows:
 - whether the result is preliminary or evidence-mapped;
 - actions: Save, Ignore, Analyze, Prepare application, and Open original.
 
-The recommendation score is labeled **Resume OS relevance**, not interview chance or
+The recommendation score is labeled **JobSeeker Agent relevance**, not interview chance or
 ATS probability.
 
 ### 5. Promote a posting to a target job
@@ -232,11 +232,11 @@ free-form model output.
 
 ### 7. Submit with user control
 
-Resume OS opens the original application page and provides the approved packet. The
+JobSeeker Agent opens the original application page and provides the approved packet. The
 user completes platform-specific questions and performs the final submission.
 
 Afterward, the user explicitly marks the application as submitted and records the
-date. Resume OS never assumes that opening an application page means it was submitted.
+date. JobSeeker Agent never assumes that opening an application page means it was submitted.
 
 ### 8. Track outcomes
 

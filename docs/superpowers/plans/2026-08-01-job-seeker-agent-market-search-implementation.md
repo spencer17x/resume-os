@@ -1,4 +1,4 @@
-# Resume OS Multi-Platform Market Search Implementation Plan
+# JobSeeker Agent Multi-Platform Market Search Implementation Plan
 
 ## Status
 
@@ -7,7 +7,7 @@ Implemented on 2026-08-01 and extended into the cross-platform Job Copilot loop.
 ## Objective
 
 Change Job Radar from a company-board-first workflow into a resume-driven market
-search. A target company is optional. Users select job platforms, Resume OS derives
+search. A target company is optional. Users select job platforms, JobSeeker Agent derives
 an initial search profile from a trusted resume, refreshes every reviewed automatic
 source in the selected supported market, and presents one locally ranked inbox.
 

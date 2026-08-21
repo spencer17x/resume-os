@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { runInNewContext } from 'node:vm'
 import { describe, expect, it, vi } from 'vitest'
 
-describe('Resume OS BOSS extension background', () => {
+describe('JobSeeker Agent BOSS extension background', () => {
   it('constructs a fixed-host search tab, collects bounded jobs, and closes the tab', async () => {
     let listener: ((message: unknown, sender: unknown, respond: (value: unknown) => void) => boolean) | undefined
     const create = vi.fn(async ({ url }: { url: string }) => ({ id: 42, url }))

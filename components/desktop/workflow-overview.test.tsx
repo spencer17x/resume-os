@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('@/lib/agent/workflow-persistence', () => ({
-  ACTIVE_WORKFLOW_CHANGED_EVENT: 'resume-os-active-workflow-changed',
+  ACTIVE_WORKFLOW_CHANGED_EVENT: 'job-seeker-agent-active-workflow-changed',
   loadActiveWorkflowSummary: mocks.load
 }))
 
@@ -39,7 +39,7 @@ beforeEach(() => {
       scoreBefore: {
         requirementCoverage: 62.5,
         evidenceCompleteness: 75,
-        rubricVersion: 'resume-os-alignment-v1'
+        rubricVersion: 'job-seeker-agent-alignment-v1'
       }
     }
   })
@@ -60,7 +60,7 @@ describe('WorkflowOverview', () => {
     expect(screen.getByText('Requirement coverage')).toBeVisible()
     expect(screen.getByText('62.5%')).toBeVisible()
     expect(screen.getByText('75%')).toBeVisible()
-    expect(screen.getByText('resume-os-alignment-v1')).toBeVisible()
+    expect(screen.getByText('job-seeker-agent-alignment-v1')).toBeVisible()
     expect(screen.getByRole('heading', { name: 'Stage 05: Review & Export' })).toBeVisible()
     expect(screen.getByRole('heading', { name: 'Stage 06: Settings' })).toBeVisible()
     fireEvent.click(screen.getByRole('button', { name: 'Continue Agent run' }))

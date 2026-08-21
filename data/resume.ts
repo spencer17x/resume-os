@@ -47,7 +47,7 @@ export const resumeByLocale: Record<Locale, ResumeData> = {
       github: '',
       blog: '',
       summary: [
-        'Fictional candidate profile for exploring Resume OS without loading personal information.',
+        'Fictional candidate profile for exploring JobSeeker Agent without loading personal information.',
         'Demonstrates evidence-grounded resume review, job matching, and agent-assisted drafting workflows.'
       ],
       tags: ['Demo Profile', 'AI Applications', 'Agent Workflows', 'Full-stack', 'Product Engineering']
@@ -155,7 +155,7 @@ export const resumeByLocale: Record<Locale, ResumeData> = {
       github: '',
       blog: '',
       summary: [
-        '用于体验 Resume OS 的虚构候选人资料，不包含任何真实个人信息。',
+        '用于体验 JobSeeker Agent 的虚构候选人资料，不包含任何真实个人信息。',
         '展示基于证据的简历审阅、岗位匹配和 Agent 辅助改写流程。'
       ],
       tags: ['演示资料', 'AI 应用', 'Agent 工作流', '全栈工程', '产品工程']

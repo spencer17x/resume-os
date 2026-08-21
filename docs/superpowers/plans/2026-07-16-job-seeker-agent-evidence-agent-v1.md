@@ -1,8 +1,8 @@
-# Resume OS Evidence-Driven Agent V1
+# JobSeeker Agent Evidence-Driven Agent V1
 
 ## Task
 
-Upgrade Resume OS from a presentation-led AI resume workspace into a local-first,
+Upgrade JobSeeker Agent from a presentation-led AI resume workspace into a local-first,
 evidence-grounded resume tailoring agent, while preserving the existing desktop
 shell, local drafts, BYOK support, safe change-set application, and showcase
 experiences.
@@ -14,7 +14,7 @@ cloud provider when local inference is unavailable.
 
 ## Product Baseline
 
-Position Resume OS as:
+Position JobSeeker Agent as:
 
 > A local-first, evidence-grounded workspace that turns verified career facts into a
 > tailored resume for each target job.
@@ -222,7 +222,7 @@ Show separate results for:
 - evidence completeness;
 - resume structure/readability.
 
-Call the result **Resume OS alignment**, not an ATS pass probability. Save the rubric
+Call the result **JobSeeker Agent alignment**, not an ATS pass probability. Save the rubric
 version, input fingerprint, individual rule results, and evidence paths so identical
 inputs produce identical results.
 
@@ -396,7 +396,7 @@ Settings must provide:
 
 Privacy copy must state:
 
-> Resume OS does not persist your career data on its server. Chrome Built-in AI runs
+> JobSeeker Agent does not persist your career data on its server. Chrome Built-in AI runs
 > supported tasks on this device. When you explicitly use a cloud provider, only the
 > information required for that task is sent to the provider you configured.
 

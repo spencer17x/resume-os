@@ -41,6 +41,7 @@ import {
 export type { BossConversationMessage, BossConversationThread } from '@/lib/jobs/boss-conversation'
 
 export const DOMAIN_STORE_SCHEMA_VERSION = 4 as const
+// Keep the original IndexedDB name so existing local career evidence remains available after rebranding.
 export const DEFAULT_DOMAIN_DATABASE_NAME = 'resume-os-domain'
 
 export const DOMAIN_STORE_NAMES = [

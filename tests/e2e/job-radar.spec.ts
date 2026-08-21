@@ -19,7 +19,7 @@ async function createTrustedDraft(page: Page) {
     expect(route.request().postDataJSON()).toEqual({ text: resumeText, locale: 'en', source: 'paste' })
     await json(route, { data: resume, model: 'job-radar-e2e' })
   })
-  await page.addInitScript(() => localStorage.setItem('resume-os-ai-provider-preference-v1', JSON.stringify({
+  await page.addInitScript(() => localStorage.setItem('job-seeker-agent-ai-provider-preference-v1', JSON.stringify({
     version: 1, mode: 'openai-compatible', allowCloudFallback: false
   })))
   await page.goto('/en/studio')

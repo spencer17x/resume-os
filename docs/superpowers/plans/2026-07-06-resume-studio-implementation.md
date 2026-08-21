@@ -588,7 +588,7 @@ Create `lib/resume-store.ts`:
 ```ts
 import { createResumeDraft, normalizeResumeData, type ResumeDraft, type ResumeDraftState } from './resume-model'
 
-export const RESUME_DRAFT_STORAGE_KEY = 'resume-os:drafts:v1'
+export const RESUME_DRAFT_STORAGE_KEY = 'job-seeker-agent:drafts:v1'
 
 export const emptyDraftState: ResumeDraftState = {
   activeDraftId: null,
@@ -1003,7 +1003,7 @@ export function buildResumeQuestionPrompt({
   const language = locale === 'zh' ? 'Chinese' : 'English'
 
   return [
-    'You are Resume OS, an AI Resume Agent.',
+    'You are JobSeeker Agent, an AI Resume Agent.',
     'Answer only based on the provided structured resume data.',
     'Do not fabricate companies, metrics, titles, education, projects, dates, or outcomes.',
     'If the data does not contain the answer, say that it is not shown in the current resume data.',

@@ -28,7 +28,10 @@ import { z } from 'zod'
 import {
   AI_API_KEY_HEADER,
   AI_BASE_URL_HEADER,
-  AI_MODEL_HEADER
+  AI_MODEL_HEADER,
+  LEGACY_AI_API_KEY_HEADER,
+  LEGACY_AI_BASE_URL_HEADER,
+  LEGACY_AI_MODEL_HEADER
 } from './provider-headers'
 
 function byokRequest({
@@ -66,8 +69,8 @@ beforeEach(() => {
   vi.stubEnv('OPENAI_API_KEY', 'test-key')
   vi.stubEnv('OPENAI_BASE_URL', '')
   vi.stubEnv('OPENAI_MODEL', 'test-model')
-  vi.stubEnv('RESUME_OS_ALLOWED_AI_HOSTS', '')
-  vi.stubEnv('RESUME_OS_LOCAL_ONLY', '')
+  vi.stubEnv('JOB_SEEKER_AGENT_ALLOWED_AI_HOSTS', '')
+  vi.stubEnv('JOB_SEEKER_AGENT_LOCAL_ONLY', '')
 })
 
 afterEach(() => {
@@ -77,6 +80,17 @@ afterEach(() => {
 })
 
 describe('agent OpenAI boundary', () => {
+  it('accepts legacy Resume OS BYOK headers during the rebrand migration', async () => {
+    await generateAgentText('prompt', { request: new Request('https://resume.example/api/chat', {
+      headers: {
+        [LEGACY_AI_API_KEY_HEADER]: 'legacy-key',
+        [LEGACY_AI_BASE_URL_HEADER]: 'https://api.openai.com/v1',
+        [LEGACY_AI_MODEL_HEADER]: 'legacy-model'
+      }
+    }) })
+    expect(sdkMocks.createOpenAI).toHaveBeenCalledWith(expect.objectContaining({ apiKey: 'legacy-key' }))
+    expect(sdkMocks.model).toHaveBeenCalledWith('legacy-model')
+  })
   it('passes immutable system instructions, abort signal, and a bounded output budget', async () => {
     const controller = new AbortController()
     const result = await generateAgentText('untrusted user data', {
@@ -149,7 +163,7 @@ describe('agent OpenAI boundary', () => {
   })
 
   it('allows exact additional provider hosts configured by the server', async () => {
-    vi.stubEnv('RESUME_OS_ALLOWED_AI_HOSTS', 'gateway.example:8443, api.example')
+    vi.stubEnv('JOB_SEEKER_AGENT_ALLOWED_AI_HOSTS', 'gateway.example:8443, api.example')
 
     await generateAgentText('prompt', {
       request: byokRequest({ baseURL: 'https://gateway.example:8443/openai/v1' })
@@ -173,7 +187,7 @@ describe('agent OpenAI boundary', () => {
   })
 
   it('allows an HTTP loopback provider only in explicit local-only mode', async () => {
-    vi.stubEnv('RESUME_OS_LOCAL_ONLY', '1')
+    vi.stubEnv('JOB_SEEKER_AGENT_LOCAL_ONLY', '1')
 
     await generateAgentText('prompt', {
       request: byokRequest({ baseURL: 'http://127.0.0.1:11434/v1' })

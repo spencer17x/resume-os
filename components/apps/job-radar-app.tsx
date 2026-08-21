@@ -86,6 +86,7 @@ import {
   sendBossBrowserMessage,
   sendBossResumeAttachment,
   JOB_AGENT_WAKE_EVENT,
+  LEGACY_JOB_AGENT_WAKE_EVENT,
   type BrowserBossJob,
   type BrowserBossAdapterDiagnostic,
   type BrowserJobAgentRuntime,
@@ -95,10 +96,12 @@ import {
   DEFAULT_JOB_AGENT_PREFERENCES,
   JOB_AGENT_PLATFORM_IDS,
   JOB_AGENT_PREFERENCES_KEY,
+  LEGACY_JOB_AGENT_PREFERENCES_KEY,
   parseJobAgentPreferences,
   serializeJobAgentPreferences,
   type JobAgentPreferences
 } from '@/lib/jobs/job-agent-policy'
+import { readMigratedStorageValue } from '@/lib/brand-migration'
 import { simulateJobAgentFromHistory, type JobHistorySimulation } from '@/lib/jobs/job-history-learning'
 import {
   DEFAULT_JOB_MARKETPLACES,
@@ -340,7 +343,11 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
     }
   }, [load, store, t])
   useEffect(() => {
-    setAgentPreferences(parseJobAgentPreferences(window.localStorage.getItem(JOB_AGENT_PREFERENCES_KEY)))
+    setAgentPreferences(parseJobAgentPreferences(readMigratedStorageValue(
+      window.localStorage,
+      JOB_AGENT_PREFERENCES_KEY,
+      LEGACY_JOB_AGENT_PREFERENCES_KEY
+    )))
     setAgentPreferencesHydrated(true)
   }, [])
   useEffect(() => {
@@ -445,7 +452,11 @@ export function JobRadarApp({ store: storeOverride, createAdapter = createSameOr
       void run()
     }
     window.addEventListener(JOB_AGENT_WAKE_EVENT, wake)
-    return () => window.removeEventListener(JOB_AGENT_WAKE_EVENT, wake)
+    window.addEventListener(LEGACY_JOB_AGENT_WAKE_EVENT, wake)
+    return () => {
+      window.removeEventListener(JOB_AGENT_WAKE_EVENT, wake)
+      window.removeEventListener(LEGACY_JOB_AGENT_WAKE_EVENT, wake)
+    }
   }, [agentExecutionEnabled, busySourceId, titles])
 
   function toggleJobAgent() {

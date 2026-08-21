@@ -252,8 +252,8 @@ describe('JDMatchApp', () => {
     expect(within(report).getByText('Verified requirement coverage')).toBeVisible()
     expect(within(report).getByText('Verified evidence completeness')).toBeVisible()
     expect(within(report).getByText('Structure & readability')).toBeVisible()
-    expect(within(report).getByText('Alignment rubric: resume-os-alignment-v1')).toBeVisible()
-    expect(within(report).getByText('Structure rubric: resume-os-structure-v1')).toBeVisible()
+    expect(within(report).getByText('Alignment rubric: job-seeker-agent-alignment-v1')).toBeVisible()
+    expect(within(report).getByText('Structure rubric: job-seeker-agent-structure-v1')).toBeVisible()
     expect(within(report).getByText(/^Input fingerprint: fnv1a:/)).toBeVisible()
     expect(within(report).getByText('15%')).toBeVisible()
     expect(within(report).getAllByText('Pending evidence review')).toHaveLength(2)
@@ -281,7 +281,7 @@ describe('JDMatchApp', () => {
 
     expect(await screen.findByText('0 of 3 confirmed')).toBeVisible()
     expect(workflowPersistence).not.toHaveBeenCalled()
-    expect(window.localStorage.getItem('resume-os-active-workflow-v1')).toBeNull()
+    expect(window.localStorage.getItem('job-seeker-agent-active-workflow-v1')).toBeNull()
 
     await reviewAllRequirements(user)
     expect(await screen.findByText('Target job and resumable Agent run saved in this browser.')).toBeVisible()
@@ -292,7 +292,7 @@ describe('JDMatchApp', () => {
     expect(workflowPersistence.mock.calls[0][0].analysis.matrix.requirements.every(
       (requirement) => requirement.userConfirmed
     )).toBe(true)
-    expect(JSON.parse(window.localStorage.getItem('resume-os-active-workflow-v1') ?? '')).toEqual({
+    expect(JSON.parse(window.localStorage.getItem('job-seeker-agent-active-workflow-v1') ?? '')).toEqual({
       targetJobId: workflowAnalysis.targetJob.id,
       optimizationRunId: 'run-1'
     })
@@ -315,7 +315,7 @@ describe('JDMatchApp', () => {
 
     expect(await screen.findByText('1 of 3 confirmed')).toBeVisible()
     expect(workflowPersistence).not.toHaveBeenCalled()
-    expect(window.localStorage.getItem('resume-os-active-workflow-v1')).toBeNull()
+    expect(window.localStorage.getItem('job-seeker-agent-active-workflow-v1')).toBeNull()
     expect(screen.getByRole('button', { name: 'Review 2 remaining' })).toBeDisabled()
   })
 

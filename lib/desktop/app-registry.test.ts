@@ -23,7 +23,7 @@ describe('app registry', () => {
   })
 
   it('accepts one nonempty nested project id only', () => {
-    expect(appIdFromPath('/zh/projects/resume-os')).toBe('projects')
+    expect(appIdFromPath('/zh/projects/job-seeker-agent')).toBe('projects')
     expect(appIdFromPath('/en/projects/any-future-project/')).toBe('projects')
     expect(appIdFromPath('/zh/projects/id/extra')).toBeNull()
     expect(appIdFromPath('/zh/projects//extra')).toBeNull()

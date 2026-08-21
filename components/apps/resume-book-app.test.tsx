@@ -41,7 +41,7 @@ function storageWithDrafts() {
 }
 
 function renderBook(options: { storage?: MemoryStorage; reduced?: boolean } = {}) {
-  if (options.reduced) window.localStorage.setItem('resume-os-motion', 'reduced')
+  if (options.reduced) window.localStorage.setItem('job-seeker-agent-motion', 'reduced')
   const storage = options.storage ?? storageWithDrafts()
   return render(
     <NextIntlClientProvider locale="en" messages={en}>

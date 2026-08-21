@@ -11,7 +11,7 @@ describe('JobAgentRuntimeStatus', () => {
       offlineReason: 'page-closed', nextRunAt: '2026-08-20T09:15:00.000Z'
     }} /></NextIntlClientProvider>)
     expect(screen.getByLabelText('Agent runtime')).toHaveTextContent('2')
-    expect(screen.getByLabelText('Agent runtime')).toHaveTextContent('Resume OS page was closed')
+    expect(screen.getByLabelText('Agent runtime')).toHaveTextContent('JobSeeker Agent page was closed')
     expect(screen.getByText('3 missed cycles will be coalesced and checked before execution.')).toBeVisible()
   })
 })

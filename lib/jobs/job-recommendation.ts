@@ -6,7 +6,7 @@ import {
   type JobSearchProfile
 } from './job-domain'
 
-export const JOB_RELEVANCE_RUBRIC_VERSION = 'resume-os-job-relevance-v1' as const
+export const JOB_RELEVANCE_RUBRIC_VERSION = 'job-seeker-agent-job-relevance-v1' as const
 
 export type RecommendationCareerFact = {
   id: string

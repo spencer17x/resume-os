@@ -57,12 +57,12 @@ describe('ThemePreferenceProvider', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Light' }))
     await waitFor(() => expect(document.documentElement.dataset.theme).toBe('light'))
-    expect(window.localStorage.getItem('resume-os-theme')).toBe('light')
+    expect(window.localStorage.getItem('job-seeker-agent-theme')).toBe('light')
     expect(screen.getByTestId('resolved')).toHaveTextContent('light')
 
     fireEvent.click(screen.getByRole('button', { name: 'Dark' }))
     expect(document.documentElement.dataset.theme).toBe('dark')
-    expect(window.localStorage.getItem('resume-os-theme')).toBe('dark')
+    expect(window.localStorage.getItem('job-seeker-agent-theme')).toBe('dark')
   })
 
   it('reacts to OS color scheme changes only while system mode is selected', async () => {
@@ -82,7 +82,7 @@ describe('ThemePreferenceProvider', () => {
 
   it('accepts same-tab preference events without hydration-only state', async () => {
     render(<ThemePreferenceProvider><Probe /></ThemePreferenceProvider>)
-    act(() => window.dispatchEvent(new CustomEvent('resume-os-theme-change', { detail: 'dark' })))
+    act(() => window.dispatchEvent(new CustomEvent('job-seeker-agent-theme-change', { detail: 'dark' })))
     await waitFor(() => expect(screen.getByTestId('mode')).toHaveTextContent('dark'))
     expect(document.documentElement.dataset.themeMode).toBe('dark')
   })
@@ -102,7 +102,7 @@ describe('ThemePreferenceProvider', () => {
     vi.stubGlobal('window', undefined)
     const markup = renderToString(<ThemePreferenceProvider><Probe /></ThemePreferenceProvider>)
     vi.unstubAllGlobals()
-    window.localStorage.setItem('resume-os-theme', 'dark')
+    window.localStorage.setItem('job-seeker-agent-theme', 'dark')
     const container = document.createElement('div')
     container.innerHTML = markup
     document.body.append(container)
