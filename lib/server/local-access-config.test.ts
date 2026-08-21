@@ -26,14 +26,14 @@ describe('local AI process scripts', () => {
 
   it.each(['dev', 'start'])('binds %s to loopback and explicitly enables local-only mode', (scriptName) => {
     const script = packageJson.scripts?.[scriptName]
-    expect(script).toContain('RESUME_OS_LOCAL_ONLY=1')
+    expect(script).toContain('JOB_SEEKER_AGENT_LOCAL_ONLY=1')
     expect(script).toMatch(/(?:--hostname|-H) 127\.0\.0\.1/)
   })
 
   it('provides a public server script that does not enable local-only mode', () => {
     const script = packageJson.scripts?.['start:server']
     expect(script).toContain('--hostname 0.0.0.0')
-    expect(script).not.toContain('RESUME_OS_LOCAL_ONLY')
+    expect(script).not.toContain('JOB_SEEKER_AGENT_LOCAL_ONLY')
   })
 
   it('defines a built-server document extraction smoke', () => {

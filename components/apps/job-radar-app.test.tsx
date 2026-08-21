@@ -201,14 +201,14 @@ describe('JobRadarApp', () => {
     expect(await screen.findByRole('heading', { name: 'Agent is paused' })).toBeVisible()
     await user.click(screen.getByRole('button', { name: 'Start Agent' }))
     expect(await screen.findByRole('heading', { name: 'Agent is ready' })).toBeVisible()
-    expect(JSON.parse(window.localStorage.getItem('resume-os:job-agent-preferences:v1') ?? '{}'))
+    expect(JSON.parse(window.localStorage.getItem('job-seeker-agent:job-agent-preferences:v1') ?? '{}'))
       .toMatchObject({ enabled: true })
   })
 
   it('preserves an enabled Agent preference while hydrating after refresh', async () => {
     const store = createStore()
     await store.put('jobSearchProfiles', { ...profile, platforms: ['boss'] })
-    window.localStorage.setItem('resume-os:job-agent-preferences:v1', JSON.stringify({
+    window.localStorage.setItem('job-seeker-agent:job-agent-preferences:v1', JSON.stringify({
       version: 1,
       enabled: true,
       autonomy: 'autopilot',
@@ -224,8 +224,20 @@ describe('JobRadarApp', () => {
 
     expect(await screen.findByRole('heading', { name: 'Agent is ready' })).toBeVisible()
     await waitFor(() => expect(JSON.parse(
-      window.localStorage.getItem('resume-os:job-agent-preferences:v1') ?? '{}'
+      window.localStorage.getItem('job-seeker-agent:job-agent-preferences:v1') ?? '{}'
     )).toMatchObject({ enabled: true, autonomy: 'autopilot' }))
+  })
+
+  it('migrates the legacy Resume OS Agent preference key', async () => {
+    const store = createStore()
+    await store.put('jobSearchProfiles', { ...profile, platforms: ['boss'] })
+    window.localStorage.setItem('resume-os:job-agent-preferences:v1', JSON.stringify({
+      version: 1, enabled: true, autonomy: 'autopilot', platforms: ['boss'],
+      learnFromReplies: true, learnFromOutcomes: true
+    }))
+    renderRadar({ store, storage: trustedStorage() })
+    expect(await screen.findByRole('heading', { name: 'Agent is ready' })).toBeVisible()
+    expect(window.localStorage.getItem('job-seeker-agent:job-agent-preferences:v1')).not.toBeNull()
   })
 
   it('automatically searches the first three configured BOSS title types', async () => {
@@ -235,7 +247,7 @@ describe('JobRadarApp', () => {
       platforms: ['boss'],
       titles: ['Platform Engineer', 'Backend Engineer', 'AI Engineer', 'Fourth Role']
     })
-    window.localStorage.setItem('resume-os:job-agent-preferences:v1', JSON.stringify({
+    window.localStorage.setItem('job-seeker-agent:job-agent-preferences:v1', JSON.stringify({
       version: 1,
       enabled: true,
       autonomy: 'autopilot',

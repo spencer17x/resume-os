@@ -1,10 +1,10 @@
 {
   "meta": {
-    "title": "Resume OS — 自动求职 Agent",
+    "title": "JobSeeker Agent — 自动求职助手",
     "description": "本地优先、基于真实职业证据，自动找岗、沟通并从求职结果中持续优化的 Agent。"
   },
   "nav": {
-    "brand": "Resume OS",
+    "brand": "JobSeeker Agent",
     "classic": "审阅与导出",
     "agent": "Agent",
     "jdMatch": "目标岗位",
@@ -22,8 +22,8 @@
     "themeDark": "深色"
   },
   "desktop": {
-    "brand": "Resume OS",
-    "landmark": "Resume OS 桌面",
+    "brand": "JobSeeker Agent",
+    "landmark": "JobSeeker Agent 桌面",
     "desktop": "桌面",
     "applications": "应用程序",
     "dock": "程序坞",
@@ -114,8 +114,8 @@
     "error": "此应用无法加载。"
   },
   "mobile": {
-    "homeTitle": "Resume OS",
-    "title": "Resume OS",
+    "homeTitle": "JobSeeker Agent",
+    "title": "JobSeeker Agent",
     "eyebrow": "证据驱动简历定制 Agent",
     "status": "就绪",
     "applications": "应用程序",
@@ -127,7 +127,7 @@
     "open": "已打开"
   },
   "agent": {
-    "back": "返回 Resume OS",
+    "back": "返回 JobSeeker Agent",
     "title": "证据驱动简历 Agent",
     "description": "只基于已有职业证据，为目标岗位定制当前简历。缺失事实会转为问题，每一项建议都可审阅。",
     "workflow": {
@@ -258,7 +258,7 @@
       "PROTECTED_FIELD": "已阻止：身份或履历保护字段需手动编辑",
       "UNSTABLE_REORDER": "已阻止：重新排序需要稳定条目 ID",
       "INVALID_ADD_FROM_FACT": "已阻止：事实只能用于经历要点或项目亮点",
-      "UNSAFE_REMOVE": "已阻止：Resume OS 不会自动删除简历内容"
+      "UNSAFE_REMOVE": "已阻止：JobSeeker Agent 不会自动删除简历内容"
     },
     "evidence": {
       "requirements": "岗位要求",
@@ -328,7 +328,7 @@
     ]
   },
   "jdMatch": {
-    "back": "返回 Resume OS",
+    "back": "返回 JobSeeker Agent",
     "title": "目标岗位要求",
     "description": "先从岗位描述中提取并确认要求，再进入职业证据映射。",
     "draft": "使用中的简历",
@@ -460,7 +460,7 @@
     ]
   },
   "projects": {
-    "back": "返回 Resume OS",
+    "back": "返回 JobSeeker Agent",
     "backToProjects": "返回项目列表",
     "title": "项目浏览器",
     "description": "浏览当前简历中的项目，把技能、职责和可量化成果作为可复用的职业证据。",
@@ -476,22 +476,22 @@
     "askAgentHint": "可以试着问：“{name} 可以支持目标岗位的哪些要求？”"
   },
   "timeline": {
-    "back": "返回 Resume OS",
+    "back": "返回 JobSeeker Agent",
     "title": "职业时间线",
     "description": "按时间查看可作为职业证据的经历与成果。",
     "sampleResume": "示例简历",
     "empty": "当前简历尚未添加工作经历。"
   },
   "terminal": {
-    "back": "返回 Resume OS",
-    "title": "resume-os terminal",
+    "back": "返回 JobSeeker Agent",
+    "title": "job-seeker-agent terminal",
     "help": "可用路由：/classic、/agent、/jd-match、/projects、/timeline",
     "regionLabel": "简历终端",
     "sampleResume": "示例简历",
     "commandShortcuts": "命令快捷入口",
     "runCommand": "运行 {command}",
     "output": "终端输出",
-    "welcome": "Resume OS 已就绪，运行命令查看当前简历。",
+    "welcome": "JobSeeker Agent 已就绪，运行命令查看当前简历。",
     "commandInput": "终端命令",
     "placeholder": "输入 whoami、skills、projects 或 help",
     "runInput": "运行终端命令",
@@ -501,7 +501,7 @@
     "unknownCommand": "未找到命令：{command}"
   },
   "classic": {
-    "back": "返回 Resume OS",
+    "back": "返回 JobSeeker Agent",
     "summary": "个人简介",
     "skills": "专业技能",
     "experience": "工作经历",
@@ -576,7 +576,7 @@
   "settings": {
     "eyebrow": "系统偏好设置",
     "title": "设置",
-    "description": "管理 Resume OS 的外观、动效和 AI 服务连接。",
+    "description": "管理 JobSeeker Agent 的外观、动效和 AI 服务连接。",
     "appearance": "外观",
     "appearanceDescription": "跟随操作系统，或选择固定的明亮/深色主题。",
     "language": "语言",
@@ -606,11 +606,11 @@
       "automatic": "优先本地模型；无法运行任务时停止，除非已允许云端回退。"
     },
     "allowCloudFallback": "允许显式云端回退",
-    "allowCloudFallbackDescription": "保存此项即代表你同意：本地模型不可用或无法容纳这个有界任务时，Resume OS 可仅将任务所需上下文发送到你配置的云端 Provider。",
+    "allowCloudFallbackDescription": "保存此项即代表你同意：本地模型不可用或无法容纳这个有界任务时，JobSeeker Agent 可仅将任务所需上下文发送到你配置的云端 Provider。",
     "chromeLanguageBoundary": "Chrome 尚未正式保证 Prompt API 中文输出。中文任务会使用实验性本地尽力模式，仍需通过结构化校验，且没有已保存授权时绝不会转到云端。",
     "aiProvider": "自配置 AI",
     "aiProviderDescription": "填写 OpenAI-compatible 接口；自定义服务域名需要部署者加入允许列表。",
-    "aiPrivacyNote": "密钥与职业数据默认保留在当前浏览器；执行 AI 任务时，仅将必要上下文发送给你选择的服务，Resume OS 服务端不会持久化。",
+    "aiPrivacyNote": "密钥与职业数据默认保留在当前浏览器；执行 AI 任务时，仅将必要上下文发送给你选择的服务，JobSeeker Agent 服务端不会持久化。",
     "aiAdapter": "适配器",
     "aiAdapterValue": "OpenAI-compatible",
     "aiBaseURL": "API Base URL",
@@ -860,7 +860,7 @@
       "catchUp": "检测到错过 {count} 个周期，将合并补跑并在执行前重新校验岗位和会话。",
       "offlineReason": {
         "none": "运行正常",
-        "page-closed": "Resume OS 页面曾关闭，任务已保留",
+        "page-closed": "JobSeeker Agent 页面曾关闭，任务已保留",
         "browser-restarted": "Chrome 已重启，等待补跑",
         "dispatch-failed": "最近派发失败，将限速重试"
       }
@@ -1088,7 +1088,7 @@
       }
     },
     "platforms": "招聘平台",
-    "platformHelp": "目标公司不是必填项。公开来源在 Resume OS 内自动搜索；受限平台只打开官方搜索，不使用爬虫。",
+    "platformHelp": "目标公司不是必填项。公开来源在 JobSeeker Agent 内自动搜索；受限平台只打开官方搜索，不使用爬虫。",
     "platformLegend": "选择要搜索的平台",
     "marketplace": {
       "boss": { "name": "BOSS 直聘", "note": "已支持官方搜索和登录状态检测；自动发送适配器正在验证。" }
@@ -1126,7 +1126,7 @@
     "saveProfile": "保存偏好",
     "profileSaved": "搜索偏好已保存，当前岗位已重新评分。",
     "importJob": "带回一个岗位",
-    "importJobHelp": "在招聘平台选中岗位后，把官方链接和职位描述粘贴到这里。Resume OS 只保存你主动提供的内容，不读取平台登录态。",
+    "importJobHelp": "在招聘平台选中岗位后，把官方链接和职位描述粘贴到这里。JobSeeker Agent 只保存你主动提供的内容，不读取平台登录态。",
     "clipboardJob": "快速粘贴",
     "clipboardJobPlaceholder": "职位：…\n公司：…\n地点：…\n链接：https://…\n职位描述：…",
     "parseClipboardJob": "解析并预填",
@@ -1180,7 +1180,7 @@
     "application": {
       "eyebrow": "手动投递",
       "title": "申请材料包",
-      "description": "Resume OS 在本地准备并检查材料；你需要亲自打开雇主网站，并明确确认已经投递。",
+      "description": "JobSeeker Agent 在本地准备并检查材料；你需要亲自打开雇主网站，并明确确认已经投递。",
       "checklist": "申请就绪检查清单",
       "checks": {
         "posting-current": "公开岗位仍开放且内容未变化",

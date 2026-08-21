@@ -1,10 +1,10 @@
-# Resume OS Agent Guide
+# JobSeeker Agent Repository Guide
 
 This file applies to the entire repository. A nested `AGENTS.md` would win for its subtree without weakening root safety, secrets, or verification rules.
 
 ## Purpose
 
-Resume OS is a local-first, evidence-grounded resume tailoring agent built with Next.js App Router, TypeScript, React, and `next-intl`.
+JobSeeker Agent is a local-first, evidence-grounded job-search agent built with Next.js App Router, TypeScript, React, and `next-intl`.
 
 ## Start Here
 
@@ -96,7 +96,7 @@ Preserve these product invariants:
 - Use Node.js 24.18.0 (`>=24.18.0 <25`) and `pnpm@11.17.0`. Do not use npm or Yarn to install dependencies or generate another lockfile.
 - The default development server is local-only at `127.0.0.1:3001`. If that port is occupied, use another loopback port; do not terminate an unrelated process merely to reclaim the default port.
 - Keep secrets in untracked `.env.local` or the deployment secret store. `.env.example` must contain only safe placeholders, and server credentials must never be exposed through a `NEXT_PUBLIC_*` variable or client bundle.
-- Treat `RESUME_OS_ALLOWED_AI_HOSTS`, `RESUME_OS_AI_ACCESS_TOKEN`, `RESUME_OS_LOCAL_ONLY`, and `RESUME_OS_TRUSTED_PROXY` as security-boundary configuration. Do not weaken their semantics to make a request work.
+- Treat `JOB_SEEKER_AGENT_ALLOWED_AI_HOSTS`, `JOB_SEEKER_AGENT_AI_ACCESS_TOKEN`, `JOB_SEEKER_AGENT_LOCAL_ONLY`, and `JOB_SEEKER_AGENT_TRUSTED_PROXY` as security-boundary configuration. Do not weaken their semantics to make a request work.
 - When adding or changing an environment variable, update `.env.example`, `README.md`, and `docs/deployment.md` wherever that variable affects local or production operation.
 
 ## Dependencies And Generated Artifacts

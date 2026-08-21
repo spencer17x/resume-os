@@ -3,7 +3,10 @@ import { isIP } from 'node:net'
 import {
   AI_API_KEY_HEADER,
   AI_BASE_URL_HEADER,
-  AI_MODEL_HEADER
+  AI_MODEL_HEADER,
+  LEGACY_AI_API_KEY_HEADER,
+  LEGACY_AI_BASE_URL_HEADER,
+  LEGACY_AI_MODEL_HEADER
 } from '@/lib/agent/provider-headers'
 
 export type ApiErrorCode =
@@ -155,9 +158,9 @@ export function createAiRequestGuard(dependencies: {
   const limiter = dependencies.limiter ?? new FixedWindowRateLimiter()
   const authFailureLimiter = dependencies.authFailureLimiter ?? new FixedWindowRateLimiter(1)
   const authFailureRateLimit = dependencies.authFailureRateLimit ?? DEFAULT_AUTH_FAILURE_RATE_LIMIT
-  const localOnly = dependencies.localOnly ?? process.env.RESUME_OS_LOCAL_ONLY === '1'
+  const localOnly = dependencies.localOnly ?? securityEnv('JOB_SEEKER_AGENT_LOCAL_ONLY', 'RESUME_OS_LOCAL_ONLY') === '1'
   const accessToken = dependencies.accessToken === undefined
-    ? process.env.RESUME_OS_AI_ACCESS_TOKEN ?? null
+    ? securityEnv('JOB_SEEKER_AGENT_AI_ACCESS_TOKEN', 'RESUME_OS_AI_ACCESS_TOKEN') ?? null
     : dependencies.accessToken
   const now = dependencies.now ?? Date.now
 
@@ -262,7 +265,7 @@ function isAllowedSameOriginBrowser(request: Request) {
 }
 
 function trustedForwardedProtocol(request: Request) {
-  const trustedProxy = process.env.RESUME_OS_TRUSTED_PROXY
+  const trustedProxy = securityEnv('JOB_SEEKER_AGENT_TRUSTED_PROXY', 'RESUME_OS_TRUSTED_PROXY')
   const trustsForwarding = trustedProxy === 'cloudflare'
     || (trustedProxy === 'vercel' && process.env.VERCEL === '1')
   if (!trustsForwarding) return null
@@ -272,8 +275,11 @@ function trustedForwardedProtocol(request: Request) {
 }
 
 function hasCompleteBrowserAiConfig(request: Request) {
-  return [AI_API_KEY_HEADER, AI_BASE_URL_HEADER, AI_MODEL_HEADER]
-    .every((header) => Boolean(request.headers.get(header)?.trim()))
+  return [
+    [AI_API_KEY_HEADER, LEGACY_AI_API_KEY_HEADER],
+    [AI_BASE_URL_HEADER, LEGACY_AI_BASE_URL_HEADER],
+    [AI_MODEL_HEADER, LEGACY_AI_MODEL_HEADER]
+  ].every(([current, legacy]) => Boolean((request.headers.get(current) ?? request.headers.get(legacy))?.trim()))
 }
 
 function hasValidBearerToken(request: Request, configured: string | null) {
@@ -300,12 +306,12 @@ function isLoopbackHost(hostname: string) {
 }
 
 export function resolveRateLimitIdentity(request: Request) {
-  if (process.env.RESUME_OS_TRUSTED_PROXY === 'vercel' && process.env.VERCEL === '1') {
+  if (securityEnv('JOB_SEEKER_AGENT_TRUSTED_PROXY', 'RESUME_OS_TRUSTED_PROXY') === 'vercel' && process.env.VERCEL === '1') {
     const candidate = request.headers.get('x-forwarded-for')?.trim()
     if (candidate && candidate.length <= 64 && isIP(candidate)) return candidate
   }
 
-  if (process.env.RESUME_OS_TRUSTED_PROXY === 'cloudflare') {
+  if (securityEnv('JOB_SEEKER_AGENT_TRUSTED_PROXY', 'RESUME_OS_TRUSTED_PROXY') === 'cloudflare') {
     const candidate = request.headers.get('cf-connecting-ip')?.trim()
     if (candidate && candidate.length <= 64 && isIP(candidate)) return candidate
   }
@@ -313,4 +319,8 @@ export function resolveRateLimitIdentity(request: Request) {
   // Request does not expose a trustworthy socket peer address here. Without an
   // explicitly configured platform, all requests deliberately share one instance key.
   return 'single-instance'
+}
+
+function securityEnv(current: string, legacy: string) {
+  return process.env[current] ?? process.env[legacy]
 }

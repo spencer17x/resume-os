@@ -93,6 +93,21 @@ describe('browser AI configuration', () => {
     expect(readBrowserAiConfig().apiKey).toBe('session-secret')
   })
 
+  it('migrates legacy Resume OS AI configuration and session credentials', () => {
+    window.localStorage.setItem('resume-os-ai-config-v1', JSON.stringify({
+      version: 1, baseURL: 'https://legacy.example/v1', model: 'legacy-model', rememberApiKey: false
+    }))
+    window.sessionStorage.setItem('resume-os-ai-key', 'legacy-key')
+    window.sessionStorage.setItem('resume-os-ai-key-binding-v1', JSON.stringify({
+      version: 1, baseURL: 'https://legacy.example/v1', model: 'legacy-model'
+    }))
+    expect(readBrowserAiConfig()).toMatchObject({
+      baseURL: 'https://legacy.example/v1', model: 'legacy-model', apiKey: 'legacy-key'
+    })
+    expect(window.localStorage.getItem(AI_CONFIG_STORAGE_KEY)).not.toBeNull()
+    expect(window.sessionStorage.getItem(AI_KEY_STORAGE_KEY)).toBe('legacy-key')
+  })
+
   it('moves a remembered key between storage areas without leaving another copy', () => {
     saveBrowserAiConfig({
       baseURL: DEFAULT_AI_BASE_URL,

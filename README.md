@@ -1,8 +1,8 @@
-# Resume OS
+# JobSeeker Agent
 
 [Live Demo](https://resume-os-phi.vercel.app/en) · [中文体验](https://resume-os-phi.vercel.app/zh) · [Deployment and data boundaries](docs/deployment.md)
 
-Resume OS is a local-first, evidence-grounded job-search agent. It turns a trusted resume and explicit job preferences into cross-platform discovery, qualification, job-specific materials, and recruiter-conversation drafts. Users choose the platforms and automation level. The agent improves search and communication strategy from user corrections, replies, interviews, and outcomes without changing the user's career facts.
+JobSeeker Agent is a local-first, evidence-grounded job-search agent. It turns a trusted resume and explicit job preferences into cross-platform discovery, qualification, job-specific materials, and recruiter-conversation drafts. Users choose the platforms and automation level. The agent improves search and communication strategy from user corrections, replies, interviews, and outcomes without changing the user's career facts.
 
 The current MVP runs while the browser is open and is scoped only to BOSS Zhipin. The bundled Manifest V3 Browser Agent detects the BOSS session without reading cookies and provides a fail-closed, approval-bound send adapter. Live BOSS selector verification is still required before treating the adapter as production-ready. The target product requirements are documented in [docs/product-requirements.md](docs/product-requirements.md).
 
@@ -29,7 +29,7 @@ Resume 3D, Resume Book, Projects, Timeline, and Terminal are secondary showcase 
 
 ## What kind of agent is this?
 
-Resume OS is a **job-search domain agent**, not an unrestricted computer-use bot. Its bounded loop is Career Profile → discovery → qualification → evidence mapping → job-specific material → recruiter conversation → outcome feedback. The model can propose structured output, but deterministic validators, platform capabilities, the saved autonomy policy, and evidence boundaries control what may be applied or sent.
+JobSeeker Agent is a **job-search domain agent**, not an unrestricted computer-use bot. Its bounded loop is Career Profile → discovery → qualification → evidence mapping → job-specific material → recruiter conversation → outcome feedback. The model can propose structured output, but deterministic validators, platform capabilities, the saved autonomy policy, and evidence boundaries control what may be applied or sent.
 
 The project uses a narrow, structured form of retrieval rather than a conventional vector RAG stack:
 
@@ -102,7 +102,7 @@ The supported local runtime is Node.js 24.18.0 (`>=24.18.0 <25`).
 `pnpm dev` binds to `127.0.0.1:3001`. When that port is owned by another process, use a separate loopback port without killing an unrelated service:
 
 ```bash
-RESUME_OS_LOCAL_ONLY=1 corepack pnpm@11.17.0 exec next dev --hostname 127.0.0.1 -p 3114
+JOB_SEEKER_AGENT_LOCAL_ONLY=1 corepack pnpm@11.17.0 exec next dev --hostname 127.0.0.1 -p 3114
 ```
 
 For local development, either configure the AI service in Settings or create `.env.local`:
@@ -117,7 +117,9 @@ Theme (`system`, `light`, `dark`), motion (`system`, `full`, `reduced`), and des
 
 ## Local data and server boundary
 
-Resume OS does not require a server-side database, account system, or cloud-sync service. The browser origin owns the durable product state:
+JobSeeker Agent does not require a server-side database, account system, or cloud-sync service. The browser origin owns the durable product state:
+
+Existing installations are migrated in place: legacy `resume-os*` localStorage values are copied to the new `job-seeker-agent*` keys when first read, while the IndexedDB database keeps its historical `resume-os-domain` name to preserve career evidence and Agent runs. New operational configuration uses `JOB_SEEKER_AGENT_*`; legacy `RESUME_OS_*` variables remain compatibility aliases.
 
 | Data | Storage | Sent off-device? |
 | --- | --- | --- |
@@ -125,7 +127,7 @@ Resume OS does not require a server-side database, account system, or cloud-sync
 | Career evidence, postings, recommendations, application records, target jobs, requirements, mappings, variants, agent runs, BOSS conversations, interview rounds, Q&A, and reviews | IndexedDB | Job discovery stays in the local browser bridge; career context leaves the device only for an explicitly selected cloud AI task |
 | Provider choice, theme, motion, desktop layout | `localStorage` | No |
 | OpenAI-compatible Base URL and model | `localStorage` | Included with same-origin AI requests |
-| BYOK API key | `sessionStorage` by default; `localStorage` only after explicit “remember” consent | Relayed through the same-origin route to the configured provider; never persisted by Resume OS server code |
+| BYOK API key | `sessionStorage` by default; `localStorage` only after explicit “remember” consent | Relayed through the same-origin route to the configured provider; never persisted by JobSeeker Agent server code |
 
 Uploaded PDF/DOCX/TXT bytes are processed transiently by the same-origin extraction route and are not written to the domain store. The original document bytes are not stored in IndexedDB. Clearing site data, using a different browser profile, or moving to a different deployment origin produces a separate local workspace unless the user exports or migrates it separately.
 
@@ -136,15 +138,15 @@ Job Agent starts from the resume rather than a required target company. Its firs
 - BOSS Zhipin opens a fixed-host official search carrying the primary target title.
 - BOSS Zhipin session detection and the approval-bound send protocol are implemented. The adapter refuses to send unless recipient, editor, exact body, send control, platform message ID, and receipt status all verify.
 - When the local Browser Agent is present on a BOSS search-results tab, it imports at most 50 bounded visible job cards, validates their hosts, scores them locally, and automatically queues eligible roles scoring at least 70. Queuing means “prepare for analysis,” never “submitted.”
-- When no BOSS search tab is open, the extension constructs a fixed-host search from the primary configured title, opens it in an inactive temporary tab, collects the bounded results, and closes the tab. Resume OS never passes an arbitrary URL to the extension.
-- While enabled, the extension persists a bounded, content-free cycle queue and runtime heartbeat in `chrome.storage.local`. Every 15 minutes it queues work before attempting delivery to a Resume OS tab. Closing the page leaves the cycle pending; reopening the page dispatches the oldest cycle and waits for a completion receipt before rate-limited delivery of the next. Chrome restart coalesces missed intervals into one catch-up cycle rather than replaying a burst. Results and career data remain in the Resume OS origin; queued records contain only cycle IDs, timestamps, attempts, and missed-interval counts, never cookies, resumes, jobs, or private inbox content.
+- When no BOSS search tab is open, the extension constructs a fixed-host search from the primary configured title, opens it in an inactive temporary tab, collects the bounded results, and closes the tab. JobSeeker Agent never passes an arbitrary URL to the extension.
+- While enabled, the extension persists a bounded, content-free cycle queue and runtime heartbeat in `chrome.storage.local`. Every 15 minutes it queues work before attempting delivery to a JobSeeker Agent tab. Closing the page leaves the cycle pending; reopening the page dispatches the oldest cycle and waits for a completion receipt before rate-limited delivery of the next. Chrome restart coalesces missed intervals into one catch-up cycle rather than replaying a burst. Results and career data remain in the JobSeeker Agent origin; queued records contain only cycle IDs, timestamps, attempts, and missed-interval counts, never cookies, resumes, jobs, or private inbox content.
 - Each queued role receives a posting-bound Target Job and stable draft OptimizationRun. Up to three roles per Agent cycle are analyzed sequentially through the configured model. Opening a queued role reuses that analysis for requirement review, and confirming it advances the same run into evidence mapping instead of creating a duplicate workflow.
-- Once a validated job-specific resume reaches `ready-to-apply`, Resume OS creates one evidence-linked BOSS opening draft. Editing it invalidates any prior approval. Message state is persisted separately as draft, awaiting approval, approved, sending, sent, delivered, read, or failed; external states require a matching recipient, body fingerprint, and platform receipt.
-- Verified incoming BOSS message nodes are reduced inside the extension to bounded event types such as recruiter reply, resume request, interview invitation, offer, or rejection. Raw inbox text is not returned to the Resume OS page or persisted. These events advance the local recruitment stage without allowing older or repeated events to regress it.
+- Once a validated job-specific resume reaches `ready-to-apply`, JobSeeker Agent creates one evidence-linked BOSS opening draft. Editing it invalidates any prior approval. Message state is persisted separately as draft, awaiting approval, approved, sending, sent, delivered, read, or failed; external states require a matching recipient, body fingerprint, and platform receipt.
+- Verified incoming BOSS message nodes are reduced inside the extension to bounded event types such as recruiter reply, resume request, interview invitation, offer, or rejection. Raw inbox text is not returned to the JobSeeker Agent page or persisted. These events advance the local recruitment stage without allowing older or repeated events to regress it.
 - Each new event may create one idempotent, job-bound reply draft from a fixed safe template. Resume requests are acknowledged only after the attachment receipt is verified. While a thread is waiting for a reply, the Agent may prepare a follow-up after 72 hours, with at most two follow-ups per thread and never while another outbound draft is pending.
 - In Autopilot mode, a generated reply or follow-up is sent only when the extension can re-verify that the currently active BOSS conversation is the same immutable recipient and conversation already bound to the thread. A different active chat cannot rebind the thread; the message remains in the review queue instead.
 - Job Preferences includes a content-free adapter diagnostic. It reports only selector counts and readiness for discovery, conversation identity, message sending, and PDF upload across open BOSS frames. It never returns job descriptions, recipient names, or private message text, and zero/ambiguous matches remain not ready.
-- When a verified recruiter thread requests a resume, Resume OS renders the application-linked `ResumeVariant` into a local, text-selectable PDF without a server round trip. Upload is accepted only when the extension re-verifies the recipient and conversation, the file input uniquely accepts PDF, the exact byte fingerprint matches, and BOSS exposes a matching attachment ID and filename. Otherwise the thread remains `resume-requested`.
+- When a verified recruiter thread requests a resume, JobSeeker Agent renders the application-linked `ResumeVariant` into a local, text-selectable PDF without a server round trip. Upload is accepted only when the extension re-verifies the recipient and conversation, the file input uniquely accepts PDF, the exact byte fingerprint matches, and BOSS exposes a matching attachment ID and filename. Otherwise the thread remains `resume-requested`.
 - Applied optimization runs are detected automatically. When every packet check passes, the application advances to `ready-to-apply` and its single BOSS conversation thread/opening draft is created idempotently; users do not need to click a separate “prepare materials” step.
 - Recipient approval probes all BOSS child frames and succeeds only when a single frame exposes one recipient identity, conversation identity, editor, and send control. This probe is read-only; typing is available only to an exact approved message after the same checks pass again.
 - In Autopilot mode, a successful recipient approval hands the exact approved body to the extension. The extension revalidates identity and body, writes the editor, verifies its rendered value, clicks the unique send control, and returns only a message node carrying an exact body match, platform message ID, and sent/delivered/read status. Missing or mismatched receipts are persisted as failed attempts, never successful sends.
@@ -152,7 +154,7 @@ Job Agent starts from the resume rather than a required target company. Its firs
 
 For a role selected on BOSS Zhipin, the user may paste its official HTTPS
 URL, title, company, location, and description into Job Agent. The URL is accepted only
-when its hostname matches the selected platform. Resume OS never fetches that URL,
+when its hostname matches the selected platform. JobSeeker Agent never fetches that URL,
 reads the platform session, or infers data the user did not provide. The imported role
 is stored locally, scored against the active search profile, and handed directly to
 Target Job for evidence review.
@@ -160,7 +162,7 @@ Target Job for evidence review.
 The quick-paste helper can parse a labeled job share (`Job title`, `Company`,
 `Location`, `URL`, and `Job description`, with Chinese equivalents) entirely in the
 browser and prefill the reviewable import form. Unlabeled plain text is treated only
-as a description proposal; Resume OS does not guess missing identity fields or import
+as a description proposal; JobSeeker Agent does not guess missing identity fields or import
 until the user reviews the form and presses the explicit action.
 
 The automatic source classes remain:
@@ -170,9 +172,9 @@ The automatic source classes remain:
 
 The bundled catalog is a versioned source seed, not a server-side job database. A market search refreshes at most ten selected automatic sources. The browser calls only the same-origin `/api/jobs/discover` route with a strict provider enum and a bounded public board identifier. The route constructs the upstream URL itself, uses HTTPS GET without cookies or credentials, rejects redirects, limits the request to 1 KiB, limits an upstream response to 2 MiB and 500 postings, applies a 15-second timeout and per-process rate limit, and returns normalized records. It does not accept arbitrary URLs, headers, authorization data, or resume/career content.
 
-Public-source refresh is manual. BOSS cycles remain queued when the Resume OS page is closed and are revalidated after the page returns. Closing Chrome prevents execution; on the next Chrome startup the extension restores its alarm, calculates missed intervals, and queues one bounded catch-up cycle. Partial source responses are shown as warnings and do not close missing postings. Matching and application state stay in IndexedDB. Demo/Sandbox resumes cannot enter the real application flow.
+Public-source refresh is manual. BOSS cycles remain queued when the JobSeeker Agent page is closed and are revalidated after the page returns. Closing Chrome prevents execution; on the next Chrome startup the extension restores its alarm, calculates missed intervals, and queues one bounded catch-up cycle. Partial source responses are shown as warnings and do not close missing postings. Matching and application state stay in IndexedDB. Demo/Sandbox resumes cannot enter the real application flow.
 
-Resume OS prepares a checked local packet and opens the original employer application URL in a new tab. Opening that page never changes the application status. Only the separate user action “I submitted this application” records `applied` and `submittedAt`. Authenticated marketplace scraping, cookie reuse, CAPTCHA bypass, screening-answer invention, browser form submission, and unattended or bulk applications are outside the product boundary.
+JobSeeker Agent prepares a checked local packet and opens the original employer application URL in a new tab. Opening that page never changes the application status. Only the separate user action “I submitted this application” records `applied` and `submittedAt`. Authenticated marketplace scraping, cookie reuse, CAPTCHA bypass, screening-answer invention, browser form submission, and unattended or bulk applications are outside the product boundary.
 
 After confirmed submission, an interview invitation can move the application to `interviewing`. Each round stores its schedule, user notes, questions, and answers locally. AI review provides a summary, gaps, suggestions, and an explicitly advisory pass estimate based only on the supplied interview record. Durable `passed` and `failed` outcomes always require an explicit user report.
 
@@ -187,15 +189,15 @@ Settings exposes three explicit modes:
 
 Every browser AI feature reads the same persisted provider preference at task start. Cloud calls also read the persisted Base URL and model plus the saved session/device key; unsaved form edits are never used implicitly. Chrome-only mode never calls an AI route; Automatic mode without saved fallback consent also stops locally when Chrome cannot run a task. PDF/DOCX/TXT byte extraction remains the deliberate same-origin, non-AI route before the extracted text is parsed by the selected provider.
 
-Chrome may need to download its local model after a user action. Resume OS checks task-specific language availability for officially supported languages. For experimental Chinese tasks it checks general model availability, lets the local model attempt the Chinese prompt without claiming browser-level language support, then applies the same strict output validation. It exposes availability diagnostics, can forward download progress to a task UI, validates JSON against the task schema, checks the context budget, and destroys the session after use. See the [Chrome Prompt API documentation](https://developer.chrome.com/docs/ai/prompt-api) for the browser-managed model lifecycle.
+Chrome may need to download its local model after a user action. JobSeeker Agent checks task-specific language availability for officially supported languages. For experimental Chinese tasks it checks general model availability, lets the local model attempt the Chinese prompt without claiming browser-level language support, then applies the same strict output validation. It exposes availability diagnostics, can forward download progress to a task UI, validates JSON against the task schema, checks the context budget, and destroys the session after use. See the [Chrome Prompt API documentation](https://developer.chrome.com/docs/ai/prompt-api) for the browser-managed model lifecycle.
 
-Resume OS supports per-browser BYOK (bring your own key) configuration for OpenAI-compatible APIs. The Base URL and model are stored in `localStorage`. The API key is stored in `sessionStorage` by default and is moved to `localStorage` only when the user explicitly selects “remember on this device.” Each AI request sends the configuration and the career data required for that task to the same-origin Next.js route. The server uses them for that invocation only and does not persist or echo the key or career data.
+JobSeeker Agent supports per-browser BYOK (bring your own key) configuration for OpenAI-compatible APIs. The Base URL and model are stored in `localStorage`. The API key is stored in `sessionStorage` by default and is moved to `localStorage` only when the user explicitly selects “remember on this device.” Each AI request sends the configuration and the career data required for that task to the same-origin Next.js route. The server uses them for that invocation only and does not persist or echo the key or career data.
 
-Public browser requests must be exact same-origin requests with a complete BYOK configuration. Cross-origin browser requests remain blocked. Provider URLs must use HTTPS and match the built-in exact-host allowlist. A deployment owner can append trusted OpenAI-compatible hosts with a comma-separated `RESUME_OS_ALLOWED_AI_HOSTS` value. This allowlist is an SSRF boundary; do not add hosts you do not control or trust.
+Public browser requests must be exact same-origin requests with a complete BYOK configuration. Cross-origin browser requests remain blocked. Provider URLs must use HTTPS and match the built-in exact-host allowlist. A deployment owner can append trusted OpenAI-compatible hosts with a comma-separated `JOB_SEEKER_AGENT_ALLOWED_AI_HOSTS` value. This allowlist is an SSRF boundary; do not add hosts you do not control or trust.
 
-The shipped `pnpm dev` and `pnpm start` scripts bind Next.js to `127.0.0.1` and enable local-only mode. Local requests can use either the browser configuration or the `OPENAI_*` environment fallback. A public browser deployment requires complete BYOK headers for cloud AI requests; setting a shared `OPENAI_API_KEY` on Vercel does not turn the public UI into a shared-key AI service. For intentional server-to-server integration, configure a high-entropy `RESUME_OS_AI_ACCESS_TOKEN` of at least 32 bytes and `OPENAI_*`, then run `pnpm start:server`. The access token is server-only and must never be exposed through client JavaScript.
+The shipped `pnpm dev` and `pnpm start` scripts bind Next.js to `127.0.0.1` and enable local-only mode. Local requests can use either the browser configuration or the `OPENAI_*` environment fallback. A public browser deployment requires complete BYOK headers for cloud AI requests; setting a shared `OPENAI_API_KEY` on Vercel does not turn the public UI into a shared-key AI service. For intentional server-to-server integration, configure a high-entropy `JOB_SEEKER_AGENT_AI_ACCESS_TOKEN` of at least 32 bytes and `OPENAI_*`, then run `pnpm start:server`. The access token is server-only and must never be exposed through client JavaScript.
 
-The in-process route limiter remains defense-in-depth. Set `RESUME_OS_TRUSTED_PROXY=vercel` on Vercel or `RESUME_OS_TRUSTED_PROXY=cloudflare` behind Cloudflare to use the platform-provided client IP inside each instance. Public deployments must also configure a platform or distributed rate limiter because process memory is not shared across serverless instances.
+The in-process route limiter remains defense-in-depth. Set `JOB_SEEKER_AGENT_TRUSTED_PROXY=vercel` on Vercel or `JOB_SEEKER_AGENT_TRUSTED_PROXY=cloudflare` behind Cloudflare to use the platform-provided client IP inside each instance. Public deployments must also configure a platform or distributed rate limiter because process memory is not shared across serverless instances.
 
 ## Versioned releases
 
@@ -244,9 +246,9 @@ For the complete raw-resume-to-tailored-variant workflow on Vercel:
 1. Link the repository to the Vercel project once, then add the Vercel project IDs and access token to the `production` GitHub Environment as Actions secrets and restrict deployments to `main`.
 2. Keep branch Preview deployments enabled. `vercel.json` disables direct `main` deployments so Production can only follow a version tag.
 3. Build from source in GitHub Actions on Linux; do not upload a macOS-built `.next` directory because document extraction includes platform-native code.
-4. Set `RESUME_OS_TRUSTED_PROXY=vercel`; do not set `RESUME_OS_LOCAL_ONLY`.
+4. Set `JOB_SEEKER_AGENT_TRUSTED_PROXY=vercel`; do not set `JOB_SEEKER_AGENT_LOCAL_ONLY`.
 5. Add a Vercel Firewall or other distributed rate limit for `/api/`. The in-process limiter is not shared across Functions.
-6. If users select an OpenAI-compatible host outside the built-in exact-host allowlist, add that exact host to `RESUME_OS_ALLOWED_AI_HOSTS`.
+6. If users select an OpenAI-compatible host outside the built-in exact-host allowlist, add that exact host to `JOB_SEEKER_AGENT_ALLOWED_AI_HOSTS`.
 7. Each browser user reviews the saved AI mode in Settings and runs diagnostics. Local Chrome AI is the initial persisted preference; users selecting OpenAI-compatible or allowing Automatic cloud fallback must also save a complete BYOK configuration.
 8. The browser must allow site storage. Chrome Built-in AI additionally requires a compatible Chrome environment and an available browser-managed model.
 
@@ -254,4 +256,4 @@ The app enforces a 3 MiB resume-file limit and a 4 MiB multipart limit, below Ve
 
 GitHub Pages cannot host the complete current repository because it does not execute Next.js route handlers. A separately adapted static build could expose local presentation, pasted-text parsing, Demo / Sandbox generation, and other supported Chrome tasks, but PDF/DOCX/TXT extraction and OpenAI-compatible calls would require a separately deployed API and corresponding same-origin/security changes.
 
-Run `pnpm test:production-extraction` to build Resume OS, copy the document function trace into an isolated sandbox, and verify real PDF and DOCX extraction both inside that trace and through the built API route.
+Run `pnpm test:production-extraction` to build JobSeeker Agent, copy the document function trace into an isolated sandbox, and verify real PDF and DOCX extraction both inside that trace and through the built API route.

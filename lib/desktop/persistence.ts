@@ -1,8 +1,10 @@
 import { z } from 'zod'
+import { readMigratedStorageValue } from '@/lib/brand-migration'
 import { appRegistry } from './app-registry'
 import type { AppId, DesktopState, DesktopWindowState } from './types'
 
-export const DESKTOP_STORAGE_KEY = 'resume-os-desktop-v1'
+export const DESKTOP_STORAGE_KEY = 'job-seeker-agent-desktop-v1'
+export const LEGACY_DESKTOP_STORAGE_KEY = 'resume-os-desktop-v1'
 
 const appIds = Object.keys(appRegistry) as [AppId, ...AppId[]]
 const maxPersistedZIndex = Number.MAX_SAFE_INTEGER - 1
@@ -90,9 +92,9 @@ function normalizeState(value: unknown): DesktopState | null {
   }
 }
 
-export function readDesktopState(storage: Pick<Storage, 'getItem'>): DesktopState | null {
+export function readDesktopState(storage: Pick<Storage, 'getItem'> & Partial<Pick<Storage, 'setItem'>>): DesktopState | null {
   try {
-    const serialized = storage.getItem(DESKTOP_STORAGE_KEY)
+    const serialized = readMigratedStorageValue(storage, DESKTOP_STORAGE_KEY, LEGACY_DESKTOP_STORAGE_KEY)
     if (serialized === null) return null
 
     const parsedEnvelope = envelopeSchema.safeParse(JSON.parse(serialized))
@@ -116,6 +118,7 @@ export function writeDesktopState(
 export function clearDesktopState(storage: Pick<Storage, 'removeItem'>): void {
   try {
     storage.removeItem(DESKTOP_STORAGE_KEY)
+    storage.removeItem(LEGACY_DESKTOP_STORAGE_KEY)
   } catch {
     // Storage can be unavailable; clearing it must not interrupt the desktop.
   }

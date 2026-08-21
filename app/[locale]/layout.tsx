@@ -11,7 +11,7 @@ import { routing } from '@/i18n/routing'
 import '../globals.css'
 
 export const metadata: Metadata = {
-  title: 'Resume OS — Automated Job Agent',
+  title: 'JobSeeker Agent — Automated Job Search',
   description: 'A local-first Job Agent for discovering roles, tailoring evidence-grounded resumes, and tracking recruiter conversations.'
 }
 

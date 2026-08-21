@@ -37,7 +37,7 @@ function resume(): ResumeData {
     }],
     projects: [{
       id: 'ada-project',
-      name: 'Resume OS',
+      name: 'JobSeeker Agent',
       type: 'Product',
       tags: ['Next.js'],
       summary: 'Interactive resume workspace.',
@@ -85,7 +85,7 @@ function requestJson<T extends Record<string, unknown>>(route: Route) {
 
 async function installAiMocks(page: Page) {
   await page.addInitScript(() => {
-    localStorage.setItem('resume-os-ai-provider-preference-v1', JSON.stringify({
+    localStorage.setItem('job-seeker-agent-ai-provider-preference-v1', JSON.stringify({
       version: 1,
       mode: 'openai-compatible',
       allowCloudFallback: false
@@ -500,7 +500,7 @@ test('builds a reviewable Evidence Agent run and saves a variant without mutatin
 
 async function readActiveMaster(page: Page) {
   return page.evaluate(() => {
-    const serialized = localStorage.getItem('resume-os-drafts-v1')
+    const serialized = localStorage.getItem('job-seeker-agent-drafts-v1')
     if (!serialized) return null
     const envelope = JSON.parse(serialized) as {
       state?: {

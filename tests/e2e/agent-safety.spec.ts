@@ -122,7 +122,7 @@ test('Studio initializes and uses the saved Chrome preference without an AI rout
   await expect(studio.getByText('browser-managed')).toBeVisible()
   await expect(studio.getByText('Local Agent Engineer', { exact: true })).toBeVisible()
   expect(await page.evaluate(() => JSON.parse(
-    localStorage.getItem('resume-os-ai-provider-preference-v1') ?? 'null'
+    localStorage.getItem('job-seeker-agent-ai-provider-preference-v1') ?? 'null'
   ))).toEqual({
     version: 1,
     mode: 'chrome-built-in',
@@ -131,7 +131,7 @@ test('Studio initializes and uses the saved Chrome preference without an AI rout
   expect(apiRequests).toEqual([])
 })
 
-test('Chrome local JD extraction never invokes a Resume OS AI route', async ({ page }) => {
+test('Chrome local JD extraction never invokes a JobSeeker Agent AI route', async ({ page }) => {
   const draft = resumeDraft()
   const apiRequests = await blockApiRoutes(page)
   await prepareOrigin(page, { draft })
@@ -566,12 +566,12 @@ async function prepareOrigin(page: Page, input: {
 }) {
   await page.goto('/en')
   await page.evaluate(({ draft, activeWorkflow }) => {
-    localStorage.setItem('resume-os-drafts-v1', JSON.stringify({
+    localStorage.setItem('job-seeker-agent-drafts-v1', JSON.stringify({
       version: 1,
       state: { activeDraftId: draft.id, drafts: [draft] }
     }))
     if (activeWorkflow) {
-      localStorage.setItem('resume-os-active-workflow-v1', JSON.stringify({
+      localStorage.setItem('job-seeker-agent-active-workflow-v1', JSON.stringify({
         targetJobId: 'job-safety',
         optimizationRunId: 'run-safety'
       }))
@@ -586,7 +586,7 @@ async function setProviderPreference(
   allowCloudFallback: boolean
 ) {
   await page.evaluate(({ mode, allowCloudFallback }) => {
-    localStorage.setItem('resume-os-ai-provider-preference-v1', JSON.stringify({
+    localStorage.setItem('job-seeker-agent-ai-provider-preference-v1', JSON.stringify({
       version: 1,
       mode,
       allowCloudFallback
@@ -787,9 +787,9 @@ async function installCloudWorkflowRoutes(page: Page) {
     const pathname = new URL(request.url()).pathname
     requests.push(`${request.method()} ${pathname}`)
     expect(request.headers()).toMatchObject({
-      'x-resume-os-ai-key': 'sk-e2e-browser-key',
-      'x-resume-os-ai-base-url': 'https://byok.example/v1',
-      'x-resume-os-ai-model': 'e2e-cloud-model'
+      'x-job-seeker-agent-ai-key': 'sk-e2e-browser-key',
+      'x-job-seeker-agent-ai-base-url': 'https://byok.example/v1',
+      'x-job-seeker-agent-ai-model': 'e2e-cloud-model'
     })
 
     if (pathname === '/api/jd-match') {
@@ -931,9 +931,9 @@ async function publishExternalDraft(page: Page, draft: ResumeDraft) {
       version: 1,
       state: { activeDraftId: nextDraft.id, drafts: [nextDraft] }
     })
-    localStorage.setItem('resume-os-drafts-v1', serialized)
+    localStorage.setItem('job-seeker-agent-drafts-v1', serialized)
     window.dispatchEvent(new StorageEvent('storage', {
-      key: 'resume-os-drafts-v1',
+      key: 'job-seeker-agent-drafts-v1',
       newValue: serialized,
       storageArea: localStorage
     }))
@@ -942,7 +942,7 @@ async function publishExternalDraft(page: Page, draft: ResumeDraft) {
 
 async function readActiveDraftName(page: Page) {
   return page.evaluate(() => {
-    const value = localStorage.getItem('resume-os-drafts-v1')
+    const value = localStorage.getItem('job-seeker-agent-drafts-v1')
     if (!value) return null
     const envelope = JSON.parse(value) as {
       state?: { activeDraftId?: string | null; drafts?: Array<{ id: string; name: string }> }
@@ -952,12 +952,12 @@ async function readActiveDraftName(page: Page) {
 }
 
 async function readActiveWorkflowPreference(page: Page) {
-  return page.evaluate(() => localStorage.getItem('resume-os-active-workflow-v1'))
+  return page.evaluate(() => localStorage.getItem('job-seeker-agent-active-workflow-v1'))
 }
 
 async function readActiveResumeData(page: Page) {
   return page.evaluate(() => {
-    const value = localStorage.getItem('resume-os-drafts-v1')
+    const value = localStorage.getItem('job-seeker-agent-drafts-v1')
     if (!value) return null
     const envelope = JSON.parse(value) as {
       state?: {

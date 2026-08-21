@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { readMigratedStorageValue } from './brand-migration'
 import {
   createResumeId,
   normalizeResumeData,
@@ -10,7 +11,8 @@ import {
   type ResumeSnapshot
 } from './resume-model'
 
-export const RESUME_DRAFT_STORAGE_KEY = 'resume-os-drafts-v1'
+export const RESUME_DRAFT_STORAGE_KEY = 'job-seeker-agent-drafts-v1'
+export const LEGACY_RESUME_DRAFT_STORAGE_KEY = 'resume-os-drafts-v1'
 export const MAX_RESUME_SNAPSHOTS = 20
 
 const isoTimestampSchema = z.iso.datetime({ offset: true })
@@ -200,15 +202,19 @@ export function parseDraftState(serialized: string | null): DraftStateReadResult
   }
 }
 
-export function inspectDraftState(storage: Pick<Storage, 'getItem'>): DraftStateReadResult {
+export function inspectDraftState(storage: Pick<Storage, 'getItem'> & Partial<Pick<Storage, 'setItem'>>): DraftStateReadResult {
   try {
-    return parseDraftState(storage.getItem(RESUME_DRAFT_STORAGE_KEY))
+    return parseDraftState(readMigratedStorageValue(
+      storage,
+      RESUME_DRAFT_STORAGE_KEY,
+      LEGACY_RESUME_DRAFT_STORAGE_KEY
+    ))
   } catch {
     return { status: 'invalid' }
   }
 }
 
-export function readDraftState(storage: Pick<Storage, 'getItem'>): ResumeDraftState | null {
+export function readDraftState(storage: Pick<Storage, 'getItem'> & Partial<Pick<Storage, 'setItem'>>): ResumeDraftState | null {
   const result = inspectDraftState(storage)
   return result.status === 'valid' ? result.state : null
 }

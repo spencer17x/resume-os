@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 export const REQUIREMENT_MATRIX_VERSION = 1 as const
 export const REQUIREMENT_SCORE_VERSION = 1 as const
-export const REQUIREMENT_SCORING_RUBRIC_VERSION = 'resume-os-alignment-v1' as const
+export const REQUIREMENT_SCORING_RUBRIC_VERSION = 'job-seeker-agent-alignment-v1' as const
 export const MAX_REQUIREMENT_WEIGHT = 10
 export const MAX_JOB_REQUIREMENTS = 250
 

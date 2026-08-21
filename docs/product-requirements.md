@@ -1,8 +1,8 @@
-# Resume OS Product Requirements
+# JobSeeker Agent Product Requirements
 
 ## Product direction
 
-Resume OS is a user-controlled, cross-platform job-search agent. It uses a trusted
+JobSeeker Agent is a user-controlled, cross-platform job-search agent. It uses a trusted
 resume plus explicit job preferences to discover roles, qualify opportunities,
 prepare job-specific material, manage recruiter conversations, and improve its
 strategy from user corrections and real outcomes.
@@ -26,7 +26,7 @@ rules, user intent, and a complete action history.
    available in Chrome and starts recurring discovery. A missing or expired session opens the relevant
    login page; login, QR code, SMS, 2FA, and CAPTCHA completion remain user actions.
    After the first successful login, the local browser session is reused without
-   exporting cookies or credentials to Resume OS.
+   exporting cookies or credentials to JobSeeker Agent.
 6. The agent continuously discovers and deduplicates roles, explains its ranking,
    and rejects roles outside hard constraints.
 7. For a selected role, the agent maps requirements to saved evidence, creates a

@@ -2,6 +2,7 @@
 
 import { Monitor, Moon, Sun } from 'lucide-react'
 import { useTranslations } from 'next-intl'
+import { readMigratedStorageValue } from '@/lib/brand-migration'
 import {
   createContext,
   useCallback,
@@ -23,8 +24,9 @@ type ThemePreference = {
   setMode(mode: ThemeMode): void
 }
 
-const STORAGE_KEY = 'resume-os-theme'
-const CHANGE_EVENT = 'resume-os-theme-change'
+const STORAGE_KEY = 'job-seeker-agent-theme'
+const LEGACY_STORAGE_KEY = 'resume-os-theme'
+const CHANGE_EVENT = 'job-seeker-agent-theme-change'
 const MEDIA_QUERY = '(prefers-color-scheme: dark)'
 const MODES: readonly ThemeMode[] = ['system', 'light', 'dark']
 const icons = { system: Monitor, light: Sun, dark: Moon }
@@ -37,7 +39,7 @@ function isThemeMode(value: unknown): value is ThemeMode {
 
 function readMode(): ThemeMode {
   try {
-    const value = window.localStorage.getItem(STORAGE_KEY)
+    const value = readMigratedStorageValue(window.localStorage, STORAGE_KEY, LEGACY_STORAGE_KEY)
     memoryMode = isThemeMode(value) ? value : 'system'
     return memoryMode
   } catch {
@@ -47,7 +49,7 @@ function readMode(): ThemeMode {
 
 function subscribeMode(onStoreChange: () => void) {
   const onStorage = (event: StorageEvent) => {
-    if (event.key === STORAGE_KEY) onStoreChange()
+    if (event.key === STORAGE_KEY || event.key === LEGACY_STORAGE_KEY) onStoreChange()
   }
   const onChange = (event: Event) => {
     const mode = (event as CustomEvent<unknown>).detail

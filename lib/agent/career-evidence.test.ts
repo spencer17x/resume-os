@@ -33,8 +33,8 @@ function resume(source: ResumeData['metadata']['source'] = 'upload') {
       bullets: ['Led a platform migration used by five teams.']
     }],
     projects: [{
-      id: 'resume-os',
-      name: 'Resume OS',
+      id: 'job-seeker-agent',
+      name: 'JobSeeker Agent',
       type: 'Product',
       tags: ['AI'],
       summary: 'Built an evidence-grounded resume workspace.',
@@ -131,7 +131,7 @@ describe('career evidence import', () => {
       expect.objectContaining({
         kind: 'project',
         text: 'Added deterministic requirement scoring.',
-        context: { project: 'Resume OS' }
+        context: { project: 'JobSeeker Agent' }
       }),
       expect.objectContaining({ kind: 'achievement', text: 'University of London · BSc · Mathematics · 1832–1835' }),
       expect.objectContaining({ kind: 'skill', text: 'English', tags: ['language'] }),

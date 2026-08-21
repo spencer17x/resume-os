@@ -201,7 +201,7 @@ describe('desktop persistence', () => {
         hasCompletedIntro: true
       }
     })
-    storage.setItem('resume-os-desktop-v1', serialized)
+    storage.setItem('job-seeker-agent-desktop-v1', serialized)
 
     expect(readDesktopState(storage)).toBeNull()
   })
@@ -234,7 +234,7 @@ describe('desktop persistence', () => {
   ])('returns null for non-finite %s parsed from raw JSON', (_family, windowJson) => {
     const storage = new MapStorage()
     const serialized = `{"version":1,"state":{"windows":{"studio":${windowJson}},"focusedAppId":"studio","nextZIndex":2,"hasCompletedIntro":true}}`
-    storage.setItem('resume-os-desktop-v1', serialized)
+    storage.setItem('job-seeker-agent-desktop-v1', serialized)
 
     expect(serialized).toContain('1e400')
     expect(containsNonFiniteNumber(JSON.parse(windowJson))).toBe(true)
@@ -249,7 +249,7 @@ describe('desktop persistence', () => {
   ])('returns null for invalid %s zIndex', (_case, zIndexJson) => {
     const storage = new MapStorage()
     const serialized = `{"version":1,"state":{"windows":{"studio":{"appId":"studio","status":"open","position":{"x":0,"y":0},"size":{"width":1,"height":1},"zIndex":${zIndexJson}}},"focusedAppId":"studio","nextZIndex":2,"hasCompletedIntro":true}}`
-    storage.setItem('resume-os-desktop-v1', serialized)
+    storage.setItem('job-seeker-agent-desktop-v1', serialized)
 
     expect(readDesktopState(storage)).toBeNull()
   })
@@ -257,7 +257,7 @@ describe('desktop persistence', () => {
   it('compacts near-limit layers before reducer focus and open roundtrip', () => {
     const storage = new MapStorage()
     storage.setItem(
-      'resume-os-desktop-v1',
+      'job-seeker-agent-desktop-v1',
       '{"version":1,"state":{"windows":{"studio":{"appId":"studio","status":"open","position":{"x":0,"y":0},"size":{"width":1,"height":1},"zIndex":9007199254740990},"agent":{"appId":"agent","status":"open","position":{"x":0,"y":0},"size":{"width":1,"height":1},"zIndex":9007199254740989}},"focusedAppId":"agent","nextZIndex":1,"hasCompletedIntro":true}}'
     )
 
@@ -290,7 +290,7 @@ describe('desktop persistence', () => {
   it('uses app-id order to compact equal near-limit layers deterministically', () => {
     const storage = new MapStorage()
     storage.setItem(
-      'resume-os-desktop-v1',
+      'job-seeker-agent-desktop-v1',
       '{"version":1,"state":{"windows":{"studio":{"appId":"studio","status":"open","position":{"x":0,"y":0},"size":{"width":1,"height":1},"zIndex":9007199254740990},"agent":{"appId":"agent","status":"open","position":{"x":0,"y":0},"size":{"width":1,"height":1},"zIndex":9007199254740990}},"focusedAppId":"studio","nextZIndex":1,"hasCompletedIntro":true}}'
     )
 
@@ -345,11 +345,11 @@ describe('desktop persistence', () => {
     const state = stateWithWindows()
     const original = structuredClone(state)
 
-    expect(DESKTOP_STORAGE_KEY).toBe('resume-os-desktop-v1')
+    expect(DESKTOP_STORAGE_KEY).toBe('job-seeker-agent-desktop-v1')
     writeDesktopState(storage, state)
 
     expect(storage.setCalls).toHaveLength(1)
-    expect(storage.setCalls[0]?.[0]).toBe('resume-os-desktop-v1')
+    expect(storage.setCalls[0]?.[0]).toBe('job-seeker-agent-desktop-v1')
     expect(JSON.parse(storage.setCalls[0]?.[1] ?? '')).toEqual({
       version: 1,
       state
@@ -357,7 +357,15 @@ describe('desktop persistence', () => {
     expect(state).toEqual(original)
 
     clearDesktopState(storage)
-    expect(storage.removeCalls).toEqual(['resume-os-desktop-v1'])
+    expect(storage.removeCalls).toEqual(['job-seeker-agent-desktop-v1', 'resume-os-desktop-v1'])
+  })
+
+  it('migrates the legacy Resume OS desktop envelope', () => {
+    const storage = new MapStorage()
+    const state = stateWithWindows()
+    storage.setItem('resume-os-desktop-v1', JSON.stringify({ version: 1, state }))
+    expect(readDesktopState(storage)).toEqual(expect.objectContaining({ hasCompletedIntro: true }))
+    expect(storage.getItem(DESKTOP_STORAGE_KEY)).not.toBeNull()
   })
 
   it('returns a fresh object graph when loading', () => {

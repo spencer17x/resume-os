@@ -25,7 +25,7 @@ const server = spawn(process.execPath, [
   String(port)
 ], {
   cwd: process.cwd(),
-  env: { ...process.env, RESUME_OS_LOCAL_ONLY: '1' },
+  env: { ...process.env, JOB_SEEKER_AGENT_LOCAL_ONLY: '1' },
   stdio: ['ignore', 'pipe', 'pipe']
 })
 
@@ -57,7 +57,7 @@ async function assertTracedWorker() {
   const traceDirectory = dirname(tracePath)
   const trace = JSON.parse(await readFile(tracePath, 'utf8'))
   const sources = trace.files.map((file) => resolve(traceDirectory, file))
-  const sandbox = await mkdtemp(join(tmpdir(), 'resume-os-trace-'))
+  const sandbox = await mkdtemp(join(tmpdir(), 'job-seeker-agent-trace-'))
 
   try {
     for (const source of sources) {

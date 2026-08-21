@@ -1,9 +1,12 @@
 import { z } from 'zod'
 import { JOB_AGENT_PLATFORM_IDS, jobAgentPlatformIdSchema } from './job-agent-policy'
 
-export const BROWSER_AGENT_REQUEST_EVENT = 'resume-os:browser-agent:request'
-export const BROWSER_AGENT_RESPONSE_EVENT = 'resume-os:browser-agent:response'
-export const JOB_AGENT_WAKE_EVENT = 'resume-os:job-agent:wakeup'
+export const BROWSER_AGENT_REQUEST_EVENT = 'job-seeker-agent:browser-agent:request'
+export const BROWSER_AGENT_RESPONSE_EVENT = 'job-seeker-agent:browser-agent:response'
+export const JOB_AGENT_WAKE_EVENT = 'job-seeker-agent:job-agent:wakeup'
+export const LEGACY_BROWSER_AGENT_REQUEST_EVENT = 'resume-os:browser-agent:request'
+export const LEGACY_BROWSER_AGENT_RESPONSE_EVENT = 'resume-os:browser-agent:response'
+export const LEGACY_JOB_AGENT_WAKE_EVENT = 'resume-os:job-agent:wakeup'
 
 export const browserJobAgentCycleSchema = z.object({
   id: z.string().trim().min(1).max(160),
@@ -376,6 +379,7 @@ async function requestBrowserAgent(input: {
       if (settled) return
       settled = true
       input.window.removeEventListener(BROWSER_AGENT_RESPONSE_EVENT, onResponse as EventListener)
+      input.window.removeEventListener(LEGACY_BROWSER_AGENT_RESPONSE_EVENT, onResponse as EventListener)
       window.clearTimeout(timeout)
       resolve(response)
     }
@@ -390,7 +394,11 @@ async function requestBrowserAgent(input: {
       error: 'EXTENSION_UNAVAILABLE'
     }), timeoutMs)
     input.window.addEventListener(BROWSER_AGENT_RESPONSE_EVENT, onResponse as EventListener)
+    input.window.addEventListener(LEGACY_BROWSER_AGENT_RESPONSE_EVENT, onResponse as EventListener)
     input.window.dispatchEvent(new CustomEvent(BROWSER_AGENT_REQUEST_EVENT, {
+      detail: { requestId, action: input.action, ...(input.payload ? { payload: input.payload } : {}) }
+    }))
+    input.window.dispatchEvent(new CustomEvent(LEGACY_BROWSER_AGENT_REQUEST_EVENT, {
       detail: { requestId, action: input.action, ...(input.payload ? { payload: input.payload } : {}) }
     }))
   })

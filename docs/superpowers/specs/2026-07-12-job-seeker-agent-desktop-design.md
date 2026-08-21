@@ -1,8 +1,8 @@
-# Resume OS Desktop Experience Design
+# JobSeeker Agent Desktop Experience Design
 
 ## Goal
 
-Transform Resume OS into a browser-based desktop operating environment for resume creation, optimization, and presentation.
+Transform JobSeeker Agent into a browser-based desktop operating environment for resume creation, optimization, and presentation.
 
 The desktop experience must preserve the existing product direction:
 
@@ -19,7 +19,7 @@ This design extends the existing Resume Studio design rather than replacing its 
 - Desktop model: a complete in-browser window manager with multiple simultaneous windows.
 - Window capability: drag, eight-direction resize, minimize, maximize, restore, close, focus, and z-index ordering.
 - Mobile model: iOS-inspired home screen with full-screen applications; no floating windows on narrow screens.
-- Visual identity: an original Resume OS system language that borrows familiar desktop interaction grammar without copying Apple assets or branding.
+- Visual identity: an original JobSeeker Agent system language that borrows familiar desktop interaction grammar without copying Apple assets or branding.
 - Startup: animate into the desktop and automatically open Resume Studio on the first visit or when no restorable application window exists.
 - Motion: product-level motion for daily interactions plus stronger showcase motion for first launch, 3D, Book, and Timeline.
 - Implementation route: `react-rnd` for window geometry, Motion for animation, and a React reducer/context for desktop state.
@@ -37,7 +37,7 @@ This design extends the existing Resume Studio design rather than replacing its 
 
 ## Product Architecture
 
-Resume OS has three product layers:
+JobSeeker Agent has three product layers:
 
 1. A responsive system shell.
 2. A registry of resume applications.
@@ -160,13 +160,13 @@ On a first visit:
 2. Desktop icons and Dock settle into place.
 3. Resume Studio opens from its Dock or desktop origin with a spring transition.
 
-On later visits, Resume OS restores the valid saved window session. If no application window is open, the root route opens Resume Studio. A direct application route always opens and focuses its target after restoration.
+On later visits, JobSeeker Agent restores the valid saved window session. If no application window is open, the root route opens Resume Studio. A direct application route always opens and focuses its target after restoration.
 
 The introduction is brief and interruptible. It must not block keyboard interaction or delay access to Studio beyond the animation interval.
 
 ## Mobile Experience
 
-Narrow screens use an iOS-inspired layout with Resume OS branding:
+Narrow screens use an iOS-inspired layout with JobSeeker Agent branding:
 
 - A status area, application grid, and compact Dock replace the desktop window manager.
 - The mobile root route shows the application grid. Tapping Resume Studio opens `/[locale]/studio`; the Home control returns to `/[locale]`.
@@ -177,11 +177,11 @@ Narrow screens use an iOS-inspired layout with Resume OS branding:
 - Mobile layouts use touch-sized controls and account for safe-area insets.
 - Window dragging, resizing, stacking, traffic lights, and desktop icon double-click behavior are disabled.
 
-The mobile visual language is original Resume OS styling. It must not include Apple logos, copyrighted wallpapers, or copied application icons.
+The mobile visual language is original JobSeeker Agent styling. It must not include Apple logos, copyrighted wallpapers, or copied application icons.
 
 ## Visual System
 
-Resume OS uses a neutral system foundation with multiple accent families instead of a one-color interface.
+JobSeeker Agent uses a neutral system foundation with multiple accent families instead of a one-color interface.
 
 - Structural colors: graphite, mist, white, and deep neutral surfaces.
 - Primary accent: teal for active system state and successful AI connectivity.
@@ -191,7 +191,7 @@ Resume OS uses a neutral system foundation with multiple accent families instead
 
 Desktop materials use restrained translucency and blur. Content-heavy applications remain opaque enough for sustained reading. Window corners remain compact, and controls use familiar icons with tooltips and accessible labels.
 
-A custom raster wallpaper provides the first-viewport visual asset. It should feel like layered glass or folded light, use the Resume OS palette, work in light and dark variants, and avoid decorative orb or bokeh motifs. Application icons use a consistent custom tile system with Lucide symbols where available.
+A custom raster wallpaper provides the first-viewport visual asset. It should feel like layered glass or folded light, use the JobSeeker Agent palette, work in light and dark variants, and avoid decorative orb or bokeh motifs. Application icons use a consistent custom tile system with Lucide symbols where available.
 
 Theme and locale controls remain global. The menu bar exposes light, dark, and system theme modes plus Chinese/English switching. Application content continues to use translation namespaces.
 
@@ -226,7 +226,7 @@ Showcase effects must pause or reduce when their window is minimized, hidden, or
 
 ### Reduced Motion
 
-The system respects `prefers-reduced-motion` and exposes a matching Resume OS setting. Reduced mode removes parallax, large transforms, Dock magnification, and cinematic camera transitions. Short opacity changes may remain. All content and controls remain available.
+The system respects `prefers-reduced-motion` and exposes a matching JobSeeker Agent setting. Reduced mode removes parallax, large transforms, Dock magnification, and cinematic camera transitions. Short opacity changes may remain. All content and controls remain available.
 
 ## Resume Data Flow
 
@@ -347,7 +347,7 @@ With the configured local environment, verify upload parsing, simulated resume g
 
 The design is implemented when all of the following are true:
 
-- The root route presents the Resume OS desktop and opens Resume Studio under the startup rules.
+- The root route presents the JobSeeker Agent desktop and opens Resume Studio under the startup rules.
 - At least three application windows can be opened and manipulated concurrently on desktop.
 - Window layout and resume drafts survive reload independently.
 - All existing application routes deep-link into the correct focused window.

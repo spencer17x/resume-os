@@ -123,7 +123,7 @@ describe('JD match report JSON', () => {
     expect(analysis.matrix.matches[0].rationale).toContain('remains an evidence gap')
     expect(analysis.score).toMatchObject({ requirementCoverage: 0, evidenceCompleteness: 0 })
     expect(analysis.structureScore).toMatchObject({
-      rubricVersion: 'resume-os-structure-v1',
+      rubricVersion: 'job-seeker-agent-structure-v1',
       score: 15
     })
     expect(repeated.matrix).toEqual(analysis.matrix)

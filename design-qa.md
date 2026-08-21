@@ -1,9 +1,9 @@
 # Job Agent Design QA
 
 - Source visual truth: `/Users/17a/.codex/generated_images/01a01885-484d-7582-a998-b22be112050f/exec-f091fb46-3ce7-46b2-bad4-a93b36947330.png`
-- Implementation screenshot: `/Users/17a/projects/resume-os/design-implementation-final-v3.png`
-- Full comparison: `/Users/17a/projects/resume-os/design-comparison-final-v3.png`
-- Focused top comparison: `/Users/17a/projects/resume-os/design-comparison-focus-top-v3.png`
+- Implementation screenshot: `/Users/17a/projects/job-seeker-agent/design-implementation-final-v3.png`
+- Full comparison: `/Users/17a/projects/job-seeker-agent/design-comparison-final-v3.png`
+- Focused top comparison: `/Users/17a/projects/job-seeker-agent/design-comparison-focus-top-v3.png`
 - Implementation route: `http://127.0.0.1:3001/zh/jobs`
 - State: light theme, empty local job workspace, Browser Agent disconnected
 - CSS viewport: `1280 × 720`, reported device pixel ratio `2`
@@ -31,7 +31,7 @@ No actionable P0, P1, or P2 visual differences remain.
 
 - [P3] The captured connection indicator is gray instead of green.
   - Location: top bar and Agent status.
-  - Evidence: the in-app browser does not have the Resume OS Chrome extension, while the source depicts a connected BOSS session.
+  - Evidence: the in-app browser does not have the JobSeeker Agent Chrome extension, while the source depicts a connected BOSS session.
   - Rationale: the implementation changes to green from real Browser Agent state.
 
 ## Required fidelity surfaces

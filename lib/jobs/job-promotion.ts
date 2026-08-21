@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { createDomainStore, type IndexedDbDomainStore } from '@/lib/agent/domain-store'
+import { readMigratedStorageValue } from '@/lib/brand-migration'
 import {
   applicationRecordSchema,
   createStableJobDomainId,
@@ -8,7 +9,8 @@ import {
   type JobRecommendation
 } from './job-domain'
 
-export const JOB_PROMOTION_STORAGE_KEY = 'resume-os-job-promotion-v1'
+export const JOB_PROMOTION_STORAGE_KEY = 'job-seeker-agent-job-promotion-v1'
+const LEGACY_JOB_PROMOTION_STORAGE_KEY = 'resume-os-job-promotion-v1'
 
 const jobPromotionIntentSchema = z.object({
   postingId: z.string().trim().min(1).max(160),
@@ -67,7 +69,11 @@ export function readJobPromotionIntent(
 ): JobPromotionIntent | null {
   if (!storage) return null
   try {
-    return jobPromotionIntentSchema.parse(JSON.parse(storage.getItem(JOB_PROMOTION_STORAGE_KEY) ?? 'null'))
+    return jobPromotionIntentSchema.parse(JSON.parse(readMigratedStorageValue(
+      storage,
+      JOB_PROMOTION_STORAGE_KEY,
+      LEGACY_JOB_PROMOTION_STORAGE_KEY
+    ) ?? 'null'))
   } catch {
     return null
   }
@@ -75,6 +81,7 @@ export function readJobPromotionIntent(
 
 export function clearJobPromotionIntent(storage: PromotionStorage | null = browserStorage()) {
   storage?.removeItem(JOB_PROMOTION_STORAGE_KEY)
+  storage?.removeItem(LEGACY_JOB_PROMOTION_STORAGE_KEY)
 }
 
 export async function resolveJobPromotion(input: {

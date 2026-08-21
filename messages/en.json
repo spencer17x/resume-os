@@ -1,10 +1,10 @@
 {
   "meta": {
-    "title": "Resume OS — Automated Job Agent",
+    "title": "JobSeeker Agent — Automated Job Search",
     "description": "A local-first agent that finds jobs, prepares conversations, and improves from outcomes without inventing career evidence."
   },
   "nav": {
-    "brand": "Resume OS",
+    "brand": "JobSeeker Agent",
     "classic": "Review & Export",
     "agent": "Agent",
     "jdMatch": "Target Job",
@@ -22,8 +22,8 @@
     "themeDark": "Dark"
   },
   "desktop": {
-    "brand": "Resume OS",
-    "landmark": "Resume OS desktop",
+    "brand": "JobSeeker Agent",
+    "landmark": "JobSeeker Agent desktop",
     "desktop": "Desktop",
     "applications": "Applications",
     "dock": "Dock",
@@ -114,8 +114,8 @@
     "error": "This application could not be loaded."
   },
   "mobile": {
-    "homeTitle": "Resume OS",
-    "title": "Resume OS",
+    "homeTitle": "JobSeeker Agent",
+    "title": "JobSeeker Agent",
     "eyebrow": "Evidence-grounded tailoring agent",
     "status": "Ready",
     "applications": "Applications",
@@ -127,7 +127,7 @@
     "open": "Open"
   },
   "agent": {
-    "back": "Back to Resume OS",
+    "back": "Back to JobSeeker Agent",
     "title": "Evidence-Grounded Resume Agent",
     "description": "Tailor the active resume to a target job using only supported career evidence. Missing facts become questions, and every proposed change remains reviewable.",
     "workflow": {
@@ -258,7 +258,7 @@
       "PROTECTED_FIELD": "Blocked: edit this protected identity or history field manually",
       "UNSTABLE_REORDER": "Blocked: reordering requires stable item IDs",
       "INVALID_ADD_FROM_FACT": "Blocked: facts can only populate an experience bullet or project highlight",
-      "UNSAFE_REMOVE": "Blocked: Resume OS does not automatically remove resume content"
+      "UNSAFE_REMOVE": "Blocked: JobSeeker Agent does not automatically remove resume content"
     },
     "evidence": {
       "requirements": "Requirements",
@@ -328,7 +328,7 @@
     ]
   },
   "jdMatch": {
-    "back": "Back to Resume OS",
+    "back": "Back to JobSeeker Agent",
     "title": "Target Job Requirements",
     "description": "Extract and review requirements from a job description before mapping them to verified career evidence.",
     "draft": "Resume in use",
@@ -460,7 +460,7 @@
     ]
   },
   "projects": {
-    "back": "Back to Resume OS",
+    "back": "Back to JobSeeker Agent",
     "backToProjects": "Back to Projects",
     "title": "Project Explorer",
     "description": "Explore projects from the active resume as reusable evidence of skills, ownership, and measurable impact.",
@@ -476,22 +476,22 @@
     "askAgentHint": "Try asking: “Which target-job requirements can {name} support?”"
   },
   "timeline": {
-    "back": "Back to Resume OS",
+    "back": "Back to JobSeeker Agent",
     "title": "Career Timeline",
     "description": "A chronological view of the experience and outcomes available as career evidence.",
     "sampleResume": "Sample resume",
     "empty": "No experience has been added to this resume."
   },
   "terminal": {
-    "back": "Back to Resume OS",
-    "title": "resume-os terminal",
+    "back": "Back to JobSeeker Agent",
+    "title": "job-seeker-agent terminal",
     "help": "Available routes: /classic, /agent, /jd-match, /projects, /timeline",
     "regionLabel": "Resume terminal",
     "sampleResume": "Sample resume",
     "commandShortcuts": "Command shortcuts",
     "runCommand": "Run {command}",
     "output": "Terminal output",
-    "welcome": "Resume OS ready. Run a command to inspect the active resume.",
+    "welcome": "JobSeeker Agent ready. Run a command to inspect the active resume.",
     "commandInput": "Terminal command",
     "placeholder": "Type whoami, skills, projects, or help",
     "runInput": "Run terminal command",
@@ -501,7 +501,7 @@
     "unknownCommand": "Command not found: {command}"
   },
   "classic": {
-    "back": "Back to Resume OS",
+    "back": "Back to JobSeeker Agent",
     "summary": "Summary",
     "skills": "Skills",
     "experience": "Experience",
@@ -576,7 +576,7 @@
   "settings": {
     "eyebrow": "System preferences",
     "title": "Settings",
-    "description": "Manage how Resume OS looks, moves, and connects to AI services.",
+    "description": "Manage how JobSeeker Agent looks, moves, and connects to AI services.",
     "appearance": "Appearance",
     "appearanceDescription": "Follow the operating system or choose a fixed theme.",
     "language": "Language",
@@ -606,11 +606,11 @@
       "automatic": "Prefer the local model; stop when it cannot run the task unless fallback is allowed."
     },
     "allowCloudFallback": "Allow explicit cloud fallback",
-    "allowCloudFallbackDescription": "Your saved consent lets Resume OS send only the required task context to your configured cloud provider when the local model is unavailable or cannot fit the bounded task.",
+    "allowCloudFallbackDescription": "Your saved consent lets JobSeeker Agent send only the required task context to your configured cloud provider when the local model is unavailable or cannot fit the bounded task.",
     "chromeLanguageBoundary": "Chrome does not officially guarantee Chinese Prompt API output yet. Chinese tasks use an experimental best-effort local session, remain schema-validated, and never cross to cloud without saved consent.",
     "aiProvider": "Self-configured AI",
     "aiProviderDescription": "Configure an OpenAI-compatible endpoint. Custom service hosts must be allowed by the deployment.",
-    "aiPrivacyNote": "Your key and career data stay in this browser until an AI task sends the necessary context to your chosen provider. Resume OS does not persist them on its server.",
+    "aiPrivacyNote": "Your key and career data stay in this browser until an AI task sends the necessary context to your chosen provider. JobSeeker Agent does not persist them on its server.",
     "aiAdapter": "Adapter",
     "aiAdapterValue": "OpenAI-compatible",
     "aiBaseURL": "API Base URL",
@@ -860,7 +860,7 @@
       "catchUp": "{count} missed cycles will be coalesced and checked before execution.",
       "offlineReason": {
         "none": "Running normally",
-        "page-closed": "Resume OS page was closed; work was retained",
+        "page-closed": "JobSeeker Agent page was closed; work was retained",
         "browser-restarted": "Chrome restarted; catch-up is pending",
         "dispatch-failed": "The last dispatch failed and will retry with rate limiting"
       }
@@ -1088,7 +1088,7 @@
       }
     },
     "platforms": "Job platforms",
-    "platformHelp": "Company is optional. Automatic sources are searched inside Resume OS; restricted platforms open their official search instead of being scraped.",
+    "platformHelp": "Company is optional. Automatic sources are searched inside JobSeeker Agent; restricted platforms open their official search instead of being scraped.",
     "platformLegend": "Platforms to search",
     "marketplace": {
       "boss": { "name": "BOSS Zhipin", "note": "Official search and session detection are supported; the automatic send adapter is under verification." }
@@ -1126,7 +1126,7 @@
     "saveProfile": "Save profile",
     "profileSaved": "Search profile saved and current jobs rescored.",
     "importJob": "Bring back a job",
-    "importJobHelp": "On a platform, choose a promising role and paste its official URL and job description here. Resume OS stores only what you provide and never reads your login session.",
+    "importJobHelp": "On a platform, choose a promising role and paste its official URL and job description here. JobSeeker Agent stores only what you provide and never reads your login session.",
     "clipboardJob": "Quick paste",
     "clipboardJobPlaceholder": "Job title: …\nCompany: …\nLocation: …\nURL: https://…\nJob description: …",
     "parseClipboardJob": "Parse and prefill",
@@ -1180,7 +1180,7 @@
     "application": {
       "eyebrow": "Manual submission",
       "title": "Application packets",
-      "description": "Resume OS prepares and checks your local packet. You open the employer site and explicitly confirm submission.",
+      "description": "JobSeeker Agent prepares and checks your local packet. You open the employer site and explicitly confirm submission.",
       "checklist": "Application readiness checklist",
       "checks": {
         "posting-current": "Public posting is still open and unchanged",

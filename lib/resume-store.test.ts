@@ -567,4 +567,12 @@ describe('resume draft store', () => {
     expect(readDraftState(memory)).toEqual(initialState)
     expect(Object.prototype).not.toHaveProperty('polluted')
   })
+
+  it('migrates legacy Resume OS drafts without deleting the old value', () => {
+    const storage = new MemoryStorage()
+    storage.setItem('resume-os-drafts-v1', JSON.stringify({ version: 1, state: initialState }))
+    expect(readDraftState(storage)).toEqual(initialState)
+    expect(storage.getItem(RESUME_DRAFT_STORAGE_KEY)).not.toBeNull()
+    expect(storage.getItem('resume-os-drafts-v1')).not.toBeNull()
+  })
 })

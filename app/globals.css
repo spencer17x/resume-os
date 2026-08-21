@@ -38,7 +38,7 @@
   --z-menu: 50;
   --system-focus-ring: #b7f7ea;
   --desktop-wallpaper-background-dark: #07111c;
-  --desktop-wallpaper-image-dark: image-set(url('/wallpapers/resume-os-dark.webp') type('image/webp') 1x);
+  --desktop-wallpaper-image-dark: image-set(url('/wallpapers/job-seeker-agent-dark.webp') type('image/webp') 1x);
   --desktop-wallpaper-overlay-dark:
     linear-gradient(180deg, rgba(4, 9, 16, 0.08), rgba(4, 9, 16, 0.26)),
     radial-gradient(circle at 24% 20%, rgba(96, 210, 255, 0.14), transparent 38%),
@@ -59,7 +59,7 @@
   --desktop-phase-synthesize: #a779ff;
   --desktop-phase-verify: #ffad70;
   --desktop-wallpaper-background-light: #eef4f6;
-  --desktop-wallpaper-image-light: image-set(url('/wallpapers/resume-os-light.webp') type('image/webp') 1x);
+  --desktop-wallpaper-image-light: image-set(url('/wallpapers/job-seeker-agent-light.webp') type('image/webp') 1x);
   --desktop-wallpaper-overlay-light:
     linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(214, 229, 236, 0.12)),
     radial-gradient(circle at 20% 18%, rgba(90, 200, 250, 0.12), transparent 36%),

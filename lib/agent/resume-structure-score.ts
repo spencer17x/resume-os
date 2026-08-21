@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { normalizeResumeData, type ResumeData } from '@/lib/resume-model'
 
 export const RESUME_STRUCTURE_SCORE_VERSION = 1 as const
-export const RESUME_STRUCTURE_RUBRIC_VERSION = 'resume-os-structure-v1' as const
+export const RESUME_STRUCTURE_RUBRIC_VERSION = 'job-seeker-agent-structure-v1' as const
 
 const ruleIdSchema = z.enum([
   'profile-basics',

@@ -58,7 +58,7 @@ describe('POST /api/jd-match', () => {
     ])
     expect(body.score).toMatchObject({ requirementCoverage: 0, evidenceCompleteness: 0 })
     expect(body.structureScore).toMatchObject({
-      rubricVersion: 'resume-os-structure-v1',
+      rubricVersion: 'job-seeker-agent-structure-v1',
       score: 15
     })
     expect(agentMocks.generateAgentText.mock.calls[0][0]).toContain('Platform role')

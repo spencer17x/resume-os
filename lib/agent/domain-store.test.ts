@@ -141,7 +141,7 @@ const jobRecommendation: JobRecommendation = {
   postingId: jobPosting.id,
   searchProfileId: searchProfile.id,
   sourceDraftId: variant.sourceDraftId,
-  rubricVersion: 'resume-os-job-relevance-v1',
+  rubricVersion: 'job-seeker-agent-job-relevance-v1',
   inputFingerprint: 'fnv1a64:job-recommendation-1',
   eligibility: 'eligible',
   preliminaryScore: 90,
@@ -165,7 +165,7 @@ const applicationRecord: ApplicationRecord = {
 
 function createTestStore() {
   const factory = new IDBFactory()
-  const databaseName = `resume-os-domain-test-${crypto.randomUUID()}`
+  const databaseName = `job-seeker-agent-domain-test-${crypto.randomUUID()}`
   return {
     factory,
     databaseName,
@@ -482,7 +482,7 @@ describe('IndexedDbDomainStore', () => {
 
   it('does not open a database created with an unsupported future schema version', async () => {
     const factory = new IDBFactory()
-    const databaseName = `resume-os-domain-future-${crypto.randomUUID()}`
+    const databaseName = `job-seeker-agent-domain-future-${crypto.randomUUID()}`
     const future = await openDatabase(factory, databaseName, DOMAIN_STORE_SCHEMA_VERSION + 1)
     future.close()
 
@@ -492,7 +492,7 @@ describe('IndexedDbDomainStore', () => {
 
   it('migrates schema v1 records to v4 without clearing existing data', async () => {
     const factory = new IDBFactory()
-    const databaseName = `resume-os-domain-v1-${crypto.randomUUID()}`
+    const databaseName = `job-seeker-agent-domain-v1-${crypto.randomUUID()}`
     const legacy = await createVersionOneDatabase(factory, databaseName)
     const transaction = legacy.transaction(['evidenceSources', 'targetJobs'], 'readwrite')
     transaction.objectStore('evidenceSources').put(source)
@@ -514,7 +514,7 @@ describe('IndexedDbDomainStore', () => {
 
   it('adds BOSS conversation stores to schema v2 without clearing job data', async () => {
     const factory = new IDBFactory()
-    const databaseName = `resume-os-domain-v2-${crypto.randomUUID()}`
+    const databaseName = `job-seeker-agent-domain-v2-${crypto.randomUUID()}`
     const legacy = await createVersionTwoDatabase(factory, databaseName)
     legacy.close()
 
@@ -530,7 +530,7 @@ describe('IndexedDbDomainStore', () => {
 
   it('adds interview stores to schema v3 without clearing conversations', async () => {
     const factory = new IDBFactory()
-    const databaseName = `resume-os-domain-v3-${crypto.randomUUID()}`
+    const databaseName = `job-seeker-agent-domain-v3-${crypto.randomUUID()}`
     const legacy = await createVersionThreeDatabase(factory, databaseName)
     legacy.close()
 

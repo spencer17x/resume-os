@@ -127,7 +127,7 @@ describe('mobile shell', () => {
   it('renders the mobile grid at the locale root without desktop windows or controls', async () => {
     renderShell({ descriptor: 'studio' })
 
-    const home = await screen.findByRole('main', { name: 'Resume OS' })
+    const home = await screen.findByRole('main', { name: 'JobSeeker Agent' })
     expect(home).toBeVisible()
     expect(within(within(home).getByRole('region', { name: 'Applications' })).getAllByRole('button')).toHaveLength(Object.keys(appRegistry).length)
     expect(within(within(home).getByRole('navigation', { name: 'Pinned applications' })).getAllByRole('button')).toHaveLength(Object.values(appRegistry).filter((app) => app.pinned).length)
@@ -144,7 +144,7 @@ describe('mobile shell', () => {
   it('opens Agent with one tap and shows its full-screen frame on the route', async () => {
     const view = renderShell()
 
-    const home = await screen.findByRole('main', { name: 'Resume OS' })
+    const home = await screen.findByRole('main', { name: 'JobSeeker Agent' })
     const agent = within(home).getAllByRole('button', { name: 'Resume Agent' })
       .find((button) => button.classList.contains('mobile-home__app'))
     if (!agent) throw new Error('Expected mobile Agent icon')
@@ -180,7 +180,7 @@ describe('mobile shell', () => {
         </DesktopProviderCore>
       </NextIntlClientProvider>
     )
-    expect(await screen.findByRole('main', { name: 'Resume OS' })).toBeVisible()
+    expect(await screen.findByRole('main', { name: 'JobSeeker Agent' })).toBeVisible()
   })
 
   it('falls back to the locale root on direct entry even when browser history is longer than one', async () => {
@@ -195,7 +195,7 @@ describe('mobile shell', () => {
 
   it('uses router back once after an internal Home-to-Agent navigation', async () => {
     const view = renderShell()
-    const home = await screen.findByRole('main', { name: 'Resume OS' })
+    const home = await screen.findByRole('main', { name: 'JobSeeker Agent' })
     const agent = within(home).getAllByRole('button', { name: 'Resume Agent' })
       .find((button) => button.classList.contains('mobile-home__app'))
     if (!agent) throw new Error('Expected mobile Agent icon')
@@ -219,7 +219,7 @@ describe('mobile shell', () => {
   it('clears the in-app predecessor when the locale changes', async () => {
     vi.spyOn(window.history, 'length', 'get').mockReturnValue(4)
     const view = renderShell()
-    const home = await screen.findByRole('main', { name: 'Resume OS' })
+    const home = await screen.findByRole('main', { name: 'JobSeeker Agent' })
     const agent = within(home).getAllByRole('button', { name: 'Resume Agent' })
       .find((button) => button.classList.contains('mobile-home__app'))
     if (!agent) throw new Error('Expected mobile Agent icon')
@@ -242,7 +242,7 @@ describe('mobile shell', () => {
   it('keeps app icons accessible touch targets with safe-area styling', async () => {
     renderShell()
 
-    const home = await screen.findByRole('main', { name: 'Resume OS' })
+    const home = await screen.findByRole('main', { name: 'JobSeeker Agent' })
     for (const app of Object.values(appRegistry)) {
       expect(within(home).getAllByRole('button', { name: en.desktop.apps[app.id] })
         .some((button) => button.classList.contains('mobile-home__app'))).toBe(true)
@@ -256,7 +256,7 @@ describe('mobile shell', () => {
 
   it('describes Dock running state without marking multiple apps as the current page', async () => {
     const view = renderShell()
-    const home = await screen.findByRole('main', { name: 'Resume OS' })
+    const home = await screen.findByRole('main', { name: 'JobSeeker Agent' })
     const agent = within(home).getAllByRole('button', { name: 'Resume Agent' })
       .find((button) => button.classList.contains('mobile-home__app'))
     if (!agent) throw new Error('Expected mobile Agent icon')
@@ -280,7 +280,7 @@ describe('mobile shell', () => {
 
     expect(await screen.findByTestId('desktop-surface')).toBeVisible()
     expect(await screen.findByRole('application', { name: 'Resume Studio' })).toBeInTheDocument()
-    expect(screen.queryByRole('main', { name: 'Resume OS' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('main', { name: 'JobSeeker Agent' })).not.toBeInTheDocument()
   })
 
   it('hydrates from an unresolved snapshot without rendering desktop controls before mobile', async () => {
@@ -306,14 +306,14 @@ describe('mobile shell', () => {
     })
     expect(container.querySelector('[data-testid="desktop-surface"]')).toBeNull()
 
-    await waitFor(() => expect(within(container).getByRole('main', { name: 'Resume OS' })).toBeInTheDocument())
+    await waitFor(() => expect(within(container).getByRole('main', { name: 'JobSeeker Agent' })).toBeInTheDocument())
     root!.unmount()
     container.remove()
   })
 
   it.each([
-    ['en', 'Resume OS', 'Settings'],
-    ['zh', 'Resume OS', '设置']
+    ['en', 'JobSeeker Agent', 'Settings'],
+    ['zh', 'JobSeeker Agent', '设置']
   ] satisfies Array<[Locale, string, string]>)('localizes %s mobile labels', async (locale, homeName, settingsName) => {
     renderShell({ locale })
     expect(await screen.findByRole('main', { name: homeName })).toBeVisible()

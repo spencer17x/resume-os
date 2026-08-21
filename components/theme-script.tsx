@@ -1,9 +1,11 @@
 const themeScript = `
   (() => {
-    const storageKey = 'resume-os-theme';
+    const storageKey = 'job-seeker-agent-theme';
+    const legacyStorageKey = 'resume-os-theme';
     let stored = null;
     try {
-      stored = localStorage.getItem(storageKey);
+      stored = localStorage.getItem(storageKey) || localStorage.getItem(legacyStorageKey);
+      if (stored && !localStorage.getItem(storageKey)) localStorage.setItem(storageKey, stored);
     } catch {
       stored = null;
     }
@@ -15,5 +17,5 @@ const themeScript = `
 `
 
 export function ThemeScript() {
-  return <script id="resume-os-theme" dangerouslySetInnerHTML={{ __html: themeScript }} />
+  return <script id="job-seeker-agent-theme" dangerouslySetInnerHTML={{ __html: themeScript }} />
 }

@@ -44,6 +44,14 @@ describe('AI provider preference', () => {
     })
   })
 
+  it('migrates a legacy Resume OS provider preference', () => {
+    window.localStorage.setItem('resume-os-ai-provider-preference-v1', JSON.stringify({
+      version: 1, mode: 'openai-compatible', allowCloudFallback: false
+    }))
+    expect(readAiProviderPreference()).toEqual({ mode: 'openai-compatible', allowCloudFallback: false })
+    expect(window.localStorage.getItem(AI_PROVIDER_PREFERENCE_STORAGE_KEY)).not.toBeNull()
+  })
+
   it.each(['chrome-built-in', 'openai-compatible'] as const)(
     'cannot enable cloud fallback while using %s',
     (mode) => {

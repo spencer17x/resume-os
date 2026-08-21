@@ -124,7 +124,7 @@ describe('AI request guard', () => {
   })
 
   it('uses the public Host and trusted forwarded protocol when the framework URL is internal', () => {
-    vi.stubEnv('RESUME_OS_TRUSTED_PROXY', 'vercel')
+    vi.stubEnv('JOB_SEEKER_AGENT_TRUSTED_PROXY', 'vercel')
     vi.stubEnv('VERCEL', '1')
     const guard = createAiRequestGuard({
       localOnly: false,
@@ -259,13 +259,13 @@ describe('AI request guard', () => {
     }
     expect(resolveRateLimitIdentity(request(undefined, headers))).toBe('single-instance')
 
-    vi.stubEnv('RESUME_OS_TRUSTED_PROXY', 'cloudflare')
+    vi.stubEnv('JOB_SEEKER_AGENT_TRUSTED_PROXY', 'cloudflare')
     expect(resolveRateLimitIdentity(request(undefined, headers))).toBe('203.0.113.8')
     expect(resolveRateLimitIdentity(request(undefined, {
       'x-vercel-forwarded-for': '198.51.100.9'
     }))).toBe('single-instance')
 
-    vi.stubEnv('RESUME_OS_TRUSTED_PROXY', 'vercel')
+    vi.stubEnv('JOB_SEEKER_AGENT_TRUSTED_PROXY', 'vercel')
     vi.stubEnv('VERCEL', '1')
     expect(resolveRateLimitIdentity(request(undefined, {
       'x-forwarded-for': '198.51.100.9'

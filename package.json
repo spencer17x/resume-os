@@ -1,11 +1,11 @@
 {
-  "name": "resume-os",
+  "name": "job-seeker-agent",
   "version": "0.3.0",
   "private": true,
   "scripts": {
-    "dev": "RESUME_OS_LOCAL_ONLY=1 next dev --hostname 127.0.0.1 -p 3001",
+    "dev": "JOB_SEEKER_AGENT_LOCAL_ONLY=1 next dev --hostname 127.0.0.1 -p 3001",
     "build": "next build",
-    "start": "RESUME_OS_LOCAL_ONLY=1 next start --hostname 127.0.0.1",
+    "start": "JOB_SEEKER_AGENT_LOCAL_ONLY=1 next start --hostname 127.0.0.1",
     "start:server": "next start --hostname 0.0.0.0",
     "test": "vitest run",
     "test:production-extraction": "next build && node scripts/smoke-document-extraction.mjs",

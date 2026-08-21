@@ -3,7 +3,7 @@ import createNextIntlPlugin from 'next-intl/plugin'
 
 const nextConfig: NextConfig = {
   typedRoutes: true,
-  devIndicators: process.env.RESUME_OS_E2E === '1' ? false : undefined,
+  devIndicators: (process.env.JOB_SEEKER_AGENT_E2E ?? process.env.RESUME_OS_E2E) === '1' ? false : undefined,
   allowedDevOrigins: ['127.0.0.1'],
   serverExternalPackages: ['@napi-rs/canvas', 'pdf-parse', 'mammoth'],
   outputFileTracingIncludes: {
