@@ -257,3 +257,7 @@ The app enforces a 3 MiB resume-file limit and a 4 MiB multipart limit, below Ve
 GitHub Pages cannot host the complete current repository because it does not execute Next.js route handlers. A separately adapted static build could expose local presentation, pasted-text parsing, Demo / Sandbox generation, and other supported Chrome tasks, but PDF/DOCX/TXT extraction and OpenAI-compatible calls would require a separately deployed API and corresponding same-origin/security changes.
 
 Run `pnpm test:production-extraction` to build JobSeeker Agent, copy the document function trace into an isolated sandbox, and verify real PDF and DOCX extraction both inside that trace and through the built API route.
+
+## License
+
+JobSeeker Agent is available under the [MIT License](LICENSE).
