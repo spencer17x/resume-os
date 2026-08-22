@@ -12,42 +12,148 @@ rules, user intent, and a complete action history.
 
 ## Primary workflow
 
-1. The user selects Start setup, uploads or pastes a trusted resume, and waits for the
-   structured resume analysis to finish.
-2. The Agent proposes resume-grounded target roles and skills. The user then confirms
-   titles, locations, salary, experience, education, workplace/employment type,
+1. The user selects Start setup and describes the work they want in natural language.
+   They may instead begin from selectable job-intent tags, or combine both methods.
+2. The user uploads or pastes a trusted resume and waits for the structured resume
+   analysis to finish. The Agent converts the prompt and resume-grounded suggestions
+   into a typed, reviewable intent proposal; neither source silently becomes a saved
+   search constraint.
+3. The user confirms the proposal through grouped selectable tags and bounded custom
+   values covering role family and specialty, industry or domain, titles, seniority,
+   skills, locations, salary, experience, education, workplace/employment type,
    industries, company preferences/blocks, company size/stage, posting age, and terms.
-3. The user confirms delegation rules: minimum match score, daily contact limit,
+   Unclear or conflicting intent remains a question until the user resolves it.
+4. The user confirms delegation rules: minimum match score, daily contact limit,
    automation level, and whether a verified recruiter resume request may send the
    job-specific PDF automatically. Only the final explicit Start enables execution.
-4. Model configuration and BOSS connection alone do not start the agent. Per-platform
+5. Model configuration and BOSS connection alone do not start the agent. Per-platform
    API configuration and platform selection are not part of the primary flow.
-5. After explicit activation, the local Browser Agent detects platform sessions already
+6. After explicit activation, the local Browser Agent detects platform sessions already
    available in Chrome and starts recurring discovery. A missing or expired session opens the relevant
    login page; login, QR code, SMS, 2FA, and CAPTCHA completion remain user actions.
    After the first successful login, the local browser session is reused without
    exporting cookies or credentials to JobSeeker Agent.
-6. The agent continuously discovers and deduplicates roles, explains its ranking,
+7. The agent continuously discovers and deduplicates roles, explains its ranking,
    and rejects roles outside hard constraints.
-7. For a selected role, the agent maps requirements to saved evidence, creates a
+8. For a selected role, the agent maps requirements to saved evidence, creates a
    job-specific resume variant, and prepares an evidence-grounded opening message.
-8. A conversation inbox groups recruiter messages, follow-ups, interview scheduling,
+9. A conversation inbox groups recruiter messages, follow-ups, interview scheduling,
    and negotiation by job. Each outbound action records its source, approval policy,
    final content, timestamp, and provider receipt when available.
-9. The user records or confirms outcomes. The agent improves targeting, timing, and
+10. The user records or confirms outcomes. The agent improves targeting, timing, and
    message strategy while keeping learned strategy separate from career facts.
-10. Interview rounds retain user-provided questions, answers, notes, and explicit
+11. Interview rounds retain user-provided questions, answers, notes, and explicit
    outcomes. The agent may generate review suggestions and an advisory pass estimate,
    but it never records pass/fail without the user's confirmation.
-11. A recruiter resume request selects only the application-linked job-specific
+12. A recruiter resume request selects only the application-linked job-specific
    variant. The browser generates a text-selectable PDF locally by default, with
    DOCX only as a verified compatibility fallback, and records `resume-sent` only
    after recipient, conversation, artifact fingerprint, filename, and platform
    attachment receipt all match.
-12. De-identified recruiter events create at most one fixed-template reply proposal.
+13. De-identified recruiter events create at most one fixed-template reply proposal.
     Waiting threads may create a follow-up after 72 hours, capped at two. Autopilot
     still requires immutable recipient/conversation re-verification and an exact
     platform message receipt; otherwise the proposal remains reviewable.
+
+## Job-intent understanding and selectable taxonomy
+
+Prompt-first and tag-first setup are equal, combinable entry paths. A user may provide
+only a natural-language prompt, only select tags, or use a prompt to obtain a proposal
+and then refine it with tags. The Agent must preserve the user's original prompt so the
+review surface can explain how every proposed constraint was derived.
+
+Natural-language understanding must produce a typed proposal rather than directly
+changing the active search profile. It may use the explicitly selected AI provider
+under the existing local/cloud boundary, but model output remains untrusted: it must be
+schema-validated, bounded, cancellable, and protected against stale input before being
+shown. Deterministic parsing may provide an immediate partial result, but exact keyword
+matching alone is not considered complete intent understanding. Ambiguous expressions
+such as `PM`, `remote`, or `Web3 role` must produce a clarification or visibly tentative
+tags instead of invented hard constraints.
+
+The product-owned taxonomy uses stable IDs and localized labels. Role and domain are
+orthogonal so, for example, a user can combine `Web3` with `frontend`, `backend`,
+`sales`, or `community` instead of treating Web3 as a job title. The initial taxonomy
+must group at least the following dimensions:
+
+- **Role family and specialty:** engineering (frontend, backend, full-stack, mobile,
+  QA, DevOps/SRE, security, data, AI/ML, blockchain), product, design, sales, business
+  development, customer success, marketing, growth, content/community, operations,
+  finance, legal, people/HR, and administrative work. Users can search the catalog and
+  add a bounded custom title or specialty when no supplied tag fits.
+- **Industry and domain:** Web3/crypto/blockchain, AI, fintech/payments, enterprise
+  software/SaaS, e-commerce, gaming, healthcare, education, consumer internet,
+  manufacturing, and bounded custom domains. A domain tag refines eligible companies
+  and postings without asserting that the user has experience in that domain.
+- **Level and qualifications:** internship/entry/mid/senior/lead/manager/executive,
+  years of experience, education, required skills, preferred skills, and explicitly
+  user-supplied language or sponsorship requirements.
+- **Location and workplace:** country, region, city, timezone, remote, hybrid, on-site,
+  acceptable remote geographies, relocation willingness, and commute radius when
+  applicable. `Remote` never silently means worldwide; an unknown hiring geography
+  remains an eligibility gap.
+- **Employment and schedule:** full-time, part-time, contract, freelance/temporary,
+  internship, shift, and schedule preferences.
+- **Compensation:** minimum and optional maximum compensation, currency, pay period,
+  and optional equity preference. Values with unknown currency or period require
+  confirmation before they become hard constraints.
+- **Company and freshness:** preferred and blocked companies, company size, financing
+  or growth stage, posting age, industries, and required/preferred/excluded terms.
+
+Each selected or proposed value must visibly distinguish `required`, `preferred`, and
+`excluded` intent where those meanings apply. Prompt-derived values remain proposals;
+an explicit tag selection, removal, or field edit takes precedence. If the user later
+edits the prompt, the Agent shows a diff and asks which changes to accept instead of
+overwriting prior selections. Resume-derived role and skill suggestions may broaden the
+review choices but may never override explicit user intent or become verified career
+evidence merely because they appear in the taxonomy.
+
+The canonical taxonomy is independent of any marketplace UI. Each reviewed platform
+adapter maps only the filters it actually supports. Unsupported preferences remain in
+the local profile for deterministic qualification and ranking; the product must not
+pretend that an unsupported platform filter was applied. Taxonomy changes are versioned
+and migrated without clearing saved profiles, and all tag groups support both locales,
+keyboard navigation, visible focus, and screen-reader labels.
+
+The initial grouping is informed by common public job-search patterns: [LinkedIn job
+search](https://www.linkedin.com/help/linkedin/answer/a8078917) exposes natural-language
+input plus suggested filters, while its [standard filter
+guide](https://www.linkedin.com/help/linkedin/answer/a507441) covers location, company,
+experience, and employment; [Indeed's public search
+guide](https://www.indeed.com/career-advice/finding-a-job/tips-on-how-to-get-better-search-results-on-indeed.com)
+covers salary, posting date, remote, location, employment, experience, education, skill,
+and schedule; [Wellfound](https://wellfound.com/jobs) separates role, industry/domain,
+location, salary, and remote preferences and provides a dedicated [Web3 domain
+view](https://wellfound.com/web3). These are reference dimensions, not authorization to
+scrape a marketplace or copy its private taxonomy. The maintained product catalog must
+be reviewed and versioned locally.
+
+Acceptance criteria:
+
+1. A prompt such as “Web3 frontend or full-stack, remote preferred, Shanghai hybrid is
+   acceptable, at least 35K monthly, 3-5 years, no outsourcing” produces a reviewable
+   proposal for domain, role specialties, workplace preferences, location, minimum
+   salary, experience, and an excluded term without starting discovery.
+2. A user can create the equivalent saved intent using tags and bounded custom values
+   without entering a prompt.
+3. Terms the user did not state and the resume does not support remain unset or become
+   questions. The UI shows the source and confidence or tentative state of every
+   inferred value before confirmation.
+4. Conflicting prompt, resume, and tag values are shown together for resolution; an
+   explicit user selection wins, and no background refresh changes the saved intent.
+5. Search, messaging, and resume preparation remain disabled until the typed intent and
+   delegation policy pass deterministic validation and the user selects the final Start.
+6. Provider cancellation, invalid structured output, and stale prompt/resume results do
+   not mutate the saved profile. Tests cover Chinese and English prompts, tag-only setup,
+   ambiguous terms, conflicts, custom values, migration, keyboard access, and both hard
+   and soft constraint behavior.
+
+Current implementation status as of 2026-08-22: prompt capture exists, but its parser
+uses a small fixed title/city/keyword catalog and regular expressions, so it does not
+provide complete semantic understanding, clarification, provenance, or conflict
+resolution. The setup UI provides selectable workplace and employment types plus a
+posting-age selector, while most other dimensions are comma-separated text fields; it
+does not yet provide the grouped role/domain/location/company taxonomy required above.
 
 ## Job workspace information architecture
 
